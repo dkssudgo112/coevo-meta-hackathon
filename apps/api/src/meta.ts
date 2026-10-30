@@ -437,6 +437,8 @@ export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: s
     console.log(JSON.stringify({ event: 'sam_output', phrase, boxes: boxes.length, boxesOutsideCommentary: parseSamBoxes(out.finalText).length, lanes: out.lanes, head: out.text.slice(0, 160).replace(/data=[^|]*/g, 'data=…') }));
     return { boxes, costUsd: SAM_USD, latencyMs: Date.now() - started };
   } catch (e) {
+    // Status and error code only (no image, prompt or key), so provider outages are visible.
+    console.error(JSON.stringify({ event: 'sam_failed', phrase, status: e instanceof MetaError ? e.status : null, code: e instanceof MetaError ? e.code ?? null : null, name: e instanceof Error ? e.name : 'unknown' }));
     if (unbilled(e)) await spend.settle(ticket, 0);
     throw e;
   }
