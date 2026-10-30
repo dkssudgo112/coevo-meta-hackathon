@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateImage, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, type MetaEnv, type Spender } from '../src/meta.ts';
+import { CostUnverifiable, generateImage, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, type MetaEnv, type Spender } from '../src/meta.ts';
+import { sparkMaxCost } from '../../../packages/core/src/budget.ts';
 import { readingTask } from '../../../packages/core/src/prompts.ts';
 
 const env: MetaEnv = { MODEL_API_KEY: 'test-key', COEVO_ALLOW_LIVE_CALLS: 'true', META_API_BASE_URL: 'https://api.meta.ai/v1' };
@@ -22,6 +23,16 @@ function response(body: unknown, status = 200, headers: Record<string, string> =
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
 }
 
+/** Route the token-count endpoint to a fixed count; everything else to `gen`. */
+function withCount(gen: (url: string, init: RequestInit) => Promise<Response>, count = 2000) {
+  const calls: string[] = [];
+  const f = (async (url: string, init: RequestInit) => {
+    calls.push(url.endsWith('/responses/input_tokens') ? 'count' : 'gen');
+    return url.endsWith('/responses/input_tokens') ? response({ object: 'response.input_tokens', input_tokens: count }) : gen(url, init);
+  }) as unknown as typeof fetch;
+  return { f, calls };
+}
+
 const ok = (text: string) => response({ status: 'completed', output: [{ type: 'reasoning', summary: [] }, { type: 'message', content: [{ type: 'output_text', text }] }], usage: { input_tokens: 2000, output_tokens: 300, input_tokens_details: { cached_tokens: 0 } } });
 
 test('live calls off: nothing is sent', async () => {
@@ -37,8 +48,9 @@ test('contributor model variants are refused', () => {
 test('runTask sends strict json_schema, store:false, and settles real cost', async () => {
   const l = ledger();
   let sent: Record<string, unknown> = {};
-  const f = (async (_url: string, init: RequestInit) => { sent = JSON.parse(init.body as string); return ok(JSON.stringify(reading)); }) as unknown as typeof fetch;
+  const { f, calls } = withCount(async (_url, init) => { sent = JSON.parse(init.body as string); return ok(JSON.stringify(reading)); });
   const r = await runTask(env, l.spender, readingTask, { text: 'Read', images: ['data:image/jpeg;base64,AAAA'] }, f);
+  assert.deepEqual(calls, ['count', 'gen'], 'input tokens are counted before the generation is sent');
   assert.equal(r.value.userRequest, 'more premium');
   assert.equal(sent.store, false);
   assert.equal((sent.text as { format: { type: string; strict: boolean } }).format.type, 'json_schema');
@@ -50,7 +62,7 @@ test('runTask sends strict json_schema, store:false, and settles real cost', asy
 
 test('429 honors Retry-After then succeeds', async () => {
   let n = 0;
-  const f = (async () => { n++; return n === 1 ? response({ error: { message: 'slow down', type: 'rate_limit_error', code: 'rate_limit_exceeded' } }, 429, { 'retry-after': '0.01' }) : ok(JSON.stringify(reading)); }) as unknown as typeof fetch;
+  const { f } = withCount(async () => { n++; return n === 1 ? response({ error: { message: 'slow down', type: 'rate_limit_error', code: 'rate_limit_exceeded' } }, 429, { 'retry-after': '0.01' }) : ok(JSON.stringify(reading)); });
   await runTask(env, ledger().spender, readingTask, { text: 'x' }, f);
   assert.equal(n, 2);
 });
@@ -58,7 +70,7 @@ test('429 honors Retry-After then succeeds', async () => {
 test('documented unbilled rejections refund; 500/504 are not retried and keep the reservation', async () => {
   for (const [status, refunded] of [[400, true], [402, true], [429, true], [503, true], [500, false], [504, false]] as const) {
     let calls = 0;
-    const g = (async () => { calls++; return response({ error: { message: 'no', type: 'x', code: null } }, status, status === 429 || status === 503 ? { 'retry-after': '0' } : {}); }) as unknown as typeof fetch;
+    const { f: g } = withCount(async () => { calls++; return response({ error: { message: 'no', type: 'x', code: null } }, status, status === 429 || status === 503 ? { 'retry-after': '0' } : {}); });
     const l = ledger();
     await assert.rejects(runTask(env, l.spender, readingTask, { text: 'x' }, g), (e: unknown) => e instanceof MetaError && e.status === status);
     assert.equal(calls, status === 429 || status === 503 ? 3 : 1, `attempts for ${status}`);
@@ -69,11 +81,10 @@ test('documented unbilled rejections refund; 500/504 are not retried and keep th
 test('lost responses keep the reservation: timeout after acceptance and malformed body', async () => {
   const timeout = (async () => { throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); }) as unknown as typeof fetch;
   const l1 = ledger();
-  await assert.rejects(runTask(env, l1.spender, readingTask, { text: 'x' }, timeout));
+  await assert.rejects(runTask(env, l1.spender, readingTask, { text: 'x' }, withCount(async () => timeout('', {})).f));
   assert.ok(l1.total() > 0, 'a request the provider may have completed stays charged');
-  const malformed = (async () => new Response('{not json', { status: 200 })) as unknown as typeof fetch;
   const l2 = ledger();
-  await assert.rejects(runTask(env, l2.spender, readingTask, { text: 'x' }, malformed));
+  await assert.rejects(runTask(env, l2.spender, readingTask, { text: 'x' }, withCount(async () => new Response('{not json', { status: 200 })).f));
   assert.ok(l2.total() > 0);
   const img = ledger();
   await assert.rejects(generateImage(env, img.spender, 'p', '1024x1536', timeout));
@@ -83,7 +94,7 @@ test('lost responses keep the reservation: timeout after acceptance and malforme
 test('Retry-After is honored in full: long waits surface RetryLater instead of a shortened retry', async () => {
   let calls = 0;
   const started = Date.now();
-  const f = (async () => { calls++; return response({ error: { message: 'busy', type: 'server_error', code: 'service_overloaded' } }, 503, { 'retry-after': '60' }); }) as unknown as typeof fetch;
+  const { f } = withCount(async () => { calls++; return response({ error: { message: 'busy', type: 'server_error', code: 'service_overloaded' } }, 503, { 'retry-after': '60' }); });
   const l = ledger();
   await assert.rejects(runTask(env, l.spender, readingTask, { text: 'x' }, f), (e: unknown) => e instanceof RetryLater && e.waitSeconds === 60);
   assert.equal(calls, 1, 'no early retry');
@@ -98,9 +109,10 @@ test('Retry-After is honored in full: long waits surface RetryLater instead of a
 
 test('invalid model output is retried once, then rejected', async () => {
   let n = 0;
-  const f = (async () => { n++; return ok('{"legible": "yes"}'); }) as unknown as typeof fetch;
+  const { f, calls } = withCount(async () => { n++; return ok('{"legible": "yes"}'); });
   await assert.rejects(runTask(env, ledger().spender, readingTask, { text: 'x' }, f), /Invalid screen_reading output/);
   assert.equal(n, 2);
+  assert.deepEqual(calls, ['count', 'gen', 'count', 'gen'], 'the second attempt is counted and reserved again');
 });
 
 test('refusals and commentary are handled when extracting text', () => {
@@ -141,4 +153,41 @@ test('image generation returns bytes and bills $0.01', async () => {
   const r = await generateImage(env, l.spender, 'a poster', '1024x1536', f);
   assert.equal(new TextDecoder().decode(r.bytes), 'png-bytes');
   assert.ok(Math.abs(l.total() - 0.01) < 1e-9);
+});
+
+test('reservation is the exact maximum from the counted input tokens', async () => {
+  const reserves: number[] = [];
+  const spender: Spender = { async reserve(usd) { reserves.push(usd); return `t:${usd}`; }, async settle() {} };
+  const { f } = withCount(async () => ok(JSON.stringify(reading)), 3000);
+  await runTask(env, spender, readingTask, { text: 'x' }, f);
+  const maxOut = readingTask.maxOutputTokens + 1500;
+  assert.ok(Math.abs(reserves[0] - sparkMaxCost(Math.ceil(3000 * INPUT_COUNT_MARGIN) + INPUT_COUNT_PAD, maxOut)) < 1e-12);
+});
+
+test('cost that cannot be verified is refused before any generation is sent', async () => {
+  for (const countFails of [() => response({ error: { message: 'bad', type: 'invalid_request_error', code: null } }, 400), () => response({ object: 'response.input_tokens' }), () => { throw new TypeError('fetch failed'); }]) {
+    let generated = false;
+    const f = (async (url: string) => { if (url.endsWith('/input_tokens')) return countFails(); generated = true; return ok(JSON.stringify(reading)); }) as unknown as typeof fetch;
+    const l = ledger();
+    await assert.rejects(runTask(env, l.spender, readingTask, { text: 'x' }, f), CostUnverifiable);
+    assert.equal(generated, false);
+    assert.equal(l.total(), 0, 'nothing was reserved');
+  }
+});
+
+test('missing or partial usage keeps the full reservation (never shrinks to a guess)', async () => {
+  for (const usage of [undefined, { input_tokens: 10 }, { output_tokens: 10 }]) {
+    const l = ledger();
+    const { f } = withCount(async () => response({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(reading) }] }], ...(usage ? { usage } : {}) }));
+    await runTask(env, l.spender, readingTask, { text: 'x' }, f);
+    const max = sparkMaxCost(Math.ceil(2000 * INPUT_COUNT_MARGIN) + INPUT_COUNT_PAD, readingTask.maxOutputTokens + 1500);
+    assert.ok(Math.abs(l.total() - max) < 1e-12, `usage ${JSON.stringify(usage)}`);
+  }
+});
+
+test('transcription without a reported duration keeps the rounded-up reservation', async () => {
+  const l = ledger();
+  const f = (async () => response({ transcript: 'hi' })) as unknown as typeof fetch;
+  await transcribe(env, l.spender, new Uint8Array(100), 4.2, [], f);
+  assert.ok(Math.abs(l.total() - (5 / 3600) * 0.18) < 1e-12);
 });

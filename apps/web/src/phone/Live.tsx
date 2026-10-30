@@ -3,7 +3,7 @@ import type { ContentItem, Moment, Session, SkillDimension, Snapshot } from '../
 import { post, postBinary, api, type Creds } from '../lib/api.ts';
 import type { ConnState } from '../lib/store.ts';
 import { vibrate } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, momentLine, sessionMoments, type FlagState } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, modelSourceLine, momentLine, sessionMoments, type FlagState } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
 import { PracticeRange } from './Practice.tsx';
@@ -76,8 +76,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
         </div>
       )}
       <main>
-        {state.workspace.testFakeModels && <div className="notice warn" role="status"><strong>Test mode:</strong> a scripted fake model is answering. Nothing here is real model output.</div>}
-        {!state.workspace.liveCalls && <div className="notice warn" role="status">Live model calls are off on this server. The Caddie cannot read your screen until they are turned on. Nothing here is simulated.</div>}
+        {(state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}
         <NowCard creds={creds} state={state} session={session} moments={moments} asking={asking} resolvedBy={resolvedBy} pulse={pulse} onOpen={id => setSheet({ kind: 'content', id })} act={act} />
         {err && <p className="faint" role="alert">{err}</p>}
         <Flow state={state} session={session} moments={moments} onOpen={id => setSheet({ kind: 'content', id })} />
@@ -100,7 +99,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
               <h3>Past sessions</h3>
               {[...state.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).map(s => (
                 <button key={s.id} className="btn" style={{ justifyContent: 'space-between' }} onClick={() => { setDrawer(false); setSheet({ kind: 'session', id: s.id }); }}>
-                  <span>{s.task ?? 'Session'}{s.fixture ? ' · sample' : ''}</span><span className="faint">{new Date(s.startedAt).toLocaleDateString()} {clock(s.startedAt)}</span>
+                  <span>{s.task ?? 'Session'}{s.fixture ? ' · sample' : ''}</span><span className="faint">{new Date(s.startedAt).toLocaleDateString('en-US')} {clock(s.startedAt)}</span>
                 </button>
               ))}
               {!state.sessions.length && <Empty>No sessions yet.</Empty>}
@@ -323,7 +322,7 @@ function SessionSummary({ creds, state, sessionId, onOpen }: { creds: Creds; sta
   const ms = sessionMoments(state, s.id);
   return (
     <div className="stack">
-      <p className="faint">{s.tool ?? 'Unknown tool'} · {new Date(s.startedAt).toLocaleString()}{s.fixture ? ' · sample data' : ''}</p>
+      <p className="faint">{s.tool ?? 'Unknown tool'} · {new Date(s.startedAt).toLocaleString('en-US')}{s.fixture ? ' · sample data' : ''}</p>
       {ms.map(m => <div key={m.id} className={`flow-item ${m.misread ? 'misread' : ''}`}><time>{clock(m.at)}</time><span>{momentLine(m).text} {m.change && <AssistLabel value={m.change.assistance} />}</span></div>)}
       {state.content.filter(c => c.sessionId === s.id).sort(byFormat).map(c => <button key={c.id} className="btn" onClick={() => onOpen(c.id)}>{FORMAT_NAME[c.format]} · {c.status}</button>)}
       {s.status === 'ended' && s.wrapStatus !== 'planned' && <button className="btn" onClick={() => post(creds, `/sessions/${s.id}/wrap`)}>Wrap up this session</button>}

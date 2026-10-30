@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Assistance, Moment, Snapshot } from '../../../../packages/contracts/index.ts';
 import type { Creds } from '../lib/api.ts';
 import { useMedia } from '../lib/media.ts';
@@ -31,7 +31,7 @@ export function FixtureTag() {
 
 export function clock(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
 export function ago(iso: string): string {
@@ -89,4 +89,25 @@ export function changeText(m: Moment): string {
 
 export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong.';
+}
+
+export interface HealthInfo { liveCallsEnabled: boolean; testFakeModels: boolean }
+
+/** Server mode, so copy never claims live model output when it isn't. */
+export function useHealth(): HealthInfo | null {
+  const [h, setH] = useState<HealthInfo | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch('/api/health').then(r => r.json()).then(d => { if (live) setH({ liveCallsEnabled: Boolean(d.liveCallsEnabled), testFakeModels: Boolean(d.testFakeModels) }); }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+  return h;
+}
+
+/** One honest sentence about who produces the Caddie's words right now. */
+export function modelSourceLine(h: HealthInfo | null): string {
+  if (!h) return 'The Caddie’s readings and replies come from Meta models when live calls are on.';
+  if (h.testFakeModels) return 'Test build: a scripted fake model answers. Nothing is real model output.';
+  if (!h.liveCallsEnabled) return 'Live model calls are off on this server right now, so the Caddie cannot respond. Nothing is simulated.';
+  return 'The Caddie’s readings and replies are live Meta model output.';
 }

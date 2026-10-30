@@ -106,7 +106,7 @@ s2.forEach((_, i) => {
   frames.push({ file, session: 2, caption: 'A week later, with the Caddie card in the AI’s memory: the AI asks first.' });
 });
 writeFileSync(new URL('manifest.json', out), JSON.stringify({
-  note: 'Synthetic sample screens (fixture). The AI chat is a generic mock-up, not a real product. The Caddie’s readings and replies are live Meta model output.',
+  note: 'Synthetic sample screens (fixture). The AI chat is a generic mock-up, not a real product.',
   frames,
 }, null, 2));
 console.log(`Wrote ${frames.length} sample screens to apps/web/public/samples/`);

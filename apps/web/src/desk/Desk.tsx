@@ -4,7 +4,7 @@ import type { InboxItem, Moment, Snapshot } from '../../../../packages/contracts
 import { api, createWorkspace, loadCreds, pairLink, post, saveCreds, type Creds } from '../lib/api.ts';
 import { useWorkspace } from '../lib/store.ts';
 import { FrameSampler, FULL, uploadFrame } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, sessionMoments } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, modelSourceLine, sessionMoments } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME } from '../ui/Players.tsx';
 import { Habits } from '../phone/Live.tsx';
 
@@ -57,11 +57,10 @@ function DeskWorkspace({ creds, pair, setPair, onReset }: { creds: Creds; pair: 
     <div className="desk">
       <header className="desk-top">
         <Flag state={state.workspace.paired ? 'watching' : 'off'} />
-        <div className="grow"><h2>Coevo Desk</h2><p className="faint">{state.workspace.paired ? 'Phone connected' : 'Waiting for your phone'} · {conn === 'live' ? 'live' : 'reconnecting…'} · model calls {state.workspace.liveCalls ? 'on' : 'off'}</p></div>
+        <div className="grow"><h2>Coevo Desk</h2><p className="faint">{state.workspace.paired ? 'Phone connected' : 'Waiting for your phone'} · {conn === 'live' ? 'live' : 'reconnecting…'} · {state.workspace.testFakeModels ? 'fake test model' : `live model calls ${state.workspace.liveCalls ? 'on' : 'off'}`}</p></div>
         <span className="faint">Spent today ${state.workspace.budget.spentUsd.toFixed(3)} / ${state.workspace.budget.capUsd.toFixed(2)}</span>
       </header>
-      {state.workspace.testFakeModels && <div className="notice warn" role="status"><strong>Test mode:</strong> a scripted fake model is answering. Nothing here is real model output.</div>}
-      {!state.workspace.liveCalls && <div className="notice warn" role="status">Live model calls are off on this server, so the Caddie cannot read screens yet. Nothing is simulated.</div>}
+      {(state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}
       {notices.map((n, i) => <div key={i} className="notice warn" role="status">{n}</div>)}
       <div className="desk-grid">
         <main className="stack-lg">
@@ -70,7 +69,7 @@ function DeskWorkspace({ creds, pair, setPair, onReset }: { creds: Creds; pair: 
             <div className="row wrap">
               <label className="faint" htmlFor="session-pick">Session</label>
               <select id="session-pick" value={session?.id ?? ''} onChange={e => setSelected(e.target.value)} style={{ minHeight: 40, borderRadius: 10, padding: '0 10px', border: '1px solid var(--line)', background: 'var(--surface)' }}>
-                {[...state.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).map(s => <option key={s.id} value={s.id}>{new Date(s.startedAt).toLocaleString()} · {s.task ?? 'session'}{s.fixture ? ' (sample)' : ''}</option>)}
+                {[...state.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).map(s => <option key={s.id} value={s.id}>{new Date(s.startedAt).toLocaleString('en-US')} · {s.task ?? 'session'}{s.fixture ? ' (sample)' : ''}</option>)}
               </select>
             </div>
           )}

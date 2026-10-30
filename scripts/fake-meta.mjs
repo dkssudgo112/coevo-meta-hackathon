@@ -100,6 +100,11 @@ createServer(async (req, res) => {
   const raw = Buffer.concat(chunks);
   const url = req.url ?? '';
   try {
+    if (req.method === 'POST' && url === '/v1/responses/input_tokens') {
+      const body = JSON.parse(raw.toString());
+      if (failNext.delete(`count-${body.text?.format?.name}`)) return send(res, 400, { error: { message: 'fake: injected count failure', type: 'invalid_request_error', code: null } });
+      return send(res, 200, { object: 'response.input_tokens', input_tokens: 1200 + Math.round(raw.length / 4) });
+    }
     if (req.method === 'POST' && url === '/v1/responses') {
       const body = JSON.parse(raw.toString());
       if (body.model === 'sam-3.1') return send(res, 200, message('<0f>0<|box;x1=128;y1=72;x2=1151;y2=647;w=1280;h=720;c=0.93|><|mask;x=0;y=0;data=2,2,!AA|>'));

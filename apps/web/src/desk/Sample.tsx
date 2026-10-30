@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createWorkspace, post, type Creds } from '../lib/api.ts';
 import { useWorkspace } from '../lib/store.ts';
 import { canvasJpeg, uploadFrame } from '../lib/capture.ts';
-import { errorText, Flag, latestSession, sessionMoments } from '../ui/common.tsx';
+import { errorText, Flag, latestSession, modelSourceLine, sessionMoments, useHealth } from '../ui/common.tsx';
 import { LiveScreen } from '../phone/Live.tsx';
 import { SessionReview } from './Desk.tsx';
 
@@ -29,6 +29,7 @@ function loadSample(): Creds | null {
 export function SampleApp() {
   const [creds, setCreds] = useState<Creds | null>(loadSample);
   const [err, setErr] = useState('');
+  const health = useHealth();
   const start = async () => {
     setErr('');
     try {
@@ -43,7 +44,7 @@ export function SampleApp() {
       <div className="landing">
         <div className="row"><Flag state="watching" /><span className="eyebrow">Sample session</span></div>
         <h1>Watch the Caddie work, without a phone</h1>
-        <p className="muted">You’ll replay a café owner’s screens while they make a poster with an AI. The screens are synthetic sample data. The Caddie’s reading of each screen and everything it says are produced live by Meta models when you press play.</p>
+        <p className="muted">You’ll replay a café owner’s screens while they make a poster with an AI. The screens are synthetic sample data. {modelSourceLine(health)}</p>
         <div className="row"><button className="btn primary" onClick={start}>Start the sample</button></div>
         {err && <p className="faint" role="alert">{err}</p>}
       </div>
@@ -137,11 +138,10 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
     <div className="desk">
       <header className="desk-top">
         <Flag state="watching" />
-        <div className="grow"><h2>Sample session</h2><p className="faint">{manifest?.note ?? 'Loading sample…'}</p></div>
+        <div className="grow"><h2>Sample session</h2><p className="faint">Synthetic sample screens (a generic AI chat mock-up, not a real product). {state ? modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels }) : ''}</p></div>
         <button className="btn small" onClick={onRestart}>New sample</button>
       </header>
-      {state?.workspace.testFakeModels && <div className="notice warn" role="status"><strong>Test mode:</strong> a scripted fake model is answering. Nothing here is real model output.</div>}
-      {state && !state.workspace.liveCalls && <div className="notice warn" role="status">Live model calls are off on this server, so the Caddie cannot read the sample screens right now. Nothing here is simulated.</div>}
+      {state && (state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}
       <div className="split">
         <section className="stack">
           <div className="row"><span className="eyebrow grow">Their screen · sample data</span><span className="faint">{manifest ? `${i + 1} / ${manifest.frames.length}` : ''}</span></div>

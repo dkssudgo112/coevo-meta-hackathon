@@ -3,7 +3,7 @@
 
 import type { ModelTask } from '../../../packages/core/src/prompts.ts';
 import { parseJsonText, ShapeError } from '../../../packages/core/src/schema.ts';
-import { PRICES, sparkCost, sparkReserve, transcribeCost } from '../../../packages/core/src/budget.ts';
+import { PRICES, sparkCost, sparkMaxCost, transcribeCost } from '../../../packages/core/src/budget.ts';
 
 export interface MetaEnv {
   MODEL_API_KEY?: string;
@@ -60,6 +60,11 @@ export class InvalidOutput extends Error {
   constructor(message: string) { super(message); this.name = 'InvalidOutput'; }
 }
 
+/** The input cost could not be verified with the token-count endpoint, so the call was not made. */
+export class CostUnverifiable extends Error {
+  constructor(message: string) { super(message); this.name = 'CostUnverifiable'; }
+}
+
 /** The provider asked us to wait longer than we can block for. Surface "try later". */
 export class RetryLater extends Error {
   readonly waitSeconds: number;
@@ -73,7 +78,7 @@ export class RetryLater extends Error {
  * so their reservation is kept.
  */
 export function unbilled(e: unknown): boolean {
-  if (e instanceof LiveCallsDisabled || e instanceof BudgetExceeded || e instanceof RetryLater) return true;
+  if (e instanceof LiveCallsDisabled || e instanceof BudgetExceeded || e instanceof RetryLater || e instanceof CostUnverifiable) return true;
   if (e instanceof MetaError) return (e.status >= 400 && e.status < 500) || e.status === 503;
   return false;
 }
@@ -176,25 +181,54 @@ export interface TaskInput { text: string; images?: string[] }
 
 export interface TaskResult<T> { value: T; costUsd: number; model: string; latencyMs: number }
 
-/** Run a structured Spark task. One extra attempt only when the output fails validation. */
+/** Safety margin on top of the provider's input-token count (documented for context checks, not billing). */
+export const INPUT_COUNT_MARGIN = 1.1;
+export const INPUT_COUNT_PAD = 64;
+
+/**
+ * Count input tokens with the documented endpoint (tokenizes only; records no
+ * generation usage). Any failure means the cost is unverifiable and the
+ * generation must not be sent.
+ */
+export async function countInputTokens(env: MetaEnv, body: Record<string, unknown>, f: Fetch = fetch): Promise<number> {
+  let data: { input_tokens?: unknown };
+  try {
+    data = (await post(env, '/responses/input_tokens', JSON.stringify(body), { 'Content-Type': 'application/json' }, f, 20_000)) as { input_tokens?: unknown };
+  } catch (e) {
+    if (e instanceof LiveCallsDisabled) throw e;
+    throw new CostUnverifiable(`Input tokens could not be counted (${e instanceof MetaError ? e.status : (e as Error).name}).`);
+  }
+  const n = data.input_tokens;
+  if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) throw new CostUnverifiable('The token count response had no usable input_tokens.');
+  return n;
+}
+
+/**
+ * Run a structured Spark task. Before EVERY attempt: count input tokens, then
+ * reserve the exact maximum (counted input × margin + max output incl. reasoning)
+ * in the lifetime ledger. Settle to real usage only when usage is reported in
+ * full; otherwise the maximum stays charged. One extra attempt only when the
+ * output fails validation (that attempt is counted and reserved again).
+ */
 export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T>, input: TaskInput, f: Fetch = fetch): Promise<TaskResult<T>> {
   if (!liveEnabled(env)) throw new LiveCallsDisabled();
   const m = models(env).text;
   const maxOut = task.maxOutputTokens + HEADROOM[task.effort];
   const content: unknown[] = [{ type: 'input_text', text: input.text }];
   for (const url of input.images ?? []) content.push({ type: 'input_image', image_url: url, detail: 'high' });
-  const body = JSON.stringify({
+  const shared = {
     model: m,
     instructions: task.instructions,
     input: [{ type: 'message', role: 'user', content }],
     text: { format: { type: 'json_schema', name: task.name, schema: task.schema, strict: true } },
     reasoning: { effort: task.effort },
-    max_output_tokens: maxOut,
-    store: false,
-  });
+  };
+  const body = JSON.stringify({ ...shared, max_output_tokens: maxOut, store: false });
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const ticket = await spend.reserve(sparkReserve(input.images?.length ?? 0, maxOut, Math.ceil(input.text.length / 3) + 1500), task.name);
+    const counted = await countInputTokens(env, shared, f);
+    const maxCost = sparkMaxCost(Math.ceil(counted * INPUT_COUNT_MARGIN) + INPUT_COUNT_PAD, maxOut);
+    const ticket = await spend.reserve(maxCost, task.name);
     const started = Date.now();
     let raw: ResponsesOutput;
     try {
@@ -204,8 +238,10 @@ export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T
       if (unbilled(e)) await spend.settle(ticket, 0);
       throw e;
     }
-    const usage = raw.usage ?? {};
-    const cost = sparkCost({ input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cached_tokens: usage.input_tokens_details?.cached_tokens });
+    const usage = raw.usage;
+    const complete = typeof usage?.input_tokens === 'number' && typeof usage?.output_tokens === 'number';
+    // Missing or partial usage never turns an accepted call into a smaller charge.
+    const cost = complete ? sparkCost({ input_tokens: usage!.input_tokens, output_tokens: usage!.output_tokens, cached_tokens: usage!.input_tokens_details?.cached_tokens }) : maxCost;
     await spend.settle(ticket, cost);
     try {
       if (raw.status === 'incomplete') throw new InvalidOutput(`Incomplete output (${raw.incomplete_details?.reason ?? 'unknown'})`);
@@ -247,8 +283,10 @@ export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, 
   fd.append('audio', new Blob([wav], { type: 'audio/wav' }), 'answer.wav');
   try {
     const data = (await post(env, '/asr/transcribe', fd, {}, f, 60_000)) as { transcript?: string; audioDurationMs?: number };
-    const durationMs = data.audioDurationMs ?? durationSec * 1000;
-    const cost = transcribeCost(Math.floor(durationMs / 1000));
+    const reported = typeof data.audioDurationMs === 'number' && Number.isFinite(data.audioDurationMs);
+    const durationMs = reported ? data.audioDurationMs! : durationSec * 1000;
+    // Without a reported duration the reservation (rounded-up WAV length) stays charged.
+    const cost = reported ? Math.min(estimate, transcribeCost(Math.floor(durationMs / 1000))) : estimate;
     await spend.settle(ticket, cost);
     return { transcript: (data.transcript ?? '').trim(), durationMs, costUsd: cost };
   } catch (e) {
@@ -284,7 +322,8 @@ export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: s
       metadata: { mask_encoding: 'one_bit', include_confidence: 'true' },
       store: false,
     }), { 'Content-Type': 'application/json' }, f, 30_000)) as ResponsesOutput;
-    await spend.settle(ticket, PRICES.samPerImage * (raw.usage?.images_processed ?? 1));
+    const processed = raw.usage?.images_processed;
+    await spend.settle(ticket, typeof processed === 'number' && processed >= 1 ? PRICES.samPerImage * processed : PRICES.samPerImage);
     return { boxes: parseSamBoxes(outputText(raw)), costUsd: PRICES.samPerImage, latencyMs: Date.now() - started };
   } catch (e) {
     if (unbilled(e)) await spend.settle(ticket, 0);

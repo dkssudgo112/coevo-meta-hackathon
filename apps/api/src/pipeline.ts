@@ -4,7 +4,7 @@ import type { CaddieCard, Decision, Moment, Reading, Session, SkillObservation }
 import { applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
 import { dimensionFor, observeChange, presentIngredients, strengthFor } from '../../../packages/core/src/labels.ts';
 import { decisionTask, readingTask, type DecisionInput } from '../../../packages/core/src/prompts.ts';
-import { BudgetExceeded, InvalidOutput, LiveCallsDisabled, MetaError, modelProvenance, RetryLater, runTask, type Spender } from './meta.ts';
+import { BudgetExceeded, CostUnverifiable, InvalidOutput, LiveCallsDisabled, MetaError, modelProvenance, RetryLater, runTask, type Spender } from './meta.ts';
 import type { Env } from './env.ts';
 import type { Store } from './store.ts';
 import { id, now } from './util.ts';
@@ -13,7 +13,10 @@ export interface Ctx {
   env: Env;
   wsId: string;
   store: Store;
+  /** Meta Model API budget (lifetime authority). */
   spender: Spender;
+  /** Modal media budget (separate free balance). */
+  mediaSpender: Spender;
   r2: R2Bucket;
   memory: () => Promise<string[]>;
   remember: (fact: string) => Promise<void>;
@@ -24,7 +27,8 @@ export interface Ctx {
 
 export function failureStatus(e: unknown): { status: Moment['readingStatus']; message: string } {
   if (e instanceof LiveCallsDisabled) return { status: 'disabled', message: 'Live model calls are off on this server, so the Caddie cannot read the screen yet.' };
-  if (e instanceof BudgetExceeded) return { status: 'budget', message: 'The daily model budget is used up. The Caddie will stay quiet until it resets.' };
+  if (e instanceof BudgetExceeded) return { status: 'budget', message: e.scope === 'workspace' ? 'This workspace reached its spending limit for today. The Caddie will stay quiet.' : 'The project’s model budget is used up. The Caddie will stay quiet.' };
+  if (e instanceof CostUnverifiable) return { status: 'error', message: 'The Caddie could not verify what this call would cost, so it did not make it.' };
   if (e instanceof RetryLater) return { status: 'error', message: `The model service is busy and asked to wait ${Math.ceil(e.waitSeconds)} s. The Caddie will look again on the next change.` };
   if (e instanceof MetaError) return { status: 'error', message: e.status === 402 ? 'Model billing is not available.' : `The model service returned ${e.status}.` };
   if (e instanceof InvalidOutput) return { status: 'error', message: 'The model reply could not be used.' };

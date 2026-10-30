@@ -1,41 +1,50 @@
 import { DurableObject } from 'cloudflare:workers';
-import { lifetimeCap } from '../../../packages/core/src/budget.ts';
+import { emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, modalCap, type Ledger } from '../../../packages/core/src/budget.ts';
 import type { Env } from './env.ts';
 
-interface Ledger { spentUsd: number; calls: number; since: string }
+export type LedgerScope = 'meta' | 'modal' | 'fake';
 
 /**
- * The single spend authority for paid calls in this deployment. It keeps a
- * lifetime ledger that is never reset by day, deployment, workspace or script.
- * Local runtimes have their own storage, so paid calls are only enabled on the
- * deployed Worker; fake-model test runs use a separately named ledger.
+ * Spend authority for one scope ("global" = Meta, "modal", or the isolated
+ * fake-test ledger). Each object keeps a lifetime ledger that day rollover,
+ * restarts, deployments, workspaces and scripts can never reset. Durable
+ * Object input gates make each reserve (read → check → write) atomic.
+ * Paid calls are enabled only on the deployed Worker, so this deployment's
+ * objects are the single authority. This is an application-enforced budget,
+ * not a provider billing cap.
  */
 export class Budget extends DurableObject<Env> {
   private async ledger(): Promise<Ledger> {
-    return (await this.ctx.storage.get<Ledger>('lifetime')) ?? { spentUsd: 0, calls: 0, since: new Date().toISOString() };
+    return (await this.ctx.storage.get<Ledger>('lifetime')) ?? emptyLedger(new Date().toISOString());
   }
 
-  private cap(): number {
-    return lifetimeCap(this.env.COEVO_LIFETIME_CAP_USD);
+  private cap(scope: LedgerScope): number {
+    return scope === 'modal' ? modalCap(this.env.COEVO_MODAL_CAP_USD) : lifetimeCap(this.env.COEVO_LIFETIME_CAP_USD);
   }
 
-  async reserve(usd: number): Promise<boolean> {
-    const l = await this.ledger();
-    if (l.spentUsd + usd > this.cap() + 1e-9) return false;
-    await this.ctx.storage.put('lifetime', { ...l, spentUsd: l.spentUsd + usd, calls: l.calls + 1 });
-    return true;
+  /** A ledger object serves exactly one scope for its whole life. */
+  private async checkScope(scope: LedgerScope): Promise<boolean> {
+    const stored = await this.ctx.storage.get<LedgerScope>('scope');
+    if (!stored) { await this.ctx.storage.put('scope', scope); return true; }
+    return stored === scope;
+  }
+
+  async reserve(usd: number, scope: LedgerScope = 'meta'): Promise<boolean> {
+    if (!(await this.checkScope(scope))) return false;
+    const r = ledgerReserve(await this.ledger(), usd, this.cap(scope));
+    if (r.ok) await this.ctx.storage.put('lifetime', r.ledger);
+    return r.ok;
   }
 
   /** Replace a reservation with the actual amount (delta may be negative, never below zero). */
   async adjust(deltaUsd: number): Promise<void> {
-    const l = await this.ledger();
-    await this.ctx.storage.put('lifetime', { ...l, spentUsd: Math.max(0, l.spentUsd + deltaUsd) });
+    await this.ctx.storage.put('lifetime', ledgerAdjust(await this.ledger(), deltaUsd));
   }
 
   /** Reserve spend made outside the app (e.g. a Modal probe) before it runs, with an audit label. */
-  async reserveExternal(usd: number, label: string): Promise<boolean> {
+  async reserveExternal(usd: number, label: string, scope: LedgerScope): Promise<boolean> {
     if (!(usd > 0 && usd <= 1)) return false;
-    if (!(await this.reserve(usd))) return false;
+    if (!(await this.reserve(usd, scope))) return false;
     const log = (await this.ctx.storage.get<{ at: string; usd: number; label: string }[]>('external')) ?? [];
     await this.ctx.storage.put('external', [...log, { at: new Date().toISOString(), usd, label: label.slice(0, 80) }].slice(-200));
     return true;
@@ -45,9 +54,9 @@ export class Budget extends DurableObject<Env> {
     return (await this.ctx.storage.get<{ at: string; usd: number; label: string }[]>('external')) ?? [];
   }
 
-  async status(): Promise<{ spentUsd: number; capUsd: number; scope: 'lifetime'; calls: number; since: string }> {
+  async status(scope: LedgerScope = 'meta'): Promise<{ spentUsd: number; capUsd: number; scope: 'lifetime'; ledger: LedgerScope; reservations: number; since: string }> {
     const l = await this.ledger();
-    return { spentUsd: Number(l.spentUsd.toFixed(4)), capUsd: this.cap(), scope: 'lifetime', calls: l.calls, since: l.since };
+    return { spentUsd: Number(l.spentUsd.toFixed(4)), capUsd: this.cap(scope), scope: 'lifetime', ledger: scope, reservations: l.reservations, since: l.since };
   }
 
   /** Allow at most `limit` workspace creations per key (hashed IP) per hour. */

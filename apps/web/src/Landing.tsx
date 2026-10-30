@@ -1,4 +1,4 @@
-import { Flag } from './ui/common.tsx';
+import { Flag, modelSourceLine, useHealth } from './ui/common.tsx';
 
 function onPhone(): boolean {
   try { return matchMedia('(pointer: coarse)').matches && innerWidth < 760; } catch { return false; }
@@ -6,6 +6,7 @@ function onPhone(): boolean {
 
 export function Landing() {
   const phone = onPhone();
+  const health = useHealth();
   const desk = (
     <div className="card choice" key="desk">
       <h3>On your computer</h3>
@@ -31,7 +32,7 @@ export function Landing() {
         {phone ? [caddie, desk] : [desk, caddie]}
         <div className="card choice">
           <h3>No phone handy?</h3>
-          <p className="muted">Replay a sample session. Screens are sample data; the Caddie’s responses are live Meta model output.</p>
+          <p className="muted">Replay a sample session. Screens are sample data. {modelSourceLine(health)}</p>
           <a className="btn" href="/sample">Try a sample session</a>
         </div>
       </div>

@@ -12,7 +12,7 @@ A café owner is making a poster for a new dessert with an AI. They type "make i
 
 > You've asked for "more premium" 4×. Who is this dessert for?
 
-They answer out loud — office workers near the station, 6,500 won, a calm morning feel — then type it in their own words. The poster finally changes. After the session the Caddie proposes a **Caddie card** for their AI: *Before making a poster, ask me who it's for, the price, one feeling, and whether I have a real photo.* A week later, in a new chat that starts with that card, the AI asks those questions first. The Caddie notices and stays quiet: *Your AI asked first.*
+They answer out loud — office workers near the station, 6,500 won, a calm morning feel — then type it in their own words. The poster finally changes. After the session the Caddie proposes a **Caddie card** for their AI: *Before making a poster, ask me who it's for, the price, one feeling, and whether I have a real photo.* They start a dedicated poster chat with that card as its first message and pin it. A week later, when they ask that chat for a new drink poster, the AI asks those questions first. (Meta AI did not carry the rule into other new chats in our check, so the Caddie recommends one pinned poster chat.) The Caddie notices and stays quiet: *Your AI asked first.*
 
 ## How it works
 

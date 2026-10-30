@@ -10,6 +10,7 @@ import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, sessionMoments, type Ctx } from './pipeline.ts';
 import { cardAction, generate, podcastAsk, practiceAttempt, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
 import { Store } from './store.ts';
+import type { LedgerScope } from './budget-do.ts';
 import type { Env } from './env.ts';
 import { bearer, bytesToDataUrl, error, id, imageSize, json, MAX_AUDIO_BYTES, MAX_FRAME_BYTES, now, secret, sha256 } from './util.ts';
 
@@ -27,9 +28,14 @@ interface Meta {
 
 interface Job { contentId: string; jobId: string; startedAt: number }
 
-/** Real paid calls and fake test runs never share a ledger. */
-export function ledgerName(env: Env): string {
-  return fakeMeta(env) ? 'fake-test-ledger' : 'global';
+/** Real paid calls and fake test runs never share a ledger; Meta and Modal are separate budgets. */
+export function ledgerName(env: Env, kind: 'meta' | 'modal' = 'meta'): string {
+  if (fakeMeta(env)) return kind === 'meta' ? 'fake-test-ledger' : 'fake-modal-ledger';
+  return kind === 'meta' ? 'global' : 'modal';
+}
+
+export function ledgerScope(env: Env, kind: 'meta' | 'modal' = 'meta'): LedgerScope {
+  return fakeMeta(env) ? 'fake' : kind;
 }
 
 const IDLE_END_MS = 10 * 60_000;
@@ -43,7 +49,7 @@ export class Workspace extends DurableObject<Env> {
   private meta: Meta | null = null;
   private queue: Promise<void> = Promise.resolve();
   private lastFrameAt = 0;
-  private reservations = new Map<string, number>();
+  private settled = new Set<string>();
   private encoder = new TextEncoder();
   private pinger: ReturnType<typeof setInterval> | null = null;
 
@@ -81,28 +87,34 @@ export class Workspace extends DurableObject<Env> {
     return this.meta?.kind === 'sample' ? CAPS.sampleWorkspaceUsd : CAPS.workspacePerDayUsd;
   }
 
-  private spender(): Spender {
+  /**
+   * Spender for one budget (Meta or Modal). Each reservation is charged to the
+   * lifetime authority BEFORE the call is dispatched. The reserved amount is
+   * encoded in the ticket so a restart between reserve and settle can never
+   * turn a charged call into a refund.
+   */
+  private spender(kind: 'meta' | 'modal' = 'meta'): Spender {
+    const authority = () => this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env, kind)));
     return {
       reserve: async (usd, label) => {
+        if (!(usd >= 0) || !Number.isFinite(usd)) throw new BudgetExceeded('invalid-estimate');
         const st = await this.budgetState();
-        // Sample workspaces have a lifetime cap, user workspaces a daily cap.
+        // Sample workspaces have a lifetime cap, user workspaces a daily cap (both inside the global lifetime cap).
         const left = this.meta?.kind === 'sample' ? Math.max(0, this.cap() - st.spentUsd) : remaining(st, this.cap(), Date.now());
         if (left < usd) throw new BudgetExceeded('workspace');
-        const global = this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env)));
-        if (!(await global.reserve(usd))) throw new BudgetExceeded('global');
+        if (!(await authority().reserve(usd, ledgerScope(this.env, kind)))) throw new BudgetExceeded(kind === 'meta' ? 'global' : 'modal');
         await this.ctx.storage.put('budget', this.meta?.kind === 'sample' ? { day: st.day, spentUsd: st.spentUsd + usd } : charge(st, usd, Date.now()));
-        const ticket = `${label}:${id('t')}`;
-        this.reservations.set(ticket, usd);
-        return ticket;
+        return `${kind}:${label}:${id('t')}:${usd}`;
       },
       settle: async (ticket, actual) => {
-        const reserved = this.reservations.get(ticket) ?? 0;
-        this.reservations.delete(ticket);
+        const reserved = Number(ticket.split(':').pop());
+        if (!Number.isFinite(reserved) || this.settled.has(ticket)) return;
+        this.settled.add(ticket);
         const delta = actual - reserved;
         if (Math.abs(delta) < 1e-9) return;
         const st = await this.budgetState();
         await this.ctx.storage.put('budget', { day: st.day, spentUsd: Math.max(0, st.spentUsd + delta) });
-        await this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env))).adjust(delta);
+        await authority().adjust(delta);
         this.broadcast({ type: 'workspace', workspace: await this.summary() });
       },
     };
@@ -113,7 +125,8 @@ export class Workspace extends DurableObject<Env> {
       env: this.env,
       wsId: this.meta!.id,
       store: this.store,
-      spender: this.spender(),
+      spender: this.spender('meta'),
+      mediaSpender: this.spender('modal'),
       r2: this.env.MEDIA,
       memory: async () => (await this.ctx.storage.get<string[]>('memory')) ?? [],
       remember: async fact => {

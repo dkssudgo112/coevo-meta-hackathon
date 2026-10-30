@@ -172,16 +172,16 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
 const MEDIA_JOB_USD = { podcast: 0.03, short: 0.02 } as const;
 
 async function startMedia(ctx: Ctx, contentId: string, job: Parameters<typeof startJob>[1]): Promise<void> {
-  const ticket = await ctx.spender.reserve(MEDIA_JOB_USD[job.kind], `media-${job.kind}`);
+  const ticket = await ctx.mediaSpender.reserve(MEDIA_JOB_USD[job.kind], `media-${job.kind}`);
   let jobId: string;
   try {
     jobId = await startJob(ctx.env, job);
   } catch (e) {
     // Refund only when the job was certainly not started (disabled or rejected).
-    if (e instanceof MediaUnavailable) await ctx.spender.settle(ticket, 0);
+    if (e instanceof MediaUnavailable) await ctx.mediaSpender.settle(ticket, 0);
     throw e;
   }
-  await ctx.spender.settle(ticket, MEDIA_JOB_USD[job.kind]);
+  await ctx.mediaSpender.settle(ticket, MEDIA_JOB_USD[job.kind]);
   await ctx.trackJob(contentId, jobId);
 }
 

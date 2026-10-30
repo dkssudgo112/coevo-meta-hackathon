@@ -12,17 +12,55 @@ export const PRICES = {
   mediaPerMinute: 0.01,
 } as const;
 
+/**
+ * The maintainer approved US$3.00 in total for all Meta Model API development and
+ * validation. The application stops at an operating ceiling of $2.50, keeping a
+ * $0.50 margin. This is an application-enforced budget, not a provider billing cap.
+ */
+export const META_ABSOLUTE_MAX_USD = 3.0;
+export const META_OPERATING_CEILING_USD = 2.5;
+/** Modal uses its own separately verified free balance ($1.00); stay below it. */
+export const MODAL_CEILING_USD = 0.9;
+
 export const CAPS = {
-  /** Lifetime ceiling for ALL paid calls (Meta + Modal), never reset. Overridable via COEVO_LIFETIME_CAP_USD. */
-  globalLifetimeUsd: 3.0,
+  globalLifetimeUsd: META_OPERATING_CEILING_USD,
   workspacePerDayUsd: 0.6,
   sampleWorkspaceUsd: 0.15,
 } as const;
 
-/** Parse the configured lifetime cap; falls back to the default and never exceeds it unless explicitly set. */
+/** Configuration may LOWER the Meta ceiling, never raise it above the approved operating ceiling. */
 export function lifetimeCap(configured: string | undefined): number {
   const n = Number(configured);
-  return Number.isFinite(n) && n > 0 ? n : CAPS.globalLifetimeUsd;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, META_OPERATING_CEILING_USD) : META_OPERATING_CEILING_USD;
+}
+
+export function modalCap(configured: string | undefined): number {
+  const n = Number(configured);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, MODAL_CEILING_USD) : MODAL_CEILING_USD;
+}
+
+/** Lifetime ledger. No date field on purpose: day rollover can never reset it. */
+export interface Ledger { spentUsd: number; reservations: number; since: string }
+
+export function emptyLedger(nowIso: string): Ledger {
+  return { spentUsd: 0, reservations: 0, since: nowIso };
+}
+
+/** Reserve if it fits under the cap; otherwise leave the ledger unchanged. */
+export function ledgerReserve(l: Ledger, usd: number, cap: number): { ok: boolean; ledger: Ledger } {
+  if (!(usd >= 0) || !Number.isFinite(usd)) return { ok: false, ledger: l };
+  if (l.spentUsd + usd > cap + 1e-9) return { ok: false, ledger: l };
+  return { ok: true, ledger: { ...l, spentUsd: l.spentUsd + usd, reservations: l.reservations + 1 } };
+}
+
+/** Settle a reservation to its actual amount. Never goes below zero. */
+export function ledgerAdjust(l: Ledger, deltaUsd: number): Ledger {
+  return { ...l, spentUsd: Math.max(0, l.spentUsd + deltaUsd) };
+}
+
+/** Exact maximum for one Spark attempt once input tokens are verified. */
+export function sparkMaxCost(verifiedInputTokens: number, maxOutputTokens: number): number {
+  return sparkCost({ input_tokens: verifiedInputTokens, output_tokens: maxOutputTokens });
 }
 
 export interface Usage { input_tokens?: number; output_tokens?: number; cached_tokens?: number }
@@ -33,10 +71,6 @@ export function sparkCost(u: Usage): number {
   return (input * PRICES.sparkInputPerM + cached * PRICES.sparkCachedPerM + (u.output_tokens ?? 0) * PRICES.sparkOutputPerM) / 1_000_000;
 }
 
-/** Conservative pre-call reservation for a Spark call. */
-export function sparkReserve(images: number, maxOutputTokens: number, textTokens = 3000): number {
-  return sparkCost({ input_tokens: textTokens + images * 1600, output_tokens: maxOutputTokens });
-}
 
 export function transcribeCost(seconds: number): number {
   return (seconds / 3600) * PRICES.transcribePerHour;

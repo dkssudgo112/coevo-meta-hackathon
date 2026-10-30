@@ -4,7 +4,7 @@ import { ChangeDetector, meanAbsDiff } from '../src/change.ts';
 import { applyGuardrails, type Proposal } from '../src/ladder.ts';
 import { labelPractice, observeChange } from '../src/labels.ts';
 import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
-import { CAPS, charge, lifetimeCap, remaining, sparkCost } from '../src/budget.ts';
+import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
 import { applyHint } from '../src/cards.ts';
@@ -114,10 +114,13 @@ test('budget charges per day and caps', () => {
   let st = { day: '2026-10-31', spentUsd: 3.9 };
   assert.equal(remaining(st, CAPS.workspacePerDayUsd, now), CAPS.workspacePerDayUsd);
   st = charge(st, 0.5, now);
-  assert.equal(CAPS.globalLifetimeUsd, 3);
-  assert.equal(lifetimeCap(undefined), 3);
-  assert.equal(lifetimeCap('abc'), 3);
-  assert.equal(lifetimeCap('1.5'), 1.5);
+  assert.equal(CAPS.globalLifetimeUsd, 2.5);
+  assert.equal(META_ABSOLUTE_MAX_USD - META_OPERATING_CEILING_USD, 0.5, '$0.50 margin under the approved $3');
+  assert.equal(lifetimeCap(undefined), 2.5);
+  assert.equal(lifetimeCap('abc'), 2.5);
+  assert.equal(lifetimeCap('1.5'), 1.5, 'configuration may lower the ceiling');
+  assert.equal(lifetimeCap('10'), 2.5, 'configuration can never raise it');
+  assert.equal(modalCap('5'), 0.9);
   assert.equal(st.spentUsd, 0.5);
   assert.ok(Math.abs(sparkCost({ input_tokens: 1_000_000, output_tokens: 0 }) - 1.25) < 1e-9);
 });
@@ -166,4 +169,23 @@ test('schemas are strict objects (no extra properties) for structured output', (
     assert.equal(t.schema.type, 'object');
     assert.equal(t.schema.additionalProperties, false);
   }
+});
+
+test('lifetime ledger: never resets, never exceeds the cap under many concurrent-style reservations', () => {
+  let l = emptyLedger('2026-10-30T23:59:00Z');
+  let ok = 0;
+  for (let i = 0; i < 200; i++) { const r = ledgerReserve(l, 0.02, 2.5); if (r.ok) { ok++; l = r.ledger; } }
+  assert.equal(ok, 125);
+  assert.ok(l.spentUsd <= 2.5 + 1e-9);
+  assert.equal(ledgerReserve(l, 0.0001, 2.5).ok, false, 'full ledger refuses even tiny reservations');
+  // No date field exists, so "the next day" is the same ledger.
+  assert.equal(Object.keys(l).includes('day'), false);
+  const nextDay = { ...l, since: l.since };
+  assert.equal(ledgerReserve(nextDay, 0.02, 2.5).ok, false);
+  // Settling below the reservation frees room; never below zero.
+  l = ledgerAdjust(l, -0.5);
+  assert.ok(Math.abs(l.spentUsd - 2.0) < 1e-9);
+  assert.equal(ledgerAdjust(emptyLedger('x'), -5).spentUsd, 0);
+  assert.equal(ledgerReserve(emptyLedger('x'), Number.NaN, 2.5).ok, false);
+  assert.equal(ledgerReserve(emptyLedger('x'), -1, 2.5).ok, false);
 });

@@ -4,7 +4,7 @@ import { mediaConfigured } from './media.ts';
 import type { Env } from './env.ts';
 import { error, id, json, sha256 } from './util.ts';
 
-import { ledgerName } from './workspace.ts';
+import { ledgerName, ledgerScope } from './workspace.ts';
 export { Workspace } from './workspace.ts';
 export { Budget } from './budget-do.ts';
 
@@ -44,12 +44,17 @@ async function admin(req: Request, env: Env, path: string): Promise<Response> {
   const got = req.headers.get('authorization') ?? '';
   const [a, b] = [await sha256(got), await sha256(`Bearer ${expected}`)];
   if (a !== b) return error(401, 'unauthorized', 'Admin token required.');
-  const ledger = env.BUDGET.get(env.BUDGET.idFromName(ledgerName(env)));
-  if (path === '/api/admin/ledger' && req.method === 'GET') return json({ ...(await ledger.status()), external: await ledger.externalLog() });
+  const book = (kind: 'meta' | 'modal') => env.BUDGET.get(env.BUDGET.idFromName(ledgerName(env, kind)));
+  if (path === '/api/admin/ledger' && req.method === 'GET') {
+    const [meta, modal] = [book('meta'), book('modal')];
+    return json({ meta: { ...(await meta.status(ledgerScope(env, 'meta'))), external: await meta.externalLog() }, modal: { ...(await modal.status(ledgerScope(env, 'modal'))), external: await modal.externalLog() } });
+  }
   if (path === '/api/admin/reserve' && req.method === 'POST') {
-    const b2 = (await req.json().catch(() => ({}))) as { usd?: number; label?: string };
-    const ok = await ledger.reserveExternal(Number(b2.usd), String(b2.label ?? 'external'));
-    return ok ? json({ ok: true, ...(await ledger.status()) }) : error(402, 'budget', 'The lifetime budget cannot cover this reservation.');
+    const b2 = (await req.json().catch(() => ({}))) as { usd?: number; label?: string; ledger?: string };
+    const kind = b2.ledger === 'modal' ? 'modal' : b2.ledger === 'meta' ? 'meta' : null;
+    if (!kind) return error(400, 'ledger_required', 'Say which ledger: "meta" or "modal".');
+    const ok = await book(kind).reserveExternal(Number(b2.usd), String(b2.label ?? 'external'), ledgerScope(env, kind));
+    return ok ? json({ ok: true, ...(await book(kind).status(ledgerScope(env, kind))) }) : error(402, 'budget', 'The lifetime budget cannot cover this reservation.');
   }
   return error(404, 'not_found', 'Unknown route.');
 }
@@ -60,7 +65,7 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (!path.startsWith('/api/')) return env.ASSETS.fetch(req);
 
   if (path === '/api/health' && req.method === 'GET') {
-    const global = await env.BUDGET.get(env.BUDGET.idFromName(ledgerName(env))).status();
+    const global = await env.BUDGET.get(env.BUDGET.idFromName(ledgerName(env, 'meta'))).status(ledgerScope(env, 'meta'));
     const payload: Readiness & { budget: typeof global } = {
       service: 'coevo', mode: liveEnabled(env) ? 'live' : 'mock', metaKeyConfigured: Boolean(env.MODEL_API_KEY?.trim()),
       liveCallsEnabled: liveEnabled(env), mediaServiceConfigured: mediaConfigured(env), testFakeModels: fakeMeta(env), model: models(env).text, implementation: 'caddie', budget: global,

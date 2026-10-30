@@ -32,8 +32,8 @@ All areas reach each level together. Every evening the full demo runs end to end
 | Modal credit for the media service | Podcast audio and short video (S5) |
 | Cloudflare R2 enabled | Evidence frames and media storage in the deployed app |
 | A real phone and monitor | Camera legibility (S1, S2), haptics, real latency |
-| The maintainer's Meta AI account | S4: image generation (passed) and the card's effect in a new chat |
+| The maintainer's Meta AI account | S4: image generation (passed) and the card's effect in a dedicated pinned chat (passed; cross-chat Memory failed) |
 
 ## Rule
 
-Do not delete agreed scope to save time. If a dependency fails, apply the approved fallback (photo or screen share instead of camera; first-message card instead of Meta AI Memory) and record the evidence and the limit.
+Do not delete agreed scope to save time. If a dependency fails, apply the approved fallback (photo or screen share instead of camera; card as the first message of a dedicated pinned chat instead of Meta AI Memory) and record the evidence and the limit.

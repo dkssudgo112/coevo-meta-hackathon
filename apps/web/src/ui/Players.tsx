@@ -125,7 +125,7 @@ export function FlashcardsView({ item, creds }: { item: ContentItem; creds: Cred
   };
   return (
     <article className="stack">
-      <div className="faint">Card {i + 1} of {p.cards.length} · next due {new Date(c.dueAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+      <div className="faint">Card {i + 1} of {p.cards.length} · next due {new Date(c.dueAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
       <div className="card flash">
         <p>{c.scenario}</p>
         <p style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem' }}>{c.prompt}</p>

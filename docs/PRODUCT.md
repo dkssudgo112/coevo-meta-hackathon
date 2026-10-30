@@ -26,8 +26,8 @@ Rules that change the person's AI always need the person's approval.
 3. **Step in:** after repeated vague requests the phone buzzes. The NOW card quotes the person's words and asks one question. They answer by voice; the Caddie replies without writing the brief for them. "Show me an example" is available only after the ingredients step and anything copied from it is labeled *AI wrote it*.
 4. **Observe the change:** the next frame shows new ingredients → labeled *with the Caddie* (or *on your own* if no intervention happened).
 5. **Wrap:** the session ends by button or after 10 idle minutes. One shared learning design decides each format, with a reason.
-6. **AI grows:** the playbook's rule becomes a proposed Caddie card. Approved cards go to the Desk inbox with tool-specific instructions (Meta AI: send as the first message of a chat; Memory did not persist in our check).
-7. **Value check:** in a later session, if the AI asks the clarifying questions first, the card becomes *seen working* and the Caddie stays quiet.
+6. **AI grows:** the playbook's rule becomes a proposed Caddie card. Approved cards go to the Desk inbox with tool-specific instructions (Meta AI: start a dedicated poster chat with the card as its first message and pin it; cross-chat Memory did not work in our check).
+7. **Value check:** in a later session in that pinned chat, if the AI asks the clarifying questions first, the card becomes *seen working* and the Caddie stays quiet.
 
 ## Five formats, five moments
 
@@ -57,4 +57,4 @@ A one-sentence request with a changed condition (new item, season or audience). 
 
 - Only the device-cropped screen area is uploaded; the setup photo for SAM is disclosed and never stored. Raw frames are discarded after reading unless they are evidence for a moment; kept frames can be deleted.
 - Standard Meta models only; contributor variants are never used for user data.
-- One spend authority: the deployed Worker's Budget object keeps a **lifetime** ledger for every paid call (Meta and Modal), capped at $3.00 and never reset by day, deployment or workspace. Also $0.60/day per workspace and $0.15 per sample session. Paid calls are enabled only on the deployment; local and test runs cannot spend.
+- **Application-enforced budget** (not a provider billing cap): the maintainer approved US$3.00 in total for Meta Model API development and validation. The deployed Worker's Budget object is the single authority, with a lifetime ledger that stops at an operating ceiling of $2.50 (leaving a $0.50 margin) and is never reset by day, restart, deployment, workspace or script. Every Spark attempt first counts its input tokens with the documented endpoint and reserves the exact maximum; ambiguous outcomes and missing usage keep the full reservation. Modal media has its own ledger below its free balance. Also $0.60/day per workspace and $0.15 per sample session. Paid calls are enabled only on the deployment; local and test runs cannot spend.
