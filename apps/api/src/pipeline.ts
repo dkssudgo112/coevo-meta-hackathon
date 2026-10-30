@@ -24,6 +24,8 @@ export interface Ctx {
   notice: (level: 'info' | 'warn', code: string, message: string) => void;
   /** Register a Modal media job for alarm-driven polling. */
   trackJob: (contentId: string, jobId: string) => Promise<void>;
+  /** Make sure the stuck-generation watchdog runs soon after an item could stall. */
+  watchdog?: () => Promise<void>;
 }
 
 export function failureStatus(e: unknown): { status: Moment['readingStatus']; message: string } {

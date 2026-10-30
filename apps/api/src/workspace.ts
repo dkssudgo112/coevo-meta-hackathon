@@ -173,6 +173,7 @@ export class Workspace extends DurableObject<Env> {
         await this.ctx.storage.put('jobs', [...jobs.filter(j => j.contentId !== contentId), { contentId, jobId, startedAt: Date.now() }]);
         await this.schedule(5_000);
       },
+      watchdog: () => this.schedule(STUCK_MS + 5_000),
     };
   }
 

@@ -123,6 +123,7 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
   const session = ctx.store.get('session', item.sessionId);
   if (!session?.design) return;
   const base = await setItem(ctx, item, { status: 'generating', error: null, attempts: item.attempts + 1 });
+  await ctx.watchdog?.();
   const text = `Learning design:\n${JSON.stringify(session.design)}\n\nEvidence:\n${evidenceText(ctx, session)}`;
   const srcs = sources(ctx, session);
   try {
