@@ -1,6 +1,6 @@
 # Current status
 
-Updated: October 30, 2026 (evening KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
+Updated: October 30, 2026 (late evening KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
 
 ## Implemented and tested locally (live model calls off)
 
@@ -10,12 +10,16 @@ Updated: October 30, 2026 (evening KST). For per-requirement evidence see [VERIF
 - **Web app** (`apps/web`): phone Caddie (QR pairing, aim/crop, camera sampler, NOW card, flow, voice answers, drawer with playbook, habits, past sessions, privacy), Desk (QR, copy inbox, evidence rows, screen share and screenshot upload), sample session with synthetic screens, players for all five formats, Practice Range. Calm Caddie visual system with dark mode and reduced motion.
 - **Media composition** (`infra/modal/compose.py`): podcast timeline with per-line timings and loudness normalization; 9:16 short with scene images, evidence frames, diagrams and full captions. Verified locally with a synthetic tone: 120 s podcast, 30.8 s 1080×1920 short with audio.
 
+## Deployed (live model calls off)
+
+- https://coevo-caddie.coevo-meta-hackathon.workers.dev — Worker, Durable Objects, R2 and static assets. Public integration checks pass 17/17: security headers, pairing, workspace isolation, SSE, rate limits, honest "live calls off" state, closed admin routes, test mode off.
+- **Application-enforced budget:** the maintainer approved US$3.00 in total for Meta Model API development and validation. The deployment's Budget object stops at $2.50 (lifetime, never reset), reserves the exact maximum before every attempt from counted input tokens, keeps reservations for ambiguous outcomes, and settles each durable ticket once. Verified with unit tests and against a real local Durable Object (concurrency, restart, duplicate settlement). Live calls stay off until an independent review enables them.
+
 ## Not yet verified
 
 - **Any real Meta model output.** Live calls stay off until billing/credit is confirmed. Readings, decisions and content have only been exercised with mocks in unit tests.
 - **Kokoro TTS on Modal** (code written, never run) and the deployed media service.
 - **Real phone camera** legibility, latency and haptics.
-- **Public deployment** (waiting for Cloudflare R2 activation).
 - **Meta AI as the user's tool:** confirmed in a Korean account — poster image generation works, and a Caddie-style rule sent as the first message of a dedicated (pinned) chat made Meta AI ask for audience, price, mood and a photo before generating. A "Remember that…" rule did **not** carry into other new chats, so the Desk tells Meta AI users to keep one pinned poster chat.
 - **Modal:** a one-call CPU probe succeeded; the media service itself (Kokoro TTS) has not run yet.
 - Demo video, simulated persona tests, submission texts.
