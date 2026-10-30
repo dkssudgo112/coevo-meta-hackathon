@@ -15,6 +15,8 @@ export interface Env extends MetaEnv, MediaEnv {
   COEVO_MODAL_CAP_USD?: string;
   /** Enables /api/admin/* (ledger view, external reservations). Absent = routes do not exist. */
   COEVO_ADMIN_TOKEN?: string;
+  /** 'true' only during a diagnosis window: enables /diag/egress (free, rate-limited). Absent = route does not exist. */
+  COEVO_EGRESS_DIAG?: string;
   /** 'combined' (default): read + decide in one call. 'separate': two calls. */
   COEVO_TURN_MODE?: string;
 }

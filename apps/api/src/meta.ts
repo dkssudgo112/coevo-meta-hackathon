@@ -142,6 +142,40 @@ function base(env: MetaEnv): string {
 }
 
 type Fetch = typeof fetch;
+
+/**
+ * Diagnostic, free: where this instance's outbound requests leave from (Cloudflare colo and country)
+ * and whether one tiny text-only token count is accepted from there. Nothing is generated or billed;
+ * only the status and error code are returned.
+ */
+export async function egressProbe(env: MetaEnv, f: Fetch = fetch): Promise<{ colo: string | null; loc: string | null; countStatus: number | null; countCode: string | null; countMs: number }> {
+  let colo: string | null = null;
+  let loc: string | null = null;
+  try {
+    const t = await (await f('https://www.cloudflare.com/cdn-cgi/trace', { signal: AbortSignal.timeout(5_000) })).text();
+    colo = /^colo=(.+)$/m.exec(t)?.[1] ?? null;
+    loc = /^loc=(.+)$/m.exec(t)?.[1] ?? null;
+  } catch { /* location unknown */ }
+  const started = Date.now();
+  let countStatus: number | null = null;
+  let countCode: string | null = null;
+  if (liveEnabled(env)) {
+    try {
+      const res = await f(`${base(env)}/responses/input_tokens`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authKey(env)}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: models(env).text, input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'ping' }] }] }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      countStatus = res.status;
+      if (!res.ok) countCode = ((await res.json().catch(() => ({}))) as { error?: { code?: string } }).error?.code ?? null;
+    } catch (e) {
+      countCode = e instanceof Error ? e.name : 'unknown';
+    }
+  }
+  return { colo, loc, countStatus, countCode, countMs: Date.now() - started };
+}
+
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /**

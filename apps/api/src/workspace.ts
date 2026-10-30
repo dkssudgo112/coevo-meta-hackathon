@@ -6,7 +6,7 @@ import type { CaptureSource, CropRect, FrameRef, Moment, PodcastPayload, ServerE
 import { CAPS, charge, dayKey, remaining, type BudgetState } from '../../../packages/core/src/budget.ts';
 import { parseWav } from '../../../packages/core/src/wav.ts';
 import { asksFromText } from '../../../packages/core/src/cards.ts';
-import { BudgetExceeded, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
+import { BudgetExceeded, egressProbe, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
 import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, retainOrDiscard, ruleDecision, sessionMoments, type Ctx } from './pipeline.ts';
 import { cardAction, generate, podcastAsk, practiceAttempt, practiceRetryImage, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
@@ -86,6 +86,7 @@ export class Workspace extends DurableObject<Env> {
 
   /** This instance. Work started by another (pre-restart) instance cannot still be running here. */
   private runner = crypto.randomUUID();
+  private lastDiagAt = 0;
   private recovered = false;
 
   private async loadMeta(): Promise<Meta | null> {
@@ -426,6 +427,14 @@ export class Workspace extends DurableObject<Env> {
       }
 
       if (path === '/calibrate' && method === 'POST') return this.calibrate(req);
+      if (path === '/diag/egress' && method === 'GET' && this.env.COEVO_EGRESS_DIAG === 'true') {
+        // Diagnosis window only: one free probe per 30 s per workspace (no generation, nothing billed).
+        if (Date.now() - this.lastDiagAt < 30_000) return error(429, 'too_fast', 'One probe per 30 seconds.');
+        this.lastDiagAt = Date.now();
+        const r = await egressProbe(this.env);
+        console.log(JSON.stringify({ event: 'egress_probe', ...r }));
+        return json(r);
+      }
       if (path === '/benchmark' && method === 'GET') return this.benchmarkExport(url.searchParams.get('images') === '1');
       if (path === '/benchmark' && method === 'DELETE') return this.benchmarkDelete();
       if (seg[0] === 'frames' && seg.length === 1 && method === 'POST') return this.frame(req);

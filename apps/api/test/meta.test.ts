@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CostUnverifiable, generateImage, InvalidAudio, ModelNotAllowed, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, samOutput, RetryLater, runTask, segmentBoxes, transcribe, transcribeKeywords, type MetaEnv, type Spender } from '../src/meta.ts';
+import { CostUnverifiable, generateImage, InvalidAudio, ModelNotAllowed, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, egressProbe, models, outputText, parseSamBoxes, retryAfterSeconds, samOutput, RetryLater, runTask, segmentBoxes, transcribe, transcribeKeywords, type MetaEnv, type Spender } from '../src/meta.ts';
 import { sparkMaxCost } from '../../../packages/core/src/budget.ts';
 import { readingTask } from '../../../packages/core/src/prompts.ts';
 
@@ -154,6 +154,22 @@ test('SAM output is read from every lane and its shape is described without mask
   assert.deepEqual(both.lanes, [`message/commentary/output_text:${box.length}`, 'message/-/output_text:0']);
   assert.deepEqual(samOutput({ output: [] }), { text: '', finalText: '', lanes: [] }, 'an empty answer is a valid zero-match result');
   assert.throws(() => samOutput({ output: [{ type: 'message', content: [{ type: 'refusal', refusal: 'no' }] }] }), /refused/);
+});
+
+test('egress probe reports the outbound location and a free count result, never generating', async () => {
+  const seen: string[] = [];
+  const f = (async (u: string, init?: RequestInit) => {
+    seen.push(u);
+    if (u.includes('cdn-cgi/trace')) return new Response('fl=1\nip=x\ncolo=ICN\nloc=KR\n');
+    assert.ok(!u.endsWith('/responses'), 'never the generation endpoint');
+    assert.deepEqual(Object.keys(JSON.parse(init!.body as string)).sort(), ['input', 'model']);
+    return new Response(JSON.stringify({ error: { code: 'model_not_found', message: 'x' } }), { status: 404 });
+  }) as unknown as typeof fetch;
+  const r = await egressProbe(env, f);
+  assert.deepEqual([r.colo, r.loc, r.countStatus, r.countCode], ['ICN', 'KR', 404, 'model_not_found']);
+  assert.equal(seen.filter(u => u.endsWith('/responses/input_tokens')).length, 1);
+  const off = await egressProbe({ ...env, COEVO_ALLOW_LIVE_CALLS: 'false' }, f);
+  assert.equal(off.countStatus, null, 'no Meta call when live calls are off');
 });
 
 test('transcribe posts multipart request + audio parts', async () => {
