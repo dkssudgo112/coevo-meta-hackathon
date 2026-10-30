@@ -45,7 +45,7 @@ Last updated: 2026-10-30 (night KST).
 | B2 | Ladder question → ingredients → example; no skipping | ◐ | ☐ | ☐ | unit: guardrails; live: intervention at the question step quoting "more premium"; reply after the answer | Ingredients/example steps pending live |
 | B3 | NOW card + session flow, one primary action | ☐ | ☐ | ☐ | | |
 | B4 | Voice answer: record → 16 kHz WAV → Voice Transcribe | ☑ | ◐ | ☐ | live: 10 s synthetic answer transcribed (one place name misheard) → Caddie reply; keyword-hint 400 found and fixed (single words, retry without hints) | Browser microphone + human voice pending |
-| B5 | Haptic nudge (`navigator.vibrate`), visual pulse fallback | ☐ | ☐ | ☐ | | iOS Safari has no vibrate API |
+| B5 | Haptic nudge (`navigator.vibrate`), visual pulse fallback | ◐ | ☐ | ☐ | code: buzz + pulse on every new question, including the first of a quiet session; history on reopen does not buzz (bug found in review, fixed) | Device check pending; iOS Safari has no vibrate API |
 | B6 | Later defers with a longer cooldown; card stays in flow | ◐ | ☐ | ☐ | unit: later-cooldown | |
 | B7 | "That's not what I asked" marks a misread and drops its evidence | ☐ | ☐ | ☐ | | |
 | B8 | No interrupt while typing; praise removed; quotes must be grounded | ◐ | ☐ | ☐ | unit | |
@@ -67,8 +67,8 @@ Last updated: 2026-10-30 (night KST).
 | D1 | Moment = frame + reading + decision + response + observed change | ◐ | ☐ | ☐ | contracts | |
 | D2 | Four assistance labels by deterministic rules | ☑ | ◐ | ☐ | unit: labels incl. a question two frames earlier; live: specific brief after the Caddie's question → coached (mislabel found and fixed) | |
 | D3 | 4D observations (no levels or scores); unobserved is not failure | ◐ | ☐ | ☐ | unit: `dimensionFor` | |
-| D4 | Source links from every card and content item to its moment/frame | ☐ | ☐ | ☐ | | |
-| D5 | Frame deletion keeps the label and marks "source removed" | ☐ | ☐ | ☐ | | |
+| D4 | Source links from every card and content item to its moment/frame | ☑ | ◐ | ☐ | TEST build in the browser: "Made from" links and note quotes open their session with the moment highlighted; content opened from a past session returns there | Desk evidence rows link pending |
+| D5 | Frame deletion keeps the label and marks "source removed" | ☑ | ◐ | ☐ | fake e2e: deleting a frame keeps its "with the Caddie" label and removes the stored image; Desk row shows "Source removed", the short storyboard "(frame deleted)" | Live check pending |
 | D6 | Desk evidence rows: FRAME, YOU SAID, CADDIE, THEN | ☐ | ☐ | ☐ | | |
 
 ## E. AI growth
@@ -76,7 +76,7 @@ Last updated: 2026-10-30 (night KST).
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | E1 | Card proposed from the playbook's `cardRule` | ☑ | ◐ | ☐ | live: "Before you make a poster, ask me who it is for, what it is, the price, one feeling, and whether a real photo exists." | |
-| E2 | Approve / edit / reject / revoke with history | ☑ | ◐ | ☐ | fake e2e: edit/approve/apply/revoke history; live: approve, apply, revoke after the source session was deleted | |
+| E2 | Approve / edit / reject / revoke with history | ☑ | ◐ | ☐ | fake e2e: edit/approve/apply/revoke history; approve → edit updates the Desk copy and the card's checked details; live: approve, apply, revoke after the source session was deleted | |
 | E3 | Tool-specific apply text (Meta AI: dedicated pinned chat) | ☑ | ◐ | ☐ | unit: apply hints; S4 fallback observed in real Meta AI | Memory did not persist across new chats |
 | E4 | Next session: "AI asked first" observed → `observed-working` | ☑ | ◐ | ☐ | live: card pinned in a dedicated Meta AI chat → Meta AI asked for audience, product, price, mood → Caddie quiet → observed-working; unit negatives: approved-only, other tool/task, unrelated questions | Scoped to one pinned chat, not cross-chat memory |
 
@@ -100,6 +100,7 @@ Last updated: 2026-10-30 (night KST).
 | G2 | Spoken brief → transcript | ☑ | ◐ | ☐ | live Voice Transcribe on synthetic speech (macOS voice): 31 and 19 words; word-set similarity 0.86 to the script | Real human voice pending |
 | G3 | Muse Image renders the user's own words | ☑ | ◐ | ☐ | live: 3 portrait images (1024×1536) from spoken briefs, ~16 s per attempt incl. transcription and check | |
 | G4 | Ingredient check + exact label | ☑ | ◐ | ☐ | live: ingredient check + "independent · practice" label; unit/fake: coached after hint | |
+| G5 | Practice recovery and scope: 30 s cap, typed fallback marked typed, image-only redraw, session-scoped attempts deleted with their session | ◐ | ☐ | ☐ | fake e2e: 35 s recording refused (413), typed brief checked and marked typed, session deletion removes attempts/images/skill notes | Live check pending |
 
 ## H. Deployment and judging
 
@@ -118,9 +119,9 @@ Last updated: 2026-10-30 (night KST).
 
 | ID | Check | Pass criterion | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| S1 | Spark reading of 20 real phone-camera frames | ≥ 90% request text, 100% tool | ☐ | Needs R1 + R3 |
+| S1 | Spark reading of 20 real phone-camera frames | ≥ 90% request text, 100% tool | ☐ | Scoring ready: each frame against its own human-verified request (word/character accuracy, critical words, "nothing readable" expectations), tool on every frame. Needs the phone run (R3) |
 | S2 | SAM 3.1 monitor detection | ≥ 18/20, ≤ 2 s | ☐ | Needs R1 + R3 |
-| S3 | Frame → card latency | p50 ≤ 6 s | ◐ | Not yet measured on phone frames. Live, one real screen capture × 3 through the deployed app: separate read+decide p50 11.5 s (4 round trips) → combined turn p50 5.9 s client / 4.9 s server (2 round trips). Benchmark mode ready for the 20-frame phone run |
+| S3 | Frame → card latency | p50 ≤ 6 s | ◐ | Not yet measured on phone frames. Live, one real screen capture × 3 through the deployed app: separate read+decide p50 11.5 s (4 round trips) → combined turn p50 5.9 s client / 4.9 s server (2 round trips). Benchmark frames now record the phone's own screen change → card time, which is the S3 measure; server time is context only |
 | S4 | Meta AI (KR): image generation + rule changes behavior | both reproducible | ☑ (fallback) | Image: PASS (real 1152×2048 poster, private record). Memory across new chats: FAIL. Approved fallback PASS: rule as first message of a dedicated, pinned chat → Meta AI asked audience, price, mood and photo before generating (manual check by the maintainer's account; private record) |
 | S5 | Modal open TTS, two English voices, 60 s | acceptable quality, ≤ 60 s render, commercial-use license | ☑ | Kokoro-82M (Apache-2.0); maintainer judged the two voices distinguishable and listenable; 61.6 s two-voice benchmark rendered in 58 s end to end (one bounded run) |
 | S6 | Voice Transcribe on 20 s answers | key words correct | ◐ | Live on synthetic speech: similarity 0.86; a 10 s answer kept every key fact but misheard one place name; human voice pending |

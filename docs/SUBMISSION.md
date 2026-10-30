@@ -61,7 +61,7 @@ People stuck with an AI tool often repeat vague requests like "make it more prem
 
 Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
 
-Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone, or /sample with no phone. Sample screens are synthetic. Model spend is capped by the app.
+Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone, or /sample with no phone. The sample replays screenshots of actual Meta AI replies to a scripted, fictional café scenario; the Caddie's part is live model output. Model spend is capped by the app.
 
 **9 · Use of Meta products**
 
@@ -79,6 +79,12 @@ Seeing the screen is what makes the Caddie work with every AI tool without integ
 
 **11 · Partner technology feedback**
 
-Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition for the podcast and the short. Meta's API has no text-to-speech. We used explicit CPU and memory limits, one container, and no warm pool. [Add one sentence of real experience after the media probe.]
+Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition for the podcast and the short. Meta's API has no text-to-speech. We used explicit CPU and memory limits, one container, no warm pool, a memory snapshot and async spawn/poll from the Worker; a 61.6-second two-voice episode rendered in 58 seconds end to end. One gotcha worth documenting: `from __future__ import annotations` in the web endpoint module made FastAPI treat the injected request as a query parameter (HTTP 422) until it was removed.
 
-**Verified results (fill in, never estimate):** S1 reading accuracy [ ], S3 p50 latency [ ], S5 podcast/short lengths [ ], S8 real cost per session [ ], persona simulations [labeled simulated].
+**Verified results so far (never estimate; see docs/VERIFICATION.md):**
+- Reading actual Meta AI screens: latest request word-set match 1.0 and tool 1.0 on screen captures. **S1 on 20 real phone-camera frames: pending (R3).**
+- Latency: combined read-and-decide turn, median 5.9 s at the client / 4.9 s on the server on a screen capture (3 runs); 6–9 s per turn in full sessions. **S3 on the phone (screen change → card): pending.**
+- S5: a 61.6 s two-voice episode rendered in 58 s end to end (one bounded run); product podcasts 93–141 s; shorts 38.9–44.3 s at 1080×1920.
+- S8: one full session (5 screens, a spoken answer, five formats including 3 images) cost $0.163 in Meta usage plus a $0.08 media reservation.
+- The card in Meta AI: sent as the first message of a pinned chat, it made Meta AI ask for audience, product, price and mood first; memory across new chats did not carry the rule.
+- Persona simulations: see the labeled simulation section (never real-user evidence).
