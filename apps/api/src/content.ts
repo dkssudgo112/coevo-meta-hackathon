@@ -273,12 +273,12 @@ export async function startPractice(ctx: Ctx, autoOpened: boolean, sessionId: st
   }
 }
 
-export async function practiceAttempt(ctx: Ctx, practiceId: string, wav: Uint8Array, durationSec: number): Promise<void> {
+export async function practiceAttempt(ctx: Ctx, practiceId: string, wav: Uint8Array): Promise<void> {
   let p = ctx.store.get('practice', practiceId);
   if (!p || (p.status !== 'open' && p.status !== 'failed') || !p.scenario) return;
   p = await ctx.store.put('practice', { ...p, status: 'transcribing', error: null });
   try {
-    const { transcript } = await transcribe(ctx.env, ctx.spender, wav, durationSec);
+    const { transcript } = await transcribe(ctx.env, ctx.spender, wav);
     if (!transcript) throw new Error('No speech was detected. Try again closer to the microphone.');
     p = await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, transcript, status: 'checking', imageStatus: 'generating' });
     const examples = ctx.store.list('moment').map(m => m.decision?.exampleBrief).filter((x): x is string => !!x);

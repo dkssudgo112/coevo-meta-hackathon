@@ -28,6 +28,15 @@ test('the direct smoke check refuses to send a paid request', () => {
   assert.match(r.stderr, /disabled/);
 });
 
+test('the Muse launcher refuses every session, even with live calls on', () => {
+  for (const args of [[], ['run', 'hello'], ['--model', 'x'], ['--help', 'chat']]) {
+    const r = spawnSync(process.execPath, ['scripts/muse.mjs', ...args], { encoding: 'utf8', env: { ...process.env, COEVO_ALLOW_LIVE_CALLS: 'true', MODEL_API_KEY: 'should-never-be-used' } });
+    assert.equal(r.status, 2, `args ${JSON.stringify(args)}`);
+    assert.match(r.stderr, /disabled/);
+  }
+  assert.doesNotMatch(readFileSync('scripts/muse.mjs', 'utf8'), /META_API_KEY:\s*env\.MODEL_API_KEY/);
+});
+
 test('the spike runner only talks to an https deployment', () => {
   const r = spawnSync(process.execPath, ['scripts/spike.mjs', 'http://127.0.0.1:8788', 's1'], { encoding: 'utf8' });
   assert.equal(r.status, 2);

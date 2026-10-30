@@ -1,4 +1,4 @@
-import { Flag, modelSourceLine, useHealth } from './ui/common.tsx';
+import { Flag, modelSourceLine, PROVIDER_DATA_NOTICE, useHealth } from './ui/common.tsx';
 
 function onPhone(): boolean {
   try { return matchMedia('(pointer: coarse)').matches && innerWidth < 760; } catch { return false; }
@@ -45,6 +45,7 @@ export function Landing() {
         </ol>
       </section>
       <p className="faint">Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet. Not seen yet never means you can’t.</p>
+      <p className="faint">{PROVIDER_DATA_NOTICE}</p>
     </div>
   );
 }

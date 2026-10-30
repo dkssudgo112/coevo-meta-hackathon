@@ -34,7 +34,10 @@ token_secret = modal.Secret.from_name("coevo-media-token")
 MAX_REQUEST_BYTES = 12_000_000
 
 
-@app.cls(cpu=2.0, memory=3072, timeout=600, scaledown_window=5, min_containers=0, max_containers=1)
+# Explicit (request, limit) tuples: Modal bills the higher of requested and actual
+# usage, and a scalar request is NOT a maximum. Hard memory limit, one container,
+# no warm pool, no automatic retries, bounded startup and run time.
+@app.cls(cpu=(1.0, 2.0), memory=(2048, 3072), timeout=300, startup_timeout=180, retries=0, scaledown_window=5, min_containers=0, max_containers=1)
 class Renderer:
     @modal.enter()
     def load(self) -> None:
@@ -62,7 +65,7 @@ class Renderer:
         raise ValueError("unknown job kind")
 
 
-@app.function(secrets=[token_secret], cpu=0.25, memory=256, scaledown_window=5, min_containers=0, max_containers=1)
+@app.function(secrets=[token_secret], cpu=(0.125, 0.25), memory=(128, 256), timeout=60, startup_timeout=60, scaledown_window=5, min_containers=0, max_containers=1)
 @modal.asgi_app()
 def web():
     from fastapi import FastAPI, HTTPException, Request

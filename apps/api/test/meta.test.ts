@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CostUnverifiable, generateImage, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, type MetaEnv, type Spender } from '../src/meta.ts';
+import { CostUnverifiable, generateImage, InvalidAudio, ModelNotAllowed, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, type MetaEnv, type Spender } from '../src/meta.ts';
 import { sparkMaxCost } from '../../../packages/core/src/budget.ts';
 import { readingTask } from '../../../packages/core/src/prompts.ts';
 
@@ -31,6 +31,18 @@ function withCount(gen: (url: string, init: RequestInit) => Promise<Response>, c
     return url.endsWith('/responses/input_tokens') ? response({ object: 'response.input_tokens', input_tokens: count }) : gen(url, init);
   }) as unknown as typeof fetch;
   return { f, calls };
+}
+
+/** Build a WAV with the given duration and format (defaults: 16 kHz mono 16-bit). */
+function wavBytes(seconds: number, rate = 16000, channels = 1, bits = 16): Uint8Array {
+  const n = Math.round(seconds * rate) * channels * (bits / 8);
+  const b = new Uint8Array(44 + n);
+  const v = new DataView(b.buffer);
+  const w = (o: number, t: string) => { for (let i = 0; i < 4; i++) b[o + i] = t.charCodeAt(i); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, channels, true); v.setUint32(24, rate, true); v.setUint32(28, rate * channels * bits / 8, true); v.setUint16(32, channels * bits / 8, true); v.setUint16(34, bits, true);
+  w(36, 'data'); v.setUint32(40, n, true);
+  return b;
 }
 
 const ok = (text: string) => response({ status: 'completed', output: [{ type: 'reasoning', summary: [] }, { type: 'message', content: [{ type: 'output_text', text }] }], usage: { input_tokens: 2000, output_tokens: 300, input_tokens_details: { cached_tokens: 0 } } });
@@ -138,7 +150,7 @@ test('transcribe posts multipart request + audio parts', async () => {
   let form: FormData | null = null;
   let url = '';
   const f = (async (u: string, init: RequestInit) => { url = u; form = init.body as FormData; return response({ transcript: ' office workers ', audioDurationMs: 4000 }); }) as unknown as typeof fetch;
-  const r = await transcribe(env, ledger().spender, new Uint8Array(100), 4, ['premium'], f);
+  const r = await transcribe(env, ledger().spender, wavBytes(4), ['premium'], f);
   assert.equal(r.transcript, 'office workers');
   assert.match(url, /\/asr\/transcribe$/);
   const req = JSON.parse(await (form!.get('request') as Blob).text());
@@ -188,6 +200,25 @@ test('missing or partial usage keeps the full reservation (never shrinks to a gu
 test('transcription without a reported duration keeps the rounded-up reservation', async () => {
   const l = ledger();
   const f = (async () => response({ transcript: 'hi' })) as unknown as typeof fetch;
-  await transcribe(env, l.spender, new Uint8Array(100), 4.2, [], f);
+  await transcribe(env, l.spender, wavBytes(4.2), [], f);
   assert.ok(Math.abs(l.total() - (5 / 3600) * 0.18) < 1e-12);
+});
+
+test('audio cost comes from validated WAV bytes; invalid audio is refused before any reservation', async () => {
+  for (const bad of [new Uint8Array(100), wavBytes(2, 44100), wavBytes(2, 16000, 2), wavBytes(2, 16000, 1, 8)]) {
+    let sent = false;
+    const l = ledger();
+    await assert.rejects(transcribe(env, l.spender, bad, [], (async () => { sent = true; return response({ transcript: 'x' }); }) as unknown as typeof fetch), InvalidAudio);
+    assert.equal(sent, false);
+    assert.equal(l.total(), 0);
+  }
+});
+
+test('models outside the priced allowlist fail closed before anything is reserved', async () => {
+  let sent = false;
+  const l = ledger();
+  await assert.rejects(runTask({ ...env, META_TEXT_MODEL: 'muse-spark-9.9' }, l.spender, readingTask, { text: 'x' }, (async () => { sent = true; return ok('{}'); }) as unknown as typeof fetch), ModelNotAllowed);
+  await assert.rejects(generateImage({ ...env, META_IMAGE_MODEL: 'other-image' }, l.spender, 'p', '1024x1536', (async () => { sent = true; return ok('{}'); }) as unknown as typeof fetch), ModelNotAllowed);
+  assert.equal(sent, false);
+  assert.equal(l.total(), 0);
 });

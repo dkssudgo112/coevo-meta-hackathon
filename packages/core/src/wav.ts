@@ -49,3 +49,34 @@ export function wavDurationSeconds(bytes: Uint8Array): number {
   const channels = view.getUint16(22, true) || 1;
   return rate ? dataLen / (rate * 2 * channels) : 0;
 }
+
+export interface WavInfo { sampleRate: number; channels: number; bitsPerSample: number; seconds: number }
+
+/**
+ * Validate a WAV for Muse Voice Transcribe (RIFF/WAVE, PCM, mono, 16-bit,
+ * 16 or 24 kHz) and compute its duration from the bytes. Returns null when
+ * invalid, so cost is never derived from a client-provided duration.
+ */
+export function parseWav(bytes: Uint8Array): WavInfo | null {
+  if (bytes.length < 44) return null;
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const tag = (o: number) => String.fromCharCode(bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]);
+  if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') return null;
+  let o = 12;
+  let fmt: { format: number; channels: number; rate: number; bits: number } | null = null;
+  let dataLen = -1;
+  while (o + 8 <= bytes.length) {
+    const id = tag(o);
+    const len = v.getUint32(o + 4, true);
+    if (id === 'fmt ' && len >= 16 && o + 24 <= bytes.length) {
+      fmt = { format: v.getUint16(o + 8, true), channels: v.getUint16(o + 10, true), rate: v.getUint32(o + 12, true), bits: v.getUint16(o + 22, true) };
+    } else if (id === 'data') {
+      dataLen = Math.min(len, bytes.length - (o + 8));
+      break;
+    }
+    o += 8 + len + (len % 2);
+  }
+  if (!fmt || dataLen < 0) return null;
+  if (fmt.format !== 1 || fmt.channels !== 1 || fmt.bits !== 16 || (fmt.rate !== 16000 && fmt.rate !== 24000)) return null;
+  return { sampleRate: fmt.rate, channels: 1, bitsPerSample: 16, seconds: dataLen / (fmt.rate * 2) };
+}

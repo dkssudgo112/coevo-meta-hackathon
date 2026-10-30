@@ -4,7 +4,7 @@ import type { InboxItem, Moment, Snapshot } from '../../../../packages/contracts
 import { api, createWorkspace, loadCreds, pairLink, post, saveCreds, type Creds } from '../lib/api.ts';
 import { useWorkspace } from '../lib/store.ts';
 import { FrameSampler, FULL, uploadFrame } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, modelSourceLine, sessionMoments } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, modelSourceLine, PROVIDER_DATA_NOTICE, sessionMoments } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME } from '../ui/Players.tsx';
 import { Habits } from '../phone/Live.tsx';
 
@@ -101,6 +101,7 @@ function PairPanel({ creds, pair, setPair }: { creds: Creds; pair: PairInfo | nu
         <h1>Point your phone here</h1>
         <p className="muted">Open <strong>{location.host}/caddie</strong> on your phone and aim it at this code, or scan it with the phone’s camera app. Then prop the phone beside your monitor.</p>
         <p className="faint">The code works once and expires in 15 minutes.</p>
+        <p className="faint">{PROVIDER_DATA_NOTICE}</p>
         <button className="btn small" style={{ justifySelf: 'start' }} disabled={busy} onClick={renew}>Show a new code</button>
       </div>
     </section>

@@ -4,7 +4,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { CaptureSource, CropRect, FrameRef, Moment, PodcastPayload, ServerEvent, Session, ShortPayload, Snapshot, WorkspaceSummary } from '../../../packages/contracts/index.ts';
 import { CAPS, charge, dayKey, remaining, type BudgetState } from '../../../packages/core/src/budget.ts';
-import { wavDurationSeconds } from '../../../packages/core/src/wav.ts';
 import { BudgetExceeded, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
 import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, sessionMoments, type Ctx } from './pipeline.ts';
@@ -49,7 +48,6 @@ export class Workspace extends DurableObject<Env> {
   private meta: Meta | null = null;
   private queue: Promise<void> = Promise.resolve();
   private lastFrameAt = 0;
-  private settled = new Set<string>();
   private encoder = new TextEncoder();
   private pinger: ReturnType<typeof setInterval> | null = null;
 
@@ -88,10 +86,10 @@ export class Workspace extends DurableObject<Env> {
   }
 
   /**
-   * Spender for one budget (Meta or Modal). Each reservation is charged to the
-   * lifetime authority BEFORE the call is dispatched. The reserved amount is
-   * encoded in the ticket so a restart between reserve and settle can never
-   * turn a charged call into a refund.
+   * Spender for one budget (Meta or Modal). Each reservation is made in the
+   * lifetime authority BEFORE the call is dispatched and returns a durable
+   * ticket; settlement is idempotent per ticket in both the authority and this
+   * workspace, so duplicate or late settlements can never refund other spend.
    */
   private spender(kind: 'meta' | 'modal' = 'meta'): Spender {
     const authority = () => this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env, kind)));
@@ -102,19 +100,26 @@ export class Workspace extends DurableObject<Env> {
         // Sample workspaces have a lifetime cap, user workspaces a daily cap (both inside the global lifetime cap).
         const left = this.meta?.kind === 'sample' ? Math.max(0, this.cap() - st.spentUsd) : remaining(st, this.cap(), Date.now());
         if (left < usd) throw new BudgetExceeded('workspace');
-        if (!(await authority().reserve(usd, ledgerScope(this.env, kind)))) throw new BudgetExceeded(kind === 'meta' ? 'global' : 'modal');
-        await this.ctx.storage.put('budget', this.meta?.kind === 'sample' ? { day: st.day, spentUsd: st.spentUsd + usd } : charge(st, usd, Date.now()));
-        return `${kind}:${label}:${id('t')}:${usd}`;
+        const ticket = await authority().reserve(usd, ledgerScope(this.env, kind), `${this.meta?.id}:${label}`);
+        if (!ticket) throw new BudgetExceeded(kind === 'meta' ? 'global' : 'modal');
+        await this.ctx.storage.put({
+          budget: this.meta?.kind === 'sample' ? { day: st.day, spentUsd: st.spentUsd + usd } : charge(st, usd, Date.now()),
+          [`wt:${ticket}`]: { usd, kind, settled: false },
+        });
+        return ticket;
       },
       settle: async (ticket, actual) => {
-        const reserved = Number(ticket.split(':').pop());
-        if (!Number.isFinite(reserved) || this.settled.has(ticket)) return;
-        this.settled.add(ticket);
-        const delta = actual - reserved;
-        if (Math.abs(delta) < 1e-9) return;
-        const st = await this.budgetState();
-        await this.ctx.storage.put('budget', { day: st.day, spentUsd: Math.max(0, st.spentUsd + delta) });
-        await authority().adjust(delta);
+        const key = `wt:${ticket}`;
+        const local = await this.ctx.storage.get<{ usd: number; kind: string; settled: boolean }>(key);
+        if (!local || local.settled) return;
+        await this.ctx.storage.put(key, { ...local, settled: true });
+        const applied = await authority().settle(ticket, actual);
+        if (!applied) return;
+        const delta = actual - local.usd;
+        if (Math.abs(delta) >= 1e-9) {
+          const st = await this.budgetState();
+          await this.ctx.storage.put('budget', { day: st.day, spentUsd: Math.max(0, st.spentUsd + delta) });
+        }
         this.broadcast({ type: 'workspace', workspace: await this.summary() });
       },
     };
@@ -325,7 +330,7 @@ export class Workspace extends DurableObject<Env> {
         if (seg[2] === 'attempt' && method === 'POST') {
           const wav = new Uint8Array(await req.arrayBuffer());
           if (wav.length > MAX_AUDIO_BYTES) return error(413, 'too_large', 'Keep the brief under two minutes.');
-          this.enqueue(() => practiceAttempt(ctx, p.id, wav, wavDurationSeconds(wav)));
+          this.enqueue(() => practiceAttempt(ctx, p.id, wav));
           return json({ ok: true });
         }
       }
@@ -504,7 +509,7 @@ export class Workspace extends DurableObject<Env> {
       if (wav.length > MAX_AUDIO_BYTES) return error(413, 'too_large', 'Keep the answer under two minutes.');
       try {
         const keywords = [...(m.reading?.vagueTerms ?? []), m.reading?.task ?? ''].filter(Boolean);
-        const { transcript } = await transcribe(this.env, ctx.spender, wav, wavDurationSeconds(wav), keywords);
+        const { transcript } = await transcribe(this.env, ctx.spender, wav, keywords);
         if (!transcript) return error(422, 'no_speech', 'No speech was detected. Try again closer to the microphone.');
         const updated = await this.store.put('moment', { ...m, response: { kind: 'voice-answer', transcript, at: now() } });
         await ctx.remember(`They said: ${transcript}`);
@@ -534,7 +539,7 @@ export class Workspace extends DurableObject<Env> {
     if (type.startsWith('audio/')) {
       const wav = new Uint8Array(await req.arrayBuffer());
       try {
-        question = (await transcribe(this.env, this.context().spender, wav, wavDurationSeconds(wav))).transcript;
+        question = (await transcribe(this.env, this.context().spender, wav)).transcript;
       } catch (e) {
         const f = failureStatus(e);
         return error(503, f.status, f.message);

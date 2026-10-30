@@ -3,7 +3,8 @@
 
 import type { ModelTask } from '../../../packages/core/src/prompts.ts';
 import { parseJsonText, ShapeError } from '../../../packages/core/src/schema.ts';
-import { PRICES, sparkCost, sparkMaxCost, transcribeCost } from '../../../packages/core/src/budget.ts';
+import { isPriced, PRICED_MODELS, sparkCost, sparkMaxCost, transcribeCost, type Operation } from '../../../packages/core/src/budget.ts';
+import { parseWav } from '../../../packages/core/src/wav.ts';
 
 export interface MetaEnv {
   MODEL_API_KEY?: string;
@@ -78,7 +79,7 @@ export class RetryLater extends Error {
  * so their reservation is kept.
  */
 export function unbilled(e: unknown): boolean {
-  if (e instanceof LiveCallsDisabled || e instanceof BudgetExceeded || e instanceof RetryLater || e instanceof CostUnverifiable) return true;
+  if (e instanceof LiveCallsDisabled || e instanceof BudgetExceeded || e instanceof RetryLater || e instanceof CostUnverifiable || e instanceof ModelNotAllowed || e instanceof InvalidAudio) return true;
   if (e instanceof MetaError) return (e.status >= 400 && e.status < 500) || e.status === 503;
   return false;
 }
@@ -97,6 +98,16 @@ export const MAX_BLOCKING_WAIT_S = 10;
 
 const FORBIDDEN = /-contributor$/;
 
+/** The configured model is not on the priced allowlist for this operation. Fails closed, nothing sent. */
+export class ModelNotAllowed extends Error {
+  constructor(op: string, model: string) { super(`Model "${model}" is not on the priced allowlist for ${op}.`); this.name = 'ModelNotAllowed'; }
+}
+
+/** The audio is not a valid 16/24 kHz mono 16-bit PCM WAV, so its cost cannot be verified. */
+export class InvalidAudio extends Error {
+  constructor() { super('The recording could not be read as 16-bit mono WAV.'); this.name = 'InvalidAudio'; }
+}
+
 export function liveEnabled(env: MetaEnv): boolean {
   return env.COEVO_ALLOW_LIVE_CALLS === 'true' && (fakeMeta(env) || Boolean(env.MODEL_API_KEY?.trim()));
 }
@@ -106,18 +117,22 @@ function authKey(env: MetaEnv): string {
   return fakeMeta(env) ? 'fake-test-key' : env.MODEL_API_KEY!;
 }
 
-function model(name: string | undefined, fallback: string): string {
+function model(op: Operation, name: string | undefined, fallback: string): string {
   const m = (name ?? fallback).trim();
   if (FORBIDDEN.test(m)) throw new Error('Contributor model variants are not allowed for user data.');
+  if (!isPriced(op, m)) throw new ModelNotAllowed(op, m);
   return m;
 }
 
 export const models = (env: MetaEnv) => ({
-  text: model(env.META_TEXT_MODEL, 'muse-spark-1.3'),
-  image: model(env.META_IMAGE_MODEL, 'muse-image-1.0'),
-  transcribe: model(env.META_TRANSCRIBE_MODEL, 'muse-voice-transcribe-1.0'),
-  segment: model(env.META_SEGMENT_MODEL, 'sam-3.1'),
+  text: model('text', env.META_TEXT_MODEL, 'muse-spark-1.3'),
+  image: model('image', env.META_IMAGE_MODEL, 'muse-image-1.0'),
+  transcribe: model('transcribe', env.META_TRANSCRIBE_MODEL, 'muse-voice-transcribe-1.0'),
+  segment: model('segment', env.META_SEGMENT_MODEL, 'sam-3.1'),
 });
+
+const IMAGE_USD = PRICED_MODELS.image['muse-image-1.0'].each;
+const SAM_USD = PRICED_MODELS.segment['sam-3.1'].perImage;
 
 function base(env: MetaEnv): string {
   const b = env.META_API_BASE_URL ?? 'https://api.meta.ai/v1';
@@ -257,29 +272,36 @@ export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T
 
 /** Generate one image. Returns raw bytes (PNG). */
 export async function generateImage(env: MetaEnv, spend: Spender, prompt: string, size: '1024x1536' | '1024x1024' | '1536x1024', f: Fetch = fetch): Promise<{ bytes: Uint8Array; mime: string; costUsd: number }> {
-  const ticket = await spend.reserve(PRICES.imageEach, 'image');
+  const imageModel = models(env).image;
+  const ticket = await spend.reserve(IMAGE_USD, 'image');
   try {
     const data = (await post(env, '/images/generations', JSON.stringify({
-      model: models(env).image, prompt, n: 1, size, response_format: 'b64_json', output_format: 'png', reasoning_strength: 'low',
+      model: imageModel, prompt, n: 1, size, response_format: 'b64_json', output_format: 'png', reasoning_strength: 'low',
       tool_enablement: { enable_image_search: false, enable_web_search: false, enable_shell: false },
     }), { 'Content-Type': 'application/json' }, f, 120_000)) as { data?: { b64_json?: string }[] };
     const b64 = data.data?.[0]?.b64_json;
     if (!b64) throw new InvalidOutput('Image response had no data.');
-    await spend.settle(ticket, PRICES.imageEach);
-    return { bytes: Uint8Array.from(atob(b64), c => c.charCodeAt(0)), mime: 'image/png', costUsd: PRICES.imageEach };
+    await spend.settle(ticket, IMAGE_USD);
+    return { bytes: Uint8Array.from(atob(b64), c => c.charCodeAt(0)), mime: 'image/png', costUsd: IMAGE_USD };
   } catch (e) {
-    await spend.settle(ticket, unbilled(e) ? 0 : PRICES.imageEach);
+    await spend.settle(ticket, unbilled(e) ? 0 : IMAGE_USD);
     throw e;
   }
 }
 
 /** Transcribe 16/24 kHz mono 16-bit WAV. */
-export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, durationSec: number, keywords: string[] = [], f: Fetch = fetch): Promise<{ transcript: string; durationMs: number; costUsd: number }> {
+export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, keywords: string[] = [], f: Fetch = fetch): Promise<{ transcript: string; durationMs: number; costUsd: number }> {
+  if (!liveEnabled(env)) throw new LiveCallsDisabled();
+  const transcribeModel = models(env).transcribe;
+  // Duration (and therefore cost) comes from the validated WAV bytes, never from the client.
+  const info = parseWav(wav);
+  if (!info) throw new InvalidAudio();
+  const durationSec = info.seconds;
   if (durationSec > 120) throw new InvalidOutput('Voice answers are limited to 2 minutes.');
   const estimate = transcribeCost(Math.ceil(durationSec));
   const ticket = await spend.reserve(estimate, 'transcribe');
   const fd = new FormData();
-  fd.append('request', new Blob([JSON.stringify({ model: models(env).transcribe, audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English'], keywords: keywords.slice(0, 20) })], { type: 'application/json' }));
+  fd.append('request', new Blob([JSON.stringify({ model: transcribeModel, audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English'], keywords: keywords.slice(0, 20) })], { type: 'application/json' }));
   fd.append('audio', new Blob([wav], { type: 'audio/wav' }), 'answer.wav');
   try {
     const data = (await post(env, '/asr/transcribe', fd, {}, f, 60_000)) as { transcript?: string; audioDurationMs?: number };
@@ -313,18 +335,19 @@ export function parseSamBoxes(text: string): Box[] {
 
 /** Find objects matching a noun phrase. Returns pixel boxes in source-image coordinates. */
 export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: string, phrase: string, f: Fetch = fetch): Promise<{ boxes: Box[]; costUsd: number; latencyMs: number }> {
-  const ticket = await spend.reserve(PRICES.samPerImage, 'segment');
+  const segmentModel = models(env).segment;
+  const ticket = await spend.reserve(SAM_USD, 'segment');
   const started = Date.now();
   try {
     const raw = (await post(env, '/responses', JSON.stringify({
-      model: models(env).segment,
+      model: segmentModel,
       input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: phrase }, { type: 'input_image', image_url: imageDataUrl }] }],
       metadata: { mask_encoding: 'one_bit', include_confidence: 'true' },
       store: false,
     }), { 'Content-Type': 'application/json' }, f, 30_000)) as ResponsesOutput;
     const processed = raw.usage?.images_processed;
-    await spend.settle(ticket, typeof processed === 'number' && processed >= 1 ? PRICES.samPerImage * processed : PRICES.samPerImage);
-    return { boxes: parseSamBoxes(outputText(raw)), costUsd: PRICES.samPerImage, latencyMs: Date.now() - started };
+    await spend.settle(ticket, typeof processed === 'number' && processed >= 1 ? SAM_USD * processed : SAM_USD);
+    return { boxes: parseSamBoxes(outputText(raw)), costUsd: SAM_USD, latencyMs: Date.now() - started };
   } catch (e) {
     if (unbilled(e)) await spend.settle(ticket, 0);
     throw e;

@@ -1,31 +1,24 @@
+// Muse Code launcher. Muse Code is out of product scope, and during the bounded
+// budget validation every paid path must go through the deployed budget gate.
+// So only --help / --version run (they need no key); everything else refuses
+// unconditionally and the Meta key is never passed to the child.
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { root, readConfig } from './config.mjs';
 
 const args = process.argv.slice(2);
-const env = readConfig();
 const helpOnly = args.length > 0 && args.every(a => ['--help', '-h', '--version', '-V'].includes(a));
-const binary = path.join(process.env.HOME, '.local/bin/muse');
+if (!helpOnly) {
+  console.error('Muse Code sessions are disabled in this project: paid Meta calls must go through the deployed budget gate. Only --help and --version are allowed.');
+  process.exit(2);
+}
+const binary = path.join(process.env.HOME ?? '', '.local/bin/muse');
 if (!existsSync(binary)) {
-  console.error('Muse Code is not installed. See docs/API-SETUP.md.');
+  console.error('Muse Code is not installed.');
   process.exit(2);
 }
-if (!helpOnly && env.COEVO_ALLOW_LIVE_CALLS !== 'true') {
-  console.error('Live Muse sessions are disabled. Confirm credit/billing status before enabling COEVO_ALLOW_LIVE_CALLS.');
-  process.exit(2);
-}
-if (!helpOnly && (!env.MODEL_API_KEY?.trim() || env.META_API_BASE_URL !== 'https://api.meta.ai/v1')) {
-  console.error('Meta key or official endpoint is not configured.');
-  process.exit(2);
-}
-const child = spawn(binary, helpOnly ? args : [
-  '--provider', 'meta', '--model', env.META_TEXT_MODEL,
-  '--base-url', env.META_API_BASE_URL, '--workspace', root, ...args,
-], {
-  cwd: root,
-  stdio: 'inherit',
-  env: helpOnly ? process.env : { ...process.env, META_API_KEY: env.MODEL_API_KEY },
-});
+const { MODEL_API_KEY, META_API_KEY, ...clean } = process.env;
+void MODEL_API_KEY; void META_API_KEY;
+const child = spawn(binary, args, { stdio: 'inherit', env: clean });
 child.on('error', () => { console.error('Unable to start Muse Code.'); process.exitCode = 1; });
 child.on('exit', code => { process.exitCode = code ?? 1; });

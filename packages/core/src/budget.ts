@@ -22,6 +22,23 @@ export const META_OPERATING_CEILING_USD = 2.5;
 /** Modal uses its own separately verified free balance ($1.00); stay below it. */
 export const MODAL_CEILING_USD = 0.9;
 
+/**
+ * Explicit priced allowlist per operation (Standard tier, USD, from the public
+ * pricing page). A configured model that is not listed here fails closed.
+ */
+export const PRICED_MODELS = {
+  text: { 'muse-spark-1.3': { inputPerM: 1.25, outputPerM: 4.25, cachedPerM: 0.15 } },
+  image: { 'muse-image-1.0': { each: 0.01 } },
+  transcribe: { 'muse-voice-transcribe-1.0': { perHour: 0.18 } },
+  segment: { 'sam-3.1': { perImage: 2.5 / 1000 } },
+} as const;
+
+export type Operation = keyof typeof PRICED_MODELS;
+
+export function isPriced(op: Operation, model: string): boolean {
+  return Object.prototype.hasOwnProperty.call(PRICED_MODELS[op], model);
+}
+
 export const CAPS = {
   globalLifetimeUsd: META_OPERATING_CEILING_USD,
   workspacePerDayUsd: 0.6,

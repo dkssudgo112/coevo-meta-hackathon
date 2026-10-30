@@ -3,7 +3,7 @@ import type { ContentItem, Moment, Session, SkillDimension, Snapshot } from '../
 import { post, postBinary, api, type Creds } from '../lib/api.ts';
 import type { ConnState } from '../lib/store.ts';
 import { vibrate } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, modelSourceLine, momentLine, sessionMoments, type FlagState } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, modelSourceLine, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
 import { PracticeRange } from './Practice.tsx';
@@ -310,6 +310,7 @@ function Privacy({ creds, state, session }: { creds: Creds; state: Snapshot; ses
     <section className="stack">
       <h3>Privacy</h3>
       <p className="faint">Only the boxed screen area is sent. Frames are read, then discarded unless they are evidence for a moment. You can delete kept frames at any time.</p>
+      <p className="faint">{PROVIDER_DATA_NOTICE}</p>
       {session && <button className="btn" disabled={busy || !kept.length} onClick={async () => { setBusy(true); try { for (const m of kept) await api(creds, `/frames/${m.frame!.id}`, { method: 'DELETE' }); } finally { setBusy(false); } }}>Delete {kept.length} kept frame{kept.length === 1 ? '' : 's'} from this session</button>}
       {session && <button className="btn ghost" disabled={busy} onClick={async () => { if (!confirm('Delete this session, its frames and its content?')) return; setBusy(true); try { await api(creds, `/sessions/${session.id}`, { method: 'DELETE' }); } finally { setBusy(false); } }}>Delete this session</button>}
     </section>

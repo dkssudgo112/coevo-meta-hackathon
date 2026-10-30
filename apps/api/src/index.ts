@@ -53,8 +53,15 @@ async function admin(req: Request, env: Env, path: string): Promise<Response> {
     const b2 = (await req.json().catch(() => ({}))) as { usd?: number; label?: string; ledger?: string };
     const kind = b2.ledger === 'modal' ? 'modal' : b2.ledger === 'meta' ? 'meta' : null;
     if (!kind) return error(400, 'ledger_required', 'Say which ledger: "meta" or "modal".');
-    const ok = await book(kind).reserveExternal(Number(b2.usd), String(b2.label ?? 'external'), ledgerScope(env, kind));
-    return ok ? json({ ok: true, ...(await book(kind).status(ledgerScope(env, kind))) }) : error(402, 'budget', 'The lifetime budget cannot cover this reservation.');
+    const ticket = await book(kind).reserveExternal(Number(b2.usd), String(b2.label ?? 'external'), ledgerScope(env, kind));
+    return ticket ? json({ ok: true, ticket, ...(await book(kind).status(ledgerScope(env, kind))) }) : error(402, 'budget', 'The lifetime budget cannot cover this reservation.');
+  }
+  if (path === '/api/admin/settle' && req.method === 'POST') {
+    const b3 = (await req.json().catch(() => ({}))) as { usd?: number; ticket?: string; ledger?: string };
+    const kind = b3.ledger === 'modal' ? 'modal' : b3.ledger === 'meta' ? 'meta' : null;
+    if (!kind || !b3.ticket) return error(400, 'bad_request', 'ledger and ticket are required.');
+    const applied = await book(kind).settle(String(b3.ticket), Number(b3.usd));
+    return json({ applied, ...(await book(kind).status(ledgerScope(env, kind))) });
   }
   return error(404, 'not_found', 'Unknown route.');
 }

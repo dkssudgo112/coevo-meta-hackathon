@@ -5,7 +5,7 @@ import { applyGuardrails, type Proposal } from '../src/ladder.ts';
 import { labelPractice, observeChange } from '../src/labels.ts';
 import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
 import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
-import { encodeWav, resample, wavDurationSeconds } from '../src/wav.ts';
+import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
 import { applyHint } from '../src/cards.ts';
 import { decisionTask, readingTask, shortTask, podcastTask, manualTask } from '../src/prompts.ts';
@@ -132,6 +132,8 @@ test('wav encoding produces 16-bit mono with correct duration', () => {
   const wav = encodeWav(r, 16000);
   assert.equal(wav.length, 44 + 32000);
   assert.equal(wavDurationSeconds(wav), 1);
+  assert.deepEqual(parseWav(wav), { sampleRate: 16000, channels: 1, bitsPerSample: 16, seconds: 1 }, 'the browser encoder passes server validation');
+  assert.equal(parseWav(encodeWav(r, 44100)), null, 'unsupported rate refused');
 });
 
 test('text checks: banned phrases, grounded quotes with ellipsis, similarity, speech length', () => {

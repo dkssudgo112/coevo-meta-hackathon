@@ -3,7 +3,7 @@ import jsQR from 'jsqr';
 import type { CropRect } from '../../../../packages/contracts/index.ts';
 import { pairPhone, parsePair, postBinary, type Creds } from '../lib/api.ts';
 import { canvasJpeg, drawCrop, FULL, startRearCamera, stopStream } from '../lib/capture.ts';
-import { errorText, Flag } from '../ui/common.tsx';
+import { errorText, Flag, PROVIDER_DATA_NOTICE } from '../ui/common.tsx';
 
 export function PairScreen({ onPaired }: { onPaired: (c: Creds) => void }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -168,6 +168,7 @@ export function AimScreen({ creds, initial, onDone, onPhotos }: { creds: Creds; 
           {find.state === 'none' && <p className="faint" role="status">No screen was found. Drag the corners by hand.</p>}
           {find.state === 'error' && <p className="faint" role="alert">{find.message ?? 'Screen finding is unavailable.'} Drag the corners by hand.</p>}
         </div>
+        <p className="notice">{PROVIDER_DATA_NOTICE}</p>
         <button className="btn primary block" onClick={() => onDone(crop)} disabled={camera !== 'on'}>Start watching</button>
         <button className="linklike" onClick={onPhotos}>Use single photos instead</button>
       </main>

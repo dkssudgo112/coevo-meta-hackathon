@@ -111,3 +111,6 @@ export function modelSourceLine(h: HealthInfo | null): string {
   if (!h.liveCallsEnabled) return 'Live model calls are off on this server right now, so the Caddie cannot respond. Nothing is simulated.';
   return 'The Caddie’s readings and replies are live Meta model output.';
 }
+
+/** Shown wherever screen content is sent. Accurate for this hackathon deployment's billing state. */
+export const PROVIDER_DATA_NOTICE = 'This hackathon deployment runs on Meta’s free developer credits. Meta’s billing page says content sent while free credits are in use may be used to improve its products. Use test content and keep personal information off your screen.';

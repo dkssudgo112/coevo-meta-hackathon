@@ -11,13 +11,31 @@ const token = process.env.BUDGET_TEST_TOKEN ?? 'local-budget-test-token-01234567
 const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 let failed = 0;
 const check = (name, ok, detail = '') => { if (!ok) failed++; console.log(`${ok ? '✔' : '✖'} ${name}${detail ? ` — ${detail}` : ''}`); };
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+const PENDING = '.wrangler/budget-test-pending-ticket.json';
 const ledger = async () => (await fetch(`${base}/api/admin/ledger`, { headers: H })).json();
+const settle = (ticket, usd, ledgerName = 'meta') => fetch(`${base}/api/admin/settle`, { method: 'POST', headers: H, body: JSON.stringify({ ticket, usd, ledger: ledgerName }) }).then(r => r.json());
 const reserve = (usd, ledgerName = 'meta') => fetch(`${base}/api/admin/reserve`, { method: 'POST', headers: H, body: JSON.stringify({ usd, ledger: ledgerName, label: 'budget-test' }) });
 
 const health = await (await fetch(`${base}/api/health`)).json();
 check('local worker is not in fake mode (real Budget object under test)', health.testFakeModels === false);
 
 if (phase === 'fill') {
+  const t0 = await ledger();
+  check('fresh test ledger', t0.meta.spentUsd === 0, `$${t0.meta.spentUsd} (delete .wrangler/budget-test-state for a fresh run)`);
+  // Durable tickets: settle exactly once.
+  const a = await (await reserve(0.1)).json();
+  const s1 = await settle(a.ticket, 0.04);
+  const s2 = await settle(a.ticket, 0);
+  check('settle applies once; a duplicate settle is ignored', s1.applied === true && s2.applied === false && Math.abs(s2.spentUsd - 0.04) < 1e-9, `$${s2.spentUsd}`);
+  const unknown = await settle('00000000-0000-0000-0000-000000000000', 0);
+  check('unknown ticket cannot refund anything', unknown.applied === false && Math.abs(unknown.spentUsd - 0.04) < 1e-9);
+  const b = await (await reserve(0.1)).json();
+  const dup = await Promise.all(Array.from({ length: 20 }, () => settle(b.ticket, 0)));
+  const afterDup = await ledger();
+  check('20 concurrent duplicate settles → exactly one applied', dup.filter(d => d.applied).length === 1 && Math.abs(afterDup.meta.spentUsd - 0.04) < 1e-9, `$${afterDup.meta.spentUsd}`);
+  const c = await (await reserve(0.05)).json();
+  writeFileSync(PENDING, JSON.stringify({ ticket: c.ticket }));
   const start = await ledger();
   check('configured $10 is clamped to the $2.50 operating ceiling', start.meta.capUsd === 2.5, `cap ${start.meta.capUsd}`);
   check('Modal ledger is separate with its own ceiling ≤ $0.90', start.modal.capUsd <= 0.9, `cap ${start.modal.capUsd}`);
@@ -38,10 +56,18 @@ if (phase === 'fill') {
 }
 
 if (phase === 'after-restart') {
+  if (existsSync(PENDING)) {
+    const { ticket } = JSON.parse(readFileSync(PENDING, 'utf8'));
+    const before = (await ledger()).meta.spentUsd;
+    const r1 = await settle(ticket, 0.01);
+    const r2 = await settle(ticket, 0);
+    check('a ticket reserved before the restart settles exactly once after it', r1.applied === true && r2.applied === false && Math.abs(r2.spentUsd - (before - 0.04)) < 1e-9, `$${before} → $${r2.spentUsd}`);
+  }
   const l = await ledger();
-  check('after restart the ledger is still full (persisted, not reset)', l.meta.spentUsd >= 2.5 - 0.02 + 1e-9 && l.meta.spentUsd <= 2.5 + 1e-9, `$${l.meta.spentUsd}`);
-  const r = await reserve(0.02);
-  check('after restart new reservations are still refused', r.status === 402);
+  check('after restart the ledger is still near the ceiling (persisted, not reset)', l.meta.spentUsd >= 2.4 && l.meta.spentUsd <= 2.5 + 1e-9, `$${l.meta.spentUsd}`);
+  const fill = await Promise.all(Array.from({ length: 10 }, () => reserve(0.02)));
+  const after = await ledger();
+  check('after restart the ceiling still holds', after.meta.spentUsd <= 2.5 + 1e-9 && fill.some(r => r.status === 402), `$${after.meta.spentUsd}`);
   check('external reservations are logged for audit', l.meta.external.length > 0, `${l.meta.external.length} entries`);
 }
 
