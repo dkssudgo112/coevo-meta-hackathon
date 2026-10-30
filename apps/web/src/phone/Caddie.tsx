@@ -5,6 +5,7 @@ import { useWorkspace } from '../lib/store.ts';
 import { cropImageFile, FrameSampler, startRearCamera, stopStream, uploadFrame, type SentTiming } from '../lib/capture.ts';
 import { errorText, latestSession, sessionMoments } from '../ui/common.tsx';
 import { illegibleRun } from '../lib/moments.ts';
+import { cameraOffMessage, cameraShouldRun } from '../lib/camera.ts';
 import { AimScreen, CropEditor, PairScreen } from './Setup.tsx';
 import { LiveScreen } from './Live.tsx';
 
@@ -59,16 +60,16 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
   const [message, setMessage] = useState(crop ? 'Starting the camera…' : 'Photo mode: send a photo whenever you want the Caddie to look.');
   const [photo, setPhoto] = useState<{ file: File; url: string; crop: CropRect; aspect: number | null } | null>(null);
   const session = latestSession(state);
-  const paused = session?.status === 'paused';
 
   const benchDone = bench && (benchStopped || benchCount >= BENCHMARK_MAX);
-  // The camera runs only while actively watching. Pause, benchmark stop and benchmark
-  // completion turn the camera itself off (tracks stopped), not just the uploads.
-  const cameraOn = Boolean(crop) && !paused && !benchDone;
+  // The camera runs only while actively watching. Pause, an ended session, benchmark stop and
+  // benchmark completion turn the camera itself off (tracks stopped), not just the uploads.
+  const gate = { hasCrop: Boolean(crop), sessionStatus: session?.status ?? null, benchDone };
+  const cameraOn = cameraShouldRun(gate);
 
   useEffect(() => {
     if (!cameraOn || !crop || !videoRef.current) {
-      if (crop) setMessage(paused ? 'Paused — camera off, nothing is sent' : benchDone ? 'Benchmark finished — camera off' : 'Camera off');
+      if (crop) setMessage(cameraOffMessage(gate));
       return;
     }
     let stream: MediaStream | null = null;
@@ -94,6 +95,9 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
       if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, [cameraOn, crop?.x, crop?.y, crop?.w, crop?.h, creds.token, state !== null]); // <video> renders only after the first state
+
+  // Keep the off reason current (paused → ended) without restarting a running camera.
+  useEffect(() => { if (!cameraOn && crop) setMessage(cameraOffMessage(gate)); }, [cameraOn, gate.sessionStatus, benchDone, Boolean(crop)]);
 
   // An unreadable frame is retried quietly (same view, once more) until three in a row fail;
   // then the NOW card asks to tilt the phone or take one photo.

@@ -84,7 +84,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
 
   if (!state) return <div className="phone"><main><p className="faint" role="status">{conn === 'unauthorized' ? 'This phone is no longer paired.' : 'Connecting to your Desk…'}</p>{conn === 'unauthorized' && onUnpair && <button className="btn" onClick={onUnpair}>Pair again</button>}</main></div>;
 
-  const flag: FlagState = !session || session.status === 'paused' ? 'off' : asking && !asking.response && !resolvedBy ? 'asking' : moments.length ? 'quiet' : 'watching';
+  const flag: FlagState = !session || session.status !== 'live' ? 'off' : asking && !asking.response && !resolvedBy ? 'asking' : moments.length ? 'quiet' : 'watching';
   const toolLine = session ? `${session.status === 'paused' ? 'Paused' : session.status === 'ended' ? 'Session ended' : 'Watching'}${session.tool ? ` · ${session.tool}` : ''}` : 'Ready';
 
   const act = async (fn: () => Promise<unknown>) => { setErr(''); try { await fn(); } catch (e) { setErr(errorText(e)); } };
@@ -115,6 +115,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
         {err && <p className="faint" role="alert">{err}</p>}
         <Flow state={state} session={session} moments={moments} onOpen={id => open({ kind: 'content', id })} />
         {session && session.status !== 'ended' && <button className="btn ghost" onClick={() => act(() => post(creds, `/sessions/${session.id}/end`))}>End this session</button>}
+        {session?.status === 'ended' && camera?.mode === 'camera' && <button className="btn primary" onClick={() => act(() => post(creds, '/sessions', {}))}>Start watching again</button>}
       </main>
 
       {drawer && (
