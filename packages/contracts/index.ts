@@ -169,6 +169,10 @@ export interface Moment {
   timing?: MomentTiming | null;
   /** Captured in the disclosed benchmark test mode (frame kept for evaluation, max 20). */
   benchmark?: boolean;
+  /** Id of the server instance that started this moment's work (restart recovery). */
+  runner?: string;
+  /** The server restarted while this moment was being read or decided; nothing was invented for it. */
+  interrupted?: boolean;
   /** SAM 3.1 pointers on the artifact (visual coaching), when a check ran for this moment. */
   pointers?: Pointer[];
   pointerCheck?: { status: 'done' | 'failed'; model: string; at: string; error?: string };
@@ -192,6 +196,8 @@ export interface ObservedChange {
   /** Assistance label for the change, based on whether the Caddie had intervened. */
   assistance: Assistance;
   aiAskedFirst: boolean;
+  /** No earlier readable request in this session: the details were named, not shown to be added. */
+  firstSeen?: boolean;
   /** Discernment evidence: the request corrected this detail of the AI's earlier result. */
   correctedDetail?: string | null;
   /** Diligence evidence: the request told the AI not to invent details or to mark assumptions. */

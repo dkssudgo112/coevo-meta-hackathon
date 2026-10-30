@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Moment } from '../../../packages/contracts/index.ts';
-import { connectionTrouble, illegibleRun } from '../src/lib/moments.ts';
+import { connectionTrouble, illegibleRun, missedLook } from '../src/lib/moments.ts';
 
 const m = (readingStatus: Moment['readingStatus'], over: Partial<Moment> = {}): Moment => ({
   id: Math.random().toString(36), work: { projectId: 'w', sessionId: 's', workId: 'k' }, index: 0, at: '', frame: { id: 'f', source: 'camera', deviceCropped: true } as Moment['frame'],
@@ -29,4 +29,11 @@ test('connection trouble covers a failed reading and a failed decision, not budg
   assert.equal(connectionTrouble(m('ok', { decision: { action: 'stay-quiet', step: 'watch', reason: 'x', quote: null, message: null, note: null, missingIngredients: [], exampleBrief: null, guardrail: 'decision-error', provenance: 'rule', model: null, decidedAt: '' } })), true);
   assert.equal(connectionTrouble(m('budget')), false);
   assert.equal(connectionTrouble(m('illegible')), false);
+});
+
+test('a look lost to a restart is neither a connection problem nor unreadable', () => {
+  const lost = m('error', { interrupted: true });
+  assert.equal(connectionTrouble(lost), false);
+  assert.equal(missedLook(lost), true);
+  assert.equal(illegibleRun([m('illegible'), lost, m('illegible')]), 2);
 });

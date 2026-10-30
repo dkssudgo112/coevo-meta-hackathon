@@ -99,7 +99,7 @@ export async function buildDecisionInput(ctx: Ctx, reading: Reading, history: Mo
   };
 }
 
-function ruleDecision(reason: string, guardrail: string): Decision {
+export function ruleDecision(reason: string, guardrail: string): Decision {
   return { action: 'stay-quiet', step: 'watch', reason, quote: null, message: null, note: null, missingIngredients: [], exampleBrief: null, guardrail, provenance: 'rule', model: null, decidedAt: now() };
 }
 
@@ -231,7 +231,7 @@ async function pointAtArtifact(ctx: Ctx, momentId: string, imageDataUrl: string,
 }
 
 /** Decide whether to keep the frame as evidence; otherwise delete it from storage. */
-async function retainOrDiscard(ctx: Ctx, moment: Moment, history: Moment[]): Promise<Moment> {
+export async function retainOrDiscard(ctx: Ctx, moment: Moment, history: Moment[]): Promise<Moment> {
   const f = moment.frame;
   if (!f?.storedKey) return moment;
   if (moment.benchmark) return moment; // benchmark frames are kept for evaluation until the user deletes them
@@ -268,7 +268,7 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
       timing.countMs += res.countMs; timing.generateMs += res.latencyMs; timing.calls += res.calls;
     }
   } catch (e) {
-    if (!ctx.store.alive('moment', momentId)) return; // deleted while the model was running
+    if (!ctx.store.alive('moment', momentId) || ctx.store.get('moment', momentId)?.interrupted) return; // deleted, or closed by restart recovery
     const f = failureStatus(e);
     // Raw frame is discarded when it could not be read (benchmark frames are kept for evaluation).
     const drop = !moment.benchmark;
@@ -277,8 +277,9 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
     return;
   }
 
-  // The user may have deleted the session or frame while the model was running.
-  if (!ctx.store.alive('moment', momentId) || !ctx.store.alive('session', session.id)) return;
+  // The user may have deleted the session or frame while the model was running, or a restart
+  // may already have closed this moment honestly (its old in-memory task must not overwrite that).
+  if (!ctx.store.alive('moment', momentId) || !ctx.store.alive('session', session.id) || ctx.store.get('moment', momentId)?.interrupted) return;
 
   if (!reading.legible) {
     // Unreadable frames are never kept (except benchmark frames, kept for evaluation).
@@ -314,7 +315,7 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
       decision = ruleDecision(f.message, `decision-${f.status}`);
     }
   }
-  if (!ctx.store.alive('moment', momentId) || !ctx.store.alive('session', session.id)) return;
+  if (!ctx.store.alive('moment', momentId) || !ctx.store.alive('session', session.id) || ctx.store.get('moment', momentId)?.interrupted) return;
   timing.totalMs = Date.now() - Date.parse(moment.at);
   moment = { ...ctx.store.get('moment', momentId)!, decision, timing };
   moment = await retainOrDiscard(ctx, moment, history);
@@ -333,7 +334,7 @@ export async function followUp(ctx: Ctx, source: Moment, extra: string): Promise
   const reply: Moment = {
     id: id('m'), work: source.work, index: all.length ? all[all.length - 1].index + 1 : 0, at: now(), frame: null,
     readingStatus: 'ok', readingError: null, reading: { ...source.reading, userTyping: false }, misread: false,
-    decision: null, response: null, change: null, provenance: modelProvenance(ctx.env),
+    decision: null, response: null, change: null, provenance: modelProvenance(ctx.env), runner: ctx.runner,
   };
   await ctx.store.put('moment', reply);
   let decision: Decision;
@@ -343,6 +344,6 @@ export async function followUp(ctx: Ctx, source: Moment, extra: string): Promise
     const f = failureStatus(e);
     decision = ruleDecision(f.message, `decision-${f.status}`);
   }
-  if (!ctx.store.alive('moment', reply.id)) return; // session deleted meanwhile
+  if (!ctx.store.alive('moment', reply.id) || ctx.store.get('moment', reply.id)?.interrupted) return; // deleted, or closed by restart recovery
   await ctx.store.put('moment', { ...ctx.store.get('moment', reply.id)!, decision });
 }

@@ -8,7 +8,7 @@ import { parseWav } from '../../../packages/core/src/wav.ts';
 import { asksFromText } from '../../../packages/core/src/cards.ts';
 import { BudgetExceeded, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
 import { pollJob } from './media.ts';
-import { followUp, failureStatus, processMoment, sessionMoments, type Ctx } from './pipeline.ts';
+import { followUp, failureStatus, processMoment, retainOrDiscard, ruleDecision, sessionMoments, type Ctx } from './pipeline.ts';
 import { cardAction, generate, podcastAsk, practiceAttempt, practiceRetryImage, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
 import { Store } from './store.ts';
 import type { LedgerScope } from './budget-do.ts';
@@ -114,6 +114,28 @@ export class Workspace extends DurableObject<Env> {
     }
     for (const s of this.store.list('session')) {
       if (s.wrapStatus === 'planning') await this.store.put('session', { ...s, wrapStatus: 'failed' }); // the wrap-up shows Retry
+    }
+    // Moments: reading and deciding run in memory. A moment the previous instance left unread or
+    // undecided is closed honestly — nothing is invented, no skill is recorded, its reservation stays
+    // as it was — and the phone offers to look again. Work started by this instance is never touched.
+    const ctx = this.context();
+    for (const m of this.store.list('moment')) {
+      if (m.runner === this.runner || m.interrupted) continue;
+      if (m.readingStatus === 'pending') {
+        // Same raw-frame rule as any failed read: discard it unless it is an explicit benchmark frame.
+        const drop = !!m.frame?.storedKey && !m.benchmark;
+        if (drop) await this.bucket().delete(m.frame!.storedKey!).catch(() => undefined);
+        const reason = 'The Caddie restarted while reading this screen, so it was not read. It looks again at the next change, or send one photo.';
+        await this.store.put('moment', { ...m, readingStatus: 'error', readingError: reason, interrupted: true, frame: m.frame && drop ? { ...m.frame, storedKey: undefined, deleted: true } : m.frame, decision: ruleDecision(reason, 'interrupted') });
+      } else if (m.readingStatus === 'ok' && !m.decision) {
+        // The reading (and any observed change) is kept; only the lost decision is reported.
+        const reason = m.frame
+          ? 'The Caddie restarted before deciding about this screen, so it said nothing. It looks again at the next change.'
+          : 'The Caddie restarted before replying. Your answer is kept; it looks again at the next change.';
+        const history = sessionMoments(this.store, m.work.sessionId).filter(h => h.index < m.index);
+        const closed = await retainOrDiscard(ctx, { ...m, interrupted: true, decision: ruleDecision(reason, 'decision-interrupted') }, history);
+        await this.store.put('moment', closed);
+      }
     }
     // Practice steps run in memory too: keep what finished (scenario, transcript, check) and offer a retry.
     const cut = 'Interrupted when the server restarted. Try again.';
@@ -649,7 +671,7 @@ export class Workspace extends DurableObject<Env> {
     const moment: Moment = {
       id: id('m'), work: { projectId: this.meta!.id, sessionId: session.id, workId: session.workId }, index: all.length ? all[all.length - 1].index + 1 : 0,
       at: now(), frame, readingStatus: 'pending', readingError: null, reading: null, misread: false, decision: null, response: null, change: null,
-      provenance: source === 'sample' ? 'fixture' : 'observed',
+      provenance: source === 'sample' ? 'fixture' : 'observed', runner: this.runner,
       ...(benchmark ? { benchmark: true } : {}),
     };
     await this.store.put('moment', moment);

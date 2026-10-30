@@ -29,7 +29,7 @@ They answer out loud — office workers near the station, 6,500 won, a calm morn
 - **Muse Voice Transcribe** — your spoken answers and practice briefs.
 - **Muse Image** — Practice Range renders your spoken brief, and scenes for the short.
 
-Speech for the podcast and short uses the open-source **Kokoro-82M** model (Apache-2.0) on Modal, because Meta's API has no text-to-speech. With earphones in (you confirm it), the phone can also read new Caddie questions aloud with the browser's own speech synthesis; it is off by default.
+Speech for the podcast and short uses the open-source **Kokoro-82M** model (Apache-2.0) on Modal, because Meta's API has no text-to-speech. With earphones in (you confirm it), the phone can also read new Caddie questions aloud with a voice that runs on the phone itself; it is off by default.
 
 **After a session — five formats, five moments** (the Caddie decides which are worth making, with a one-line reason):
 note (right after) · **My playbook** manual split into "for your AI" and "you decide" (source of the Caddie card) · flashcards that apply the rule to new situations (10 min, then 1, 3, 7, 14 days) · a two-voice podcast with an objecting guest, where you can pause to ask and resume at the same line · a 30–45 s 9:16 short built on your own before/after screens.

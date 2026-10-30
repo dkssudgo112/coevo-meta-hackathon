@@ -6,7 +6,7 @@ import { vibrate } from '../lib/capture.ts';
 import { AssistLabel, changeText, clock, DataTable, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, MediaImage, modelSourceLine, PointerFrame, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
-import { connectionTrouble, illegibleRun } from '../lib/moments.ts';
+import { connectionTrouble, illegibleRun, missedLook } from '../lib/moments.ts';
 import { PracticeRange } from './Practice.tsx';
 import { ReadAloudSetting, useReadAloud } from './ReadAloud.tsx';
 
@@ -21,12 +21,12 @@ export interface CameraInfo {
 /** Content opened from a past session remembers it, so Back returns there (not to the live session). */
 type Sheet = { kind: 'content'; id: string } | { kind: 'practice'; id: string | null; sessionId: string | null } | { kind: 'session'; id: string; highlight?: string } | null;
 
-function Sheet({ title, onClose, back = 'Back to session', waiting, children }: { title: string; onClose: () => void; back?: string; waiting?: boolean; children: ReactNode }) {
+function Sheet({ title, onClose, back = 'Back to session', waiting, onToQuestion, children }: { title: string; onClose: () => void; back?: string; waiting?: boolean; onToQuestion?: () => void; children: ReactNode }) {
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
         <header><h2 className="grow">{title}</h2><button className="btn small" onClick={onClose}>{back}</button></header>
-        {waiting && <p className="faint" role="status">The Caddie has a new question. It waits until you go back.</p>}
+        {waiting && <div className="row" role="status"><span className="faint grow">The Caddie has a new question. It waits until you go back.</span>{onToQuestion && <button className="btn small" onClick={onToQuestion}>Go to the question</button>}</div>}
         {children}
       </div>
     </div>
@@ -62,6 +62,9 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
   const seenAsk = useRef<string | null | undefined>(undefined);
   const hydrated = state !== null;
   const ra = useReadAloud();
+  // Vibration can be turned off (an open office); the card still pulses.
+  const [buzz, setBuzzRaw] = useState(() => { try { return localStorage.getItem('coevo.vibrate') !== 'off'; } catch { return true; } });
+  const setBuzz = (v: boolean) => { setBuzzRaw(v); try { if (v) localStorage.removeItem('coevo.vibrate'); else localStorage.setItem('coevo.vibrate', 'off'); } catch { /* this tab only */ } };
   useEffect(() => { if (answeringId) ra.stop(); }, [answeringId]);
 
   // Reading something on the phone (a sheet or the menu) also defers the buzz and speech (plan 3.4).
@@ -72,7 +75,8 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
     if (seenAsk.current === undefined) { seenAsk.current = newestAsk?.id ?? null; return; }
     if (answeringId || readingSheet) return; // deferred: buzzes once the answer is sent or the sheet is closed
     if (newestAsk && !newestAsk.response && seenAsk.current !== newestAsk.id) {
-      vibrate([60, 40, 60]); setPulse(true); setTimeout(() => setPulse(false), 1900);
+      if (buzz) vibrate([60, 40, 60]);
+      setPulse(true); setTimeout(() => setPulse(false), 1900);
       ra.say(newestAsk.decision?.message ?? '');
       seenAsk.current = newestAsk.id;
     }
@@ -123,6 +127,11 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
               {camera && <button className="btn" onClick={() => { setDrawer(false); camera.onReaim(); }}>Re-aim the camera</button>}
               {camera && <label className="btn">Send one photo<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; if (f) { setDrawer(false); camera.onPhoto(f); } }} /></label>}
             </section>
+            <section className="stack">
+              <h3>Alerts</h3>
+              <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={buzz} onChange={e => setBuzz(e.target.checked)} /> Vibrate when the Caddie asks something</label>
+              <p className="faint">{buzz ? 'The question card also pulses.' : 'No vibration; the question card still pulses.'}</p>
+            </section>
             <ReadAloudSetting ra={ra} />
             <Playbook creds={creds} state={state} />
             <Habits state={state} />
@@ -145,18 +154,18 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
       {sheet?.kind === 'content' && (() => {
         const item = state.content.find(c => c.id === sheet.id);
         return item ? (
-          <Sheet title={FORMAT_NAME[item.format]} onClose={back} back={backLabel} waiting={unseenAsk}>
+          <Sheet title={FORMAT_NAME[item.format]} onClose={back} back={backLabel} waiting={unseenAsk} onToQuestion={() => setStack([])}>
             <ContentBody item={item} state={state} creds={creds} onSource={m => open({ kind: 'session', id: item.sessionId, highlight: m })} />
           </Sheet>
         ) : null;
       })()}
       {sheet?.kind === 'practice' && (
-        <Sheet title="Practice Range" onClose={back} back={backLabel} waiting={unseenAsk}>
+        <Sheet title="Practice Range" onClose={back} back={backLabel} waiting={unseenAsk} onToQuestion={() => setStack([])}>
           <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={sheet.sessionId} onStart={id => replaceTop({ kind: 'practice', id, sessionId: sheet.sessionId })} />
         </Sheet>
       )}
       {sheet?.kind === 'session' && (
-        <Sheet title="Session" onClose={back} back={backLabel} waiting={unseenAsk}>
+        <Sheet title="Session" onClose={back} back={backLabel} waiting={unseenAsk} onToQuestion={() => setStack([])}>
           <SessionSummary creds={creds} state={state} sessionId={sheet.id} highlight={sheet.highlight} onOpen={id => open({ kind: 'content', id })} onPractice={sid => open({ kind: 'practice', id: null, sessionId: sid })} onSource={m => open({ kind: 'session', id: sheet.id, highlight: m })} />
         </Sheet>
       )}
@@ -225,6 +234,16 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, an
         <div className="eyebrow">Now · Can’t read the screen</div>
         <p className="message" style={{ fontSize: '1.3rem' }}>Tilt me a little, or take one photo.</p>
         {camera && <label className="btn small">📷 Take one photo<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; if (f) camera.onPhoto(f); e.target.value = ''; }} /></label>}
+      </section>
+    );
+  }
+  if (!openQuestion && missedLook(last)) {
+    return (
+      <section className="now">
+        <div className="eyebrow">Now · Missed a look</div>
+        <p className="message" style={{ fontSize: '1.3rem' }}>The Caddie restarted and missed this look.</p>
+        <p className="muted" role="status">{last.readingStatus === 'error' ? last.readingError : last.decision?.reason}</p>
+        {camera && <label className="btn small">📷 Send one photo<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; if (f) camera.onPhoto(f); e.target.value = ''; }} /></label>}
       </section>
     );
   }

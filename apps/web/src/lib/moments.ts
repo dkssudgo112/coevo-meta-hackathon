@@ -15,7 +15,12 @@ export function illegibleRun(moments: Moment[]): number {
   return run;
 }
 
-/** A model or network failure (not an unreadable frame, not a budget stop). */
+/** A model or network failure (not an unreadable frame, not a budget stop, not a restart). */
 export function connectionTrouble(m: Moment | undefined): boolean {
-  return !!m && (m.readingStatus === 'error' || (m.readingStatus === 'ok' && m.decision?.guardrail === 'decision-error'));
+  return !!m && !m.interrupted && (m.readingStatus === 'error' || (m.readingStatus === 'ok' && m.decision?.guardrail === 'decision-error'));
+}
+
+/** The server restarted while this moment was being read or decided (closed honestly, nothing invented). */
+export function missedLook(m: Moment | undefined): boolean {
+  return !!m?.interrupted;
 }

@@ -102,7 +102,10 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
     if (!state || !cameraOn) return;
     const ms = sessionMoments(state, latestSession(state)?.id);
     const lastFrame = [...ms].reverse().find(m => m.frame && !m.misread);
-    if (!lastFrame || lastFrame.readingStatus !== 'illegible' || retried.current === lastFrame.id) return;
+    if (!lastFrame || retried.current === lastFrame.id) return;
+    // A look lost to a server restart is resent once, the same way.
+    if (lastFrame.interrupted) { retried.current = lastFrame.id; sampler.current?.retrySoon(); return; }
+    if (lastFrame.readingStatus !== 'illegible') return;
     retried.current = lastFrame.id;
     if (illegibleRun(ms) < 3) sampler.current?.retrySoon();
   }, [state, cameraOn]);

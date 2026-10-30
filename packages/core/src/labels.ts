@@ -54,13 +54,16 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
   } else if (interventions.length) {
     assistance = 'coached';
   }
+  // With no earlier readable request there is no baseline: the request named these details, which
+  // is a fact; that it added them is not known.
+  const firstSeen = !prev;
   const parts: string[] = [];
-  if (added.length) parts.push(`added ${added.map(k => ADDED_WORDS[k]).join(', ')}`);
+  if (added.length) parts.push(firstSeen ? `named ${added.map(k => ADDED_WORDS[k]).join(', ')} in the first request seen (nothing earlier to compare)` : `added ${added.map(k => ADDED_WORDS[k]).join(', ')}`);
   if (aiAskedFirst) parts.push('the AI asked clarifying questions first');
   if (correctedDetail) parts.push(`told the AI to fix: ${correctedDetail}`);
   if (askedNoInvention) parts.push('told the AI not to invent details');
   void opts;
-  return { addedIngredients: added, assistance, aiAskedFirst, correctedDetail, askedNoInvention, summary: parts.join('; ') };
+  return { addedIngredients: added, assistance, aiAskedFirst, ...(firstSeen ? { firstSeen: true } : {}), correctedDetail, askedNoInvention, summary: parts.join('; ') };
 }
 
 export function strengthFor(assistance: Assistance, opts: { practice?: boolean; transfer?: boolean }): EvidenceStrength | null {

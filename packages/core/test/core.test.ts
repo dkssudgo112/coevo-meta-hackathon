@@ -338,3 +338,13 @@ test('SAM pointers land on the poster, never on the same words in the chat above
   assert.deepEqual(choosePointers(['price'], [], null, {}), []);
   assert.equal(insidePoster(poster, poster), false, 'the poster itself is not a part');
 });
+
+test('the first request seen names its details; it is not called an improvement', () => {
+  const first = observeChange(reading({ userRequest: 'A matcha cheesecake poster, 6,500 won', ingredients: { audience: false, price: true, mood: false, realPhoto: false, productDetail: true } }), []);
+  assert.equal(first?.firstSeen, true);
+  assert.doesNotMatch(first!.summary, /\badded\b/);
+  assert.match(first!.summary, /named the price, what exactly it is in the first request seen/);
+  const later = observeChange(reading({ userRequest: 'For office workers, 6,500 won', ingredients: { audience: true, price: true, mood: false, realPhoto: false, productDetail: false } }), [moment({ id: 'a' })]);
+  assert.equal(later?.firstSeen, undefined);
+  assert.match(later!.summary, /^added who it is for, the price/);
+});

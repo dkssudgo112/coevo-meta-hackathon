@@ -118,7 +118,7 @@ export function changeText(m: Moment): string {
   const c = m.change;
   if (!c) return '';
   const parts: string[] = [];
-  if (c.addedIngredients.length) parts.push(`You added ${c.addedIngredients.map(k => INGREDIENT_TEXT[k] ?? k).join(', ')}.`);
+  if (c.addedIngredients.length) parts.push(`${c.firstSeen ? 'Your request named' : 'You added'} ${c.addedIngredients.map(k => INGREDIENT_TEXT[k] ?? k).join(', ')}.`);
   if (c.aiAskedFirst) parts.push('Your AI asked first.');
   if (c.correctedDetail) parts.push(`You told the AI to fix: ${c.correctedDetail}.`);
   if (c.askedNoInvention) parts.push('You told the AI not to invent details.');

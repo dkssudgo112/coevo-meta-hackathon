@@ -190,6 +190,8 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
 // them into the per-workspace daily cap.
 async function freshWorkspace() {
   const fresh = await (await fetch(`${base}/api/workspaces`, { method: 'POST', headers: { 'X-Coevo-Test-Ledger': RUN_LEDGER } })).json();
+  // Workspace creation is limited per network per hour; say so instead of failing later on an undefined id.
+  if (!fresh.workspaceId) throw new Error(`could not create a fresh workspace: ${JSON.stringify(fresh.error ?? fresh)} (local runs share the per-hour creation limit; rerun after the hour)`);
   const paired = await (await fetch(`${base}/api/w/${fresh.workspaceId}/pair`, { method: 'POST', body: JSON.stringify({ pairSecret: fresh.pairSecret }), headers: { 'Content-Type': 'application/json' } })).json();
   creds = { ws: fresh.workspaceId, token: paired.phoneToken };
 }
@@ -375,6 +377,54 @@ for (const mode of ['regenerate', 'refuse']) {
   } else {
     check('a model that skips ahead twice is refused quietly, with no example text kept', d.action === 'stay-quiet' && d.guardrail === 'ladder-step' && d.message === null && !/Copy this brief/.test(shown), `${d.action} [${d.guardrail}] ${d.reason}`);
   }
+}
+
+// Restart while a moment is in flight (TEST hook = a new instance id + startup recovery): the unread
+// frame, a decision lost after reading, and a lost frameless reply are closed honestly, never left
+// "Reading…", and the old in-memory work cannot overwrite them when it finishes later.
+await freshWorkspace();
+{
+  await fetch(`${fake}/reset`);
+  await call('/sessions', { method: 'POST', body: '{}' });
+  await sleep(2600);
+  const upload = async seed => { const fd = new FormData(); fd.append('frame', new File([png(seed)], 'f.png', { type: 'image/png' })); fd.append('source', 'camera'); fd.append('deviceCropped', 'true'); return (await call('/frames', { method: 'POST', body: fd })).body.momentId; };
+  const moment = async id => (await state()).moments.find(m => m.id === id);
+  // A: reading in flight.
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'caddie_turn', ms: 8000 }) });
+  const a = await upload(0);
+  await sleep(1500);
+  await call('/test/restart', { method: 'POST' });
+  const a1 = await moment(a);
+  await sleep(9000);
+  const a2 = await moment(a);
+  check('restart during reading: the frame is closed as interrupted (not left pending), raw frame discarded, no decision invented', a1.readingStatus === 'error' && a1.interrupted === true && a1.decision?.guardrail === 'interrupted' && a1.decision.action === 'stay-quiet' && !a1.frame?.storedKey && a2.readingStatus === 'error' && a2.interrupted === true, `${a1.readingStatus} → later ${a2.readingStatus}`);
+  const after = await frame(1);
+  check('a new frame after the restart is read normally', after.m.readingStatus === 'ok' && !after.m.interrupted);
+  // B: reading stored, decision in flight (the model is asked again for a skipped ladder step).
+  await frame(2); // the third vague request comes next, so the Caddie would step in there
+  await fetch(`${fake}/skip-ahead`, { method: 'POST', body: JSON.stringify({ mode: 'regenerate' }) });
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'caddie_decision', ms: 8000 }) });
+  const b = await upload(3);
+  let b0 = null;
+  for (let i = 0; i < 40 && !(b0?.readingStatus === 'ok'); i++) { await sleep(250); b0 = await moment(b); }
+  await call('/test/restart', { method: 'POST' });
+  const b1 = await moment(b);
+  await sleep(9000);
+  const b2 = await moment(b);
+  check('restart during deciding: the reading is kept, the lost decision is reported, nothing said', b0?.decision === null && b1.readingStatus === 'ok' && !!b1.reading?.userRequest && b1.interrupted === true && b1.decision?.guardrail === 'decision-interrupted' && b1.decision.action === 'stay-quiet' && b2.decision?.guardrail === 'decision-interrupted', `${b1.decision?.guardrail} → later ${b2.decision?.guardrail}`);
+  // C: a frameless reply in flight after a typed answer.
+  await fetch(`${fake}/force-ask`, { method: 'POST' });
+  const asked = await frame(4);
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'caddie_decision', ms: 8000 }) });
+  await call(`/moments/${asked.m.id}/respond`, { method: 'POST', body: JSON.stringify({ kind: 'typed-answer', text: 'For office workers, 6,500 won.' }) });
+  let c0 = null;
+  for (let i = 0; i < 40 && !c0; i++) { await sleep(250); c0 = (await state()).moments.find(m => m.frame === null && m.index > asked.m.index); }
+  await call('/test/restart', { method: 'POST' });
+  const c1 = await moment(c0?.id);
+  await sleep(9000);
+  const c2 = await moment(c0?.id);
+  const answer = await moment(asked.m.id);
+  check('restart during a reply: the reply is reported as interrupted, the typed answer is kept', asked.m.decision?.action === 'intervene' && c1?.interrupted === true && c1.decision?.guardrail === 'decision-interrupted' && c2?.decision?.guardrail === 'decision-interrupted' && answer?.response?.kind === 'typed-answer', `${c1?.decision?.guardrail} → later ${c2?.decision?.guardrail}`);
 }
 
 const fin = await state();
