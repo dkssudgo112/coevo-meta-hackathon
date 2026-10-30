@@ -44,6 +44,8 @@ export class FrameSampler {
   private readonly creds: Creds;
   private readonly source: CaptureSource;
   private readonly events: SamplerEvents;
+  /** Disclosed benchmark test mode: frames are tagged and kept for evaluation (max 20 on the server). */
+  benchmark = false;
 
   constructor(video: HTMLVideoElement, creds: Creds, crop: CropRect, source: CaptureSource, events: SamplerEvents) {
     this.video = video;
@@ -80,7 +82,7 @@ export class FrameSampler {
     try {
       drawCrop(this.video, this.crop, this.full, 1280);
       const blob = await canvasJpeg(this.full);
-      const id = await uploadFrame(this.creds, blob, this.source, true);
+      const id = await uploadFrame(this.creds, blob, this.source, true, this.benchmark);
       this.events.onSent?.(id);
     } catch (e) {
       const err = e as Error & { status?: number };
@@ -91,8 +93,9 @@ export class FrameSampler {
   }
 }
 
-export async function uploadFrame(creds: Creds, blob: Blob, source: CaptureSource, deviceCropped: boolean): Promise<string> {
+export async function uploadFrame(creds: Creds, blob: Blob, source: CaptureSource, deviceCropped: boolean, benchmark = false): Promise<string> {
   const fd = new FormData();
+  if (benchmark) fd.append('benchmark', 'true');
   fd.append('frame', new File([blob], 'frame.jpg', { type: blob.type || 'image/jpeg' }));
   fd.append('source', source);
   fd.append('deviceCropped', String(deviceCropped));

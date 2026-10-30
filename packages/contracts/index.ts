@@ -137,6 +137,8 @@ export interface Moment {
   provenance: Provenance;
   /** Server-side latency breakdown for this moment, in milliseconds. */
   timing?: MomentTiming | null;
+  /** Captured in the disclosed benchmark test mode (frame kept for evaluation, max 20). */
+  benchmark?: boolean;
 }
 
 export interface MomentTiming {

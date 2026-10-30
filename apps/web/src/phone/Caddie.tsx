@@ -8,6 +8,16 @@ import { AimScreen, CropEditor, PairScreen } from './Setup.tsx';
 import { LiveScreen } from './Live.tsx';
 
 const CROP_KEY = 'coevo.crop';
+const BENCH_KEY = 'coevo.benchmark';
+const BENCHMARK_MAX = 20;
+
+/** Benchmark test mode is opt-in per tab via /caddie?benchmark=1 and disclosed on screen. */
+function benchmarkMode(): boolean {
+  try {
+    if (new URLSearchParams(location.search).has('benchmark')) sessionStorage.setItem(BENCH_KEY, '1');
+    return sessionStorage.getItem(BENCH_KEY) === '1';
+  } catch { return new URLSearchParams(location.search).has('benchmark'); }
+}
 
 function loadCrop(): CropRect | null {
   try { const r = localStorage.getItem(CROP_KEY); return r ? (JSON.parse(r) as CropRect) : null; } catch { return null; }
@@ -28,6 +38,9 @@ export function CaddieApp() {
 
 function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: CropRect | null; onReaim: () => void; onUnpair: () => void }) {
   const { state, conn } = useWorkspace(creds);
+  const [bench] = useState(benchmarkMode);
+  const [benchStopped, setBenchStopped] = useState(false);
+  const benchCount = state ? state.moments.filter(m => m.benchmark).length : 0;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const sampler = useRef<FrameSampler | null>(null);
   const [message, setMessage] = useState(crop ? 'Starting the camera…' : 'Photo mode: send a photo whenever you want the Caddie to look.');
@@ -47,6 +60,7 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
         onSent: () => setMessage('Sent the boxed screen area'),
         onError: (m, status) => { if (status === 409) sampler.current?.stop(); if (status !== 429) setMessage(m); },
       });
+      sampler.current.benchmark = bench;
       sampler.current.start();
     }).catch(() => setMessage('Camera unavailable — use photos from the menu'));
     return () => { cancelled = true; sampler.current?.stop(); sampler.current = null; stopStream(stream); };
@@ -54,14 +68,23 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
 
   useEffect(() => {
     if (!sampler.current) return;
-    if (paused) sampler.current.stop();
+    if (paused || (bench && (benchStopped || benchCount >= BENCHMARK_MAX))) sampler.current.stop();
     else { sampler.current.reset(); sampler.current.start(); }
-  }, [paused]);
+  }, [paused, benchStopped, bench && benchCount >= BENCHMARK_MAX]);
 
   const onPhoto = (file: File) => setPhoto({ file, url: URL.createObjectURL(file), crop: crop ?? { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }, aspect: null });
 
   return (
     <>
+      {bench && (
+        <div className="notice warn" role="status" style={{ borderRadius: 0, position: 'sticky', top: 0, zIndex: 6 }}>
+          <div className="row wrap">
+            <strong className="grow">Benchmark test mode · {Math.min(benchCount, BENCHMARK_MAX)}/{BENCHMARK_MAX} frames</strong>
+            {!benchStopped && benchCount < BENCHMARK_MAX ? <button className="btn small" onClick={() => setBenchStopped(true)}>Stop</button> : <span>Stopped — export or delete on the Desk</span>}
+          </div>
+          <span className="faint">For a synthetic test conversation only. Device-cropped frames are kept for evaluation until you delete them on the Desk.</span>
+        </div>
+      )}
       <LiveScreen creds={creds} state={state} conn={conn} camera={{ mode: crop ? 'camera' : 'photo', videoRef, message, onReaim, onPhoto }} onUnpair={onUnpair} />
       {photo && (
         <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Crop photo">

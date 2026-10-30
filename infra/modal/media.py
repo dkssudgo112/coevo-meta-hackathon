@@ -52,14 +52,16 @@ class Renderer:
         from kokoro import KPipeline
 
         self.pipe = KPipeline(lang_code="a", device="cpu")
-        self.load_s = round(time.monotonic() - t0, 2)
-        self.first_job = True
+        # Saved inside the snapshot: this is the load time measured when the snapshot was made,
+        # not the current container's restore time.
+        self.snapshot_load_s = round(time.monotonic() - t0, 2)
 
     @modal.enter(snap=False)
     def threads(self) -> None:
         import torch
 
         torch.set_num_threads(4)
+        self.first_job = True  # set after every start or restore, never cached in the snapshot
 
     def speak(self, text: str, voice: str):
         import numpy as np
@@ -80,8 +82,9 @@ class Renderer:
             out = compose.render_short(job.get("title", ""), job.get("voice", "af_heart"), job["scenes"], self.speak)
         else:
             raise ValueError("unknown job kind")
-        # First job on this container also reports how long loading took (0 when restored from a snapshot).
-        out["timing_s"] = {**out.get("timing_s", {}), "model_load": self.load_s if self.first_job else 0.0, "cold": self.first_job}
+        # Wall-clock TTS/compose timings are current. `snapshot_load_s` is the historical load
+        # measurement stored in the snapshot; it does not say whether this start was a restore.
+        out["timing_s"] = {**out.get("timing_s", {}), "first_job_on_container": self.first_job, "snapshot_load_s_cached": self.snapshot_load_s}
         self.first_job = False
         return out
 

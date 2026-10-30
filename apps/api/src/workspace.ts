@@ -41,6 +41,8 @@ const IDLE_END_MS = 10 * 60_000;
 const STUCK_MS = 6 * 60_000;
 const JOB_TIMEOUT_MS = 12 * 60_000;
 const MIN_FRAME_GAP_MS = 2500;
+/** Disclosed benchmark test mode: at most this many kept frames per workspace. */
+export const BENCHMARK_MAX_FRAMES = 20;
 
 export class Workspace extends DurableObject<Env> {
   private store: Store;
@@ -286,6 +288,8 @@ export class Workspace extends DurableObject<Env> {
       }
 
       if (path === '/calibrate' && method === 'POST') return this.calibrate(req);
+      if (path === '/benchmark' && method === 'GET') return this.benchmarkExport(url.searchParams.get('images') === '1');
+      if (path === '/benchmark' && method === 'DELETE') return this.benchmarkDelete();
       if (seg[0] === 'frames' && seg.length === 1 && method === 'POST') return this.frame(req);
       if (seg[0] === 'frames' && seg[1] && method === 'DELETE') return this.deleteFrame(seg[1]);
 
@@ -470,6 +474,10 @@ export class Workspace extends DurableObject<Env> {
     if (Date.now() - this.lastFrameAt < MIN_FRAME_GAP_MS) return error(429, 'too_fast', 'Frames are arriving faster than the Caddie reads them.');
     this.lastFrameAt = Date.now();
     const source = (['camera', 'photo', 'screen-share', 'sample'] as CaptureSource[]).includes(form.get('source') as CaptureSource) ? (form.get('source') as CaptureSource) : 'camera';
+    const benchmark = form.get('benchmark') === 'true';
+    if (benchmark && this.store.list('moment').filter(m => m.benchmark).length >= BENCHMARK_MAX_FRAMES) {
+      return error(409, 'benchmark_full', `The benchmark already has ${BENCHMARK_MAX_FRAMES} frames. Export or delete them first.`);
+    }
     const bytes = new Uint8Array(await file.arrayBuffer());
     const size = imageSize(bytes);
     if (!size) return error(415, 'unsupported', 'Send a JPEG or PNG frame.');
@@ -490,12 +498,52 @@ export class Workspace extends DurableObject<Env> {
       id: id('m'), work: { projectId: this.meta!.id, sessionId: session.id, workId: session.workId }, index: all.length ? all[all.length - 1].index + 1 : 0,
       at: now(), frame, readingStatus: 'pending', readingError: null, reading: null, misread: false, decision: null, response: null, change: null,
       provenance: source === 'sample' ? 'fixture' : 'observed',
+      ...(benchmark ? { benchmark: true } : {}),
     };
     await this.store.put('moment', moment);
     const dataUrl = bytesToDataUrl(bytes, size.mime);
     this.enqueue(() => processMoment(this.context(), moment.id, dataUrl));
     await this.schedule(IDLE_END_MS + 1000);
     return json({ momentId: moment.id, sessionId: session.id }, 202);
+  }
+
+  /** Private export of the benchmark: readings, decisions and timings, optionally with the frames. */
+  private async benchmarkExport(images: boolean): Promise<Response> {
+    const ms = this.store.list('moment').filter(m => m.benchmark).sort((a, b) => a.at.localeCompare(b.at));
+    const frames = [];
+    for (const [i, m] of ms.entries()) {
+      let image: string | null = null;
+      if (images && m.frame?.storedKey) {
+        const obj = await this.env.MEDIA.get(m.frame.storedKey);
+        if (obj) image = bytesToDataUrl(new Uint8Array(await obj.arrayBuffer()), obj.httpMetadata?.contentType ?? 'image/jpeg');
+      }
+      frames.push({
+        index: i + 1, momentId: m.id, at: m.at, source: m.frame?.source ?? null, deviceCropped: m.frame?.deviceCropped ?? null,
+        width: m.frame?.width ?? null, height: m.frame?.height ?? null, readingStatus: m.readingStatus, readingError: m.readingError,
+        legible: m.reading?.legible ?? null, tool: m.reading?.tool ?? null, userRequest: m.reading?.userRequest ?? null,
+        userTyping: m.reading?.userTyping ?? null, aiAskedClarifyingQuestion: m.reading?.aiAskedClarifyingQuestion ?? null,
+        decision: m.decision ? { action: m.decision.action, step: m.decision.step, provenance: m.decision.provenance } : null,
+        timing: m.timing ?? null, image,
+      });
+    }
+    const totals = ms.map(m => m.timing?.totalMs).filter((x): x is number => typeof x === 'number').sort((a, b) => a - b);
+    const q = (p: number) => (totals.length ? totals[Math.min(totals.length - 1, Math.floor(p * totals.length))] : null);
+    return json({
+      kind: 'coevo-benchmark', label: 'TEST MODE — synthetic test conversation; not production data', exportedAt: now(), workspaceId: this.meta!.id,
+      summary: { frames: ms.length, legible: ms.filter(m => m.reading?.legible).length, p50ServerMs: q(0.5), p90ServerMs: q(0.9), max: BENCHMARK_MAX_FRAMES },
+      frames,
+    }, 200, { 'Content-Disposition': `attachment; filename="coevo-benchmark-${this.meta!.id}.json"` });
+  }
+
+  private async benchmarkDelete(): Promise<Response> {
+    const ms = this.store.list('moment').filter(m => m.benchmark);
+    const keys = ms.map(m => m.frame?.storedKey).filter((k): k is string => !!k);
+    if (keys.length) await this.env.MEDIA.delete(keys);
+    for (const m of ms) {
+      for (const sk of this.store.list('skill').filter(x => x.momentId === m.id)) await this.store.remove('skill', sk.id);
+      await this.store.remove('moment', m.id);
+    }
+    return json({ deleted: ms.length });
   }
 
   private async deleteFrame(frameId: string): Promise<Response> {

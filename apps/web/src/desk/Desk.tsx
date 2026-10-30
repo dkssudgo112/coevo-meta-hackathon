@@ -76,6 +76,7 @@ function DeskWorkspace({ creds, pair, setPair, onReset }: { creds: Creds; pair: 
           {session ? <SessionReview creds={creds} state={state} sessionId={session.id} /> : state.workspace.paired && <Empty>Your phone is connected. Start working with your AI tool — moments will appear here.</Empty>}
         </main>
         <aside className="stack-lg">
+          {state.moments.some(m => m.benchmark) && <BenchmarkPanel creds={creds} state={state} />}
           <Inbox creds={creds} state={state} />
           <OtherCapture creds={creds} />
           <section className="card"><Habits state={state} /></section>
@@ -114,6 +115,36 @@ function RepairLink({ creds, setPair }: { creds: Creds; setPair: (p: PairInfo | 
     <section className="card stack">
       <h3>Pair another phone</h3>
       {p ? <QR text={pairLink(creds.workspaceId, p.secret)} label="QR code to pair another phone" /> : <button className="btn small" onClick={async () => { const r = await post<{ pairSecret: string; pairExpiresAt: string }>(creds, '/repair'); const n = { secret: r.pairSecret, expiresAt: r.pairExpiresAt }; setP(n); setPair(n); }}>Show a pairing code</button>}
+    </section>
+  );
+}
+
+function BenchmarkPanel({ creds, state }: { creds: Creds; state: Snapshot }) {
+  const ms = state.moments.filter(m => m.benchmark);
+  const totals = ms.map(m => m.timing?.totalMs).filter((x): x is number => typeof x === 'number').sort((a, b) => a - b);
+  const q = (p: number) => (totals.length ? `${(totals[Math.min(totals.length - 1, Math.floor(p * totals.length))] / 1000).toFixed(1)} s` : '—');
+  const [msg, setMsg] = useState('');
+  const exportJson = async () => {
+    setMsg('Preparing export…');
+    const res = await fetch(`/api/w/${creds.workspaceId}/benchmark?images=1`, { headers: { Authorization: `Bearer ${creds.token}` } });
+    if (!res.ok) { setMsg('Export failed.'); return; }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = `coevo-benchmark-${creds.workspaceId}.json`; a.click();
+    URL.revokeObjectURL(url);
+    setMsg('Exported. Keep the file private.');
+  };
+  const del = async () => {
+    if (!confirm('Delete all benchmark frames and their readings?')) return;
+    const r = await api<{ deleted: number }>(creds, '/benchmark', { method: 'DELETE' });
+    setMsg(`Deleted ${r.deleted} benchmark moments.`);
+  };
+  return (
+    <section className="card stack">
+      <div className="row"><h3 className="grow">Benchmark (test mode)</h3><span className="faint">{ms.length}/20</span></div>
+      <p className="faint">Readable {ms.filter(m => m.reading?.legible).length} of {ms.length} · server p50 {q(0.5)} · p90 {q(0.9)} · pending {ms.filter(m => !m.decision).length}</p>
+      <div className="row wrap"><button className="btn small" onClick={exportJson}>Export JSON with frames</button><button className="btn small ghost" onClick={del}>Delete benchmark frames</button></div>
+      {msg && <p className="faint" role="status">{msg}</p>}
     </section>
   );
 }

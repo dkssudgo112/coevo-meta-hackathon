@@ -43,11 +43,12 @@ async function call(path, init = {}) {
 }
 const state = async () => (await call('/state')).body;
 
-async function frame(seed) {
+async function frame(seed, benchmark = false) {
   const fd = new FormData();
   fd.append('frame', new File([png(seed)], 'f.png', { type: 'image/png' }));
   fd.append('source', 'camera');
   fd.append('deviceCropped', 'true');
+  if (benchmark) fd.append('benchmark', 'true');
   const r = await call('/frames', { method: 'POST', body: fd });
   if (r.res.status !== 202) throw new Error(`frame ${r.res.status} ${JSON.stringify(r.body)}`);
   for (let i = 0; i < 40; i++) {
@@ -164,6 +165,16 @@ check('retry refused for a ready item', retry.res.status === 409);
 await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'revoke' }) });
 const rv = (await state()).cards.find(c => c.id === card.id);
 check('card revoked with full history', rv.status === 'revoked' && rv.history.map(h => h.status).join('>') === 'proposed>proposed>approved>applied>observed-working>revoked');
+
+// Benchmark test mode: frames kept, exportable with timing and images, deletable.
+await fetch(`${fake}/reset`);
+const b1 = await frame(0, true);
+const b2 = await frame(1, true);
+check('benchmark frames are kept even when quiet', Boolean(b1.m.frame?.storedKey) && Boolean(b2.m.frame?.storedKey) && b1.m.benchmark === true);
+const exp = await call('/benchmark?images=1');
+check('benchmark export has readings, timing and images', exp.res.ok && exp.body.frames.length === 2 && exp.body.frames.every(f => f.timing && f.image?.startsWith('data:image/') && f.userRequest) && /TEST MODE/.test(exp.body.label), `p50 ${exp.body.summary?.p50ServerMs} ms`);
+const del2 = await call('/benchmark', { method: 'DELETE' });
+check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 && !(await state()).moments.some(m => m.benchmark));
 
 const fin = await state();
 check('spend recorded under the workspace cap', fin.workspace.budget.spentUsd > 0 && fin.workspace.budget.spentUsd <= fin.workspace.budget.capUsd, `$${fin.workspace.budget.spentUsd}`);

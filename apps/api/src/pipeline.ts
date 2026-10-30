@@ -143,6 +143,7 @@ async function observeCards(ctx: Ctx, moment: Moment): Promise<void> {
 async function retainOrDiscard(ctx: Ctx, moment: Moment, history: Moment[]): Promise<Moment> {
   const f = moment.frame;
   if (!f?.storedKey) return moment;
+  if (moment.benchmark) return moment; // benchmark frames are kept for evaluation until the user deletes them
   const prevReq = [...history].reverse().find(m => m.reading?.legible)?.reading?.userRequest ?? null;
   const keep = moment.decision?.action === 'intervene' || !!moment.change || (moment.reading?.legible && moment.reading.userRequest !== prevReq) || moment.reading?.aiAskedClarifyingQuestion || !!moment.reading?.artifactVisible;
   if (keep) return moment;
@@ -177,18 +178,20 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
     }
   } catch (e) {
     const f = failureStatus(e);
-    // Raw frame is discarded when it could not be read.
-    if (moment.frame?.storedKey) await ctx.r2.delete(moment.frame.storedKey);
-    await ctx.store.put('moment', { ...moment, readingStatus: f.status, readingError: f.message, frame: moment.frame ? { ...moment.frame, storedKey: undefined, deleted: true } : null, decision: ruleDecision(f.message, f.status), timing: { ...timing, totalMs: Date.now() - Date.parse(moment.at) } });
+    // Raw frame is discarded when it could not be read (benchmark frames are kept for evaluation).
+    const drop = !moment.benchmark;
+    if (drop && moment.frame?.storedKey) await ctx.r2.delete(moment.frame.storedKey);
+    await ctx.store.put('moment', { ...moment, readingStatus: f.status, readingError: f.message, frame: moment.frame && drop ? { ...moment.frame, storedKey: undefined, deleted: true } : moment.frame, decision: ruleDecision(f.message, f.status), timing: { ...timing, totalMs: Date.now() - Date.parse(moment.at) } });
     return;
   }
 
   if (!reading.legible) {
-    // Unreadable frames are never kept.
-    if (moment.frame?.storedKey) await ctx.r2.delete(moment.frame.storedKey);
+    // Unreadable frames are never kept (except benchmark frames, kept for evaluation).
+    const drop = !moment.benchmark;
+    if (drop && moment.frame?.storedKey) await ctx.r2.delete(moment.frame.storedKey);
     await ctx.store.put('moment', {
       ...moment, readingStatus: 'illegible', reading,
-      frame: moment.frame ? { ...moment.frame, storedKey: undefined, deleted: true } : null,
+      frame: moment.frame && drop ? { ...moment.frame, storedKey: undefined, deleted: true } : moment.frame,
       decision: ruleDecision('The screen was not readable in this frame.', 'illegible'),
       timing: { ...timing, totalMs: Date.now() - Date.parse(moment.at) },
     });

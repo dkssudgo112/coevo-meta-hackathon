@@ -169,8 +169,12 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
   }
 }
 
-/** Modal CPU rendering is charged as a conservative flat estimate per job. */
-const MEDIA_JOB_USD = { podcast: 0.03, short: 0.02 } as const;
+/**
+ * Conservative flat Modal reservation per job, covering the worst case of the
+ * renderer's limits: 4 physical cores and 3 GiB for 180 s startup + 300 s run,
+ * plus ingress. Kept in the separate Modal ledger, never the Meta budget.
+ */
+const MEDIA_JOB_USD = { podcast: 0.04, short: 0.04 } as const;
 
 async function startMedia(ctx: Ctx, contentId: string, job: Parameters<typeof startJob>[1]): Promise<void> {
   const ticket = await ctx.mediaSpender.reserve(MEDIA_JOB_USD[job.kind], `media-${job.kind}`);
