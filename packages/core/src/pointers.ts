@@ -7,7 +7,11 @@ export interface PixelBox { x1: number; y1: number; x2: number; y2: number; w: n
 
 /** Which poster parts the person's request asked for: a price, their real photo, the product itself. */
 export const PART_ASKED: Record<ArtifactPart, (i: Ingredients) => boolean> = { price: i => i.price, photo: i => i.realPhoto, title: i => i.productDetail };
-export const PART_PHRASE: Record<ArtifactPart, string> = { price: 'price text', photo: 'product photo', title: 'headline text' };
+/** SAM noun phrases, tried in order until one gives a box inside the poster. */
+export const PART_PHRASES: Record<ArtifactPart, string[]> = { price: ['price text', 'price'], photo: ['product photo', 'food'], title: ['headline text', 'title'] };
+export const POSTER_PHRASES = ['poster', 'image'];
+/** At most this many SAM calls per checked moment ($0.0025 each). */
+export const MAX_SAM_CALLS = 5;
 const MISSING: Record<ArtifactPart, string> = { price: 'The price isn’t visible.', photo: 'Your product photo isn’t on it.', title: 'The product name isn’t on it.' };
 const FOUND: Record<ArtifactPart, string> = { price: 'Price', photo: 'Product photo', title: 'Title' };
 

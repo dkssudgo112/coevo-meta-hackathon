@@ -3,7 +3,7 @@
 import { type ArtifactPart, type CaddieCard, type Decision, type Ingredients, type Moment, type MomentTiming, type Pointer, type Reading, type Session, type SkillObservation } from '../../../packages/contracts/index.ts';
 import { allowedStep, applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
 import { cardObserved } from '../../../packages/core/src/cards.ts';
-import { askedParts, choosePointers, PART_PHRASE, pickPoster } from '../../../packages/core/src/pointers.ts';
+import { askedParts, choosePointers, insidePoster, MAX_SAM_CALLS, PART_PHRASES, pickPoster, POSTER_PHRASES } from '../../../packages/core/src/pointers.ts';
 import { dimensionFor, observeChange, presentIngredients, strengthFor } from '../../../packages/core/src/labels.ts';
 import { decisionTask, readingTask, turnTask, type DecisionInput, type TurnContext } from '../../../packages/core/src/prompts.ts';
 import { BudgetExceeded, CostUnverifiable, InvalidAudio, InvalidOutput, liveEnabled, LiveCallsDisabled, MetaError, modelProvenance, ModelNotAllowed, models, RetryLater, runTask, segmentBoxes, type Box, type Spender } from './meta.ts';
@@ -206,9 +206,21 @@ async function pointAtArtifact(ctx: Ctx, momentId: string, imageDataUrl: string,
   let pointers: Pointer[] = [];
   let check: NonNullable<Moment['pointerCheck']>;
   try {
-    const poster = pickPoster((await segmentBoxes(ctx.env, ctx.spender, imageDataUrl, 'poster')).boxes);
+    let calls = 0;
+    const sam = async (phrase: string) => { calls++; return (await segmentBoxes(ctx.env, ctx.spender, imageDataUrl, phrase)).boxes; };
+    let poster: Box | null = null;
+    for (const phrase of POSTER_PHRASES) { poster = pickPoster(await sam(phrase)); if (poster) break; }
     const partBoxes: Partial<Record<ArtifactPart, Box[]>> = {};
-    if (poster) for (const p of present) partBoxes[p] = (await segmentBoxes(ctx.env, ctx.spender, imageDataUrl, PART_PHRASE[p])).boxes;
+    if (poster) {
+      for (const p of present) {
+        for (const phrase of PART_PHRASES[p]) {
+          if (calls >= MAX_SAM_CALLS) break;
+          const boxes = await sam(phrase);
+          partBoxes[p] = [...(partBoxes[p] ?? []), ...boxes];
+          if (boxes.some(b => insidePoster(b, poster!))) break;
+        }
+      }
+    }
     pointers = choosePointers(asked, r.artifactShows, poster, partBoxes);
     check = { status: 'done', model, at: now(), ...(poster ? {} : { error: 'No poster found on this frame.' }) };
   } catch (e) {

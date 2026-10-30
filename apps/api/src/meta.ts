@@ -407,7 +407,11 @@ export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: s
     }), { 'Content-Type': 'application/json' }, f, 30_000)) as ResponsesOutput;
     const processed = verifiedImageCount(raw.usage?.images_processed);
     await spend.settle(ticket, processed === null ? SAM_USD : SAM_USD * processed);
-    return { boxes: parseSamBoxes(outputText(raw)), costUsd: SAM_USD, latencyMs: Date.now() - started };
+    const text = outputText(raw);
+    const boxes = parseSamBoxes(text);
+    // Output shape only (box tokens, no mask data), so a format change is visible in the logs.
+    console.log(JSON.stringify({ event: 'sam_output', phrase, boxes: boxes.length, chars: text.length, head: text.slice(0, 160).replace(/data=[^|]*/g, 'data=…'), parts: (raw.output ?? []).map(o => `${o.type}:${(o.content ?? []).map(c => c.type).join('/')}`) }));
+    return { boxes, costUsd: SAM_USD, latencyMs: Date.now() - started };
   } catch (e) {
     if (unbilled(e)) await spend.settle(ticket, 0);
     throw e;
