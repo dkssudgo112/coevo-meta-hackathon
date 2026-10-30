@@ -240,7 +240,7 @@ export function EvidenceRows({ creds, state, moments }: { creds: Creds; state: S
                 <span className="faint">{m.decision ? `Quiet — ${m.decision.note ?? m.decision.reason}` : m.readingStatus === 'pending' ? 'Reading…' : ''}</span>
               )}
               {m.decision?.guardrail && <p className="faint">Guardrail: {m.decision.guardrail}</p>}
-              {m.decision && <p className="faint">{m.decision.provenance === 'live-model' ? `Live model · ${m.decision.model}` : m.decision.provenance === 'fixture' ? 'Test fixture (fake model)' : 'Rule'}</p>}
+              {m.decision && <p className="faint">{m.decision.provenance === 'live-model' ? `Live model · ${m.decision.model}` : m.decision.provenance === 'fixture' ? 'Test fixture (fake model)' : 'Rule'}{m.timing ? ` · ${(m.timing.totalMs / 1000).toFixed(1)} s · ${m.timing.calls} calls · ${m.timing.mode}` : ''}{m.benchmark ? ' · benchmark' : ''}</p>}
             </td>
             <td>{m.change ? <div className="stack" style={{ gap: 4 }}><AssistLabel value={m.change.assistance} /><span>{changeText(m)}</span></div> : <span className="faint">—</span>}</td>
           </tr>
