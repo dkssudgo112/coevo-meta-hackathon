@@ -147,6 +147,8 @@ createServer(async (req, res) => {
     if (req.method === 'GET' && m) {
       const p = jobs.get(m[1]);
       if (!p) return send(res, 404, { status: 'failed', error: 'unknown job' });
+      // A slow poll (e.g. a large download) keeps the Worker's alarm busy for a while.
+      if (delayNext.has('media-poll')) { const ms = delayNext.get('media-poll'); delayNext.delete('media-poll'); await pause(ms); }
       const done = await Promise.race([p, new Promise(r => setTimeout(() => r(null), 50))]);
       return done ? send(res, done.status === 'failed' ? 500 : 200, done) : send(res, 202, { status: 'running' });
     }

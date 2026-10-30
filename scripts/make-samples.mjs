@@ -1,5 +1,8 @@
-// Generates the synthetic sample-session screens (fixture data) as SVG files.
-// The screens imitate a generic AI chat, not any real product.
+// Writes the sample-session manifest.
+// Session 1 uses five reviewed screenshots of actual Meta AI replies to a scripted,
+// fictional café scenario (apps/web/public/samples/meta-ai-*.jpg, listed in
+// scripts/reviewed-assets.json). The follow-up screen is still a generated mock-up
+// of a generic AI chat (SVG) and is labeled as such.
 // Usage: node scripts/make-samples.mjs
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -18,35 +21,6 @@ function wrapText(text, max) {
   }
   if (cur.trim()) lines.push(cur.trim());
   return lines;
-}
-
-const posters = {
-  plain: { bg: '#7a5230', fg: '#f3e6d0', title: 'NEW DESSERT', sub: 'Try it today', accent: '#c99a5b' },
-  gold: { bg: '#3b2a1a', fg: '#f1d48a', title: 'NEW DESSERT', sub: 'A premium treat', accent: '#d4af37', border: true },
-  black: { bg: '#121212', fg: '#e6c870', title: 'NEW DESSERT', sub: 'Luxury edition', accent: '#d4af37', border: true },
-  black2: { bg: '#0b0b0b', fg: '#e9cf7a', title: 'NEW DESSERT', sub: 'Exclusive. Premium.', accent: '#e0bb4a', border: true, sparkle: true },
-  specific: { bg: '#f3ead9', fg: '#2f3a2c', title: 'Matcha Basque Cheesecake', sub: 'For your 8 a.m. walk to Seongsu · ₩6,500', accent: '#7c9a5e', photo: true },
-};
-
-function poster(x, y, kind) {
-  const p = posters[kind];
-  const w = 220, h = 300;
-  const parts = [`<g transform="translate(${x},${y})">`, `<rect width="${w}" height="${h}" rx="6" fill="${p.bg}"/>`];
-  if (p.border) parts.push(`<rect x="10" y="10" width="${w - 20}" height="${h - 20}" fill="none" stroke="${p.accent}" stroke-width="3"/>`);
-  if (p.sparkle) for (let i = 0; i < 9; i++) parts.push(`<circle cx="${30 + (i * 23) % 170}" cy="${40 + (i * 37) % 90}" r="2" fill="${p.accent}"/>`);
-  if (p.photo) {
-    parts.push(`<rect x="20" y="20" width="${w - 40}" height="150" rx="4" fill="#d9c9a8"/>`);
-    parts.push(`<ellipse cx="${w / 2}" cy="110" rx="62" ry="38" fill="#9fb27a"/><ellipse cx="${w / 2}" cy="100" rx="62" ry="30" fill="#b8c98f"/>`);
-    parts.push(`<text x="${w / 2}" y="160" font-size="9" text-anchor="middle" fill="#5a4a32" font-family="Helvetica, Arial">real photo</text>`);
-    wrapText(p.title, 18).forEach((l, i) => parts.push(`<text x="${w / 2}" y="${200 + i * 22}" font-size="18" text-anchor="middle" fill="${p.fg}" font-family="Georgia, serif">${esc(l)}</text>`));
-    wrapText(p.sub, 30).forEach((l, i) => parts.push(`<text x="${w / 2}" y="${256 + i * 14}" font-size="11" text-anchor="middle" fill="${p.fg}" font-family="Helvetica, Arial">${esc(l)}</text>`));
-  } else {
-    parts.push(`<text x="${w / 2}" y="140" font-size="26" text-anchor="middle" fill="${p.fg}" font-family="Georgia, serif" letter-spacing="2">${p.title.split(' ')[0]}</text>`);
-    parts.push(`<text x="${w / 2}" y="172" font-size="26" text-anchor="middle" fill="${p.fg}" font-family="Georgia, serif" letter-spacing="2">${p.title.split(' ')[1]}</text>`);
-    parts.push(`<text x="${w / 2}" y="214" font-size="13" text-anchor="middle" fill="${p.fg}" font-family="Helvetica, Arial">${esc(p.sub)}</text>`);
-  }
-  parts.push('</g>');
-  return parts.join('');
 }
 
 function screen(turns) {
@@ -77,7 +51,7 @@ function screen(turns) {
       convo.push(`<circle cx="268" cy="${y + 14}" r="12" fill="#4f6bed"/>`);
       lines.forEach((l, i) => convo.push(`<text x="292" y="${y + 20 + i * 24}" font-size="17" font-family="Helvetica, Arial" fill="#1b1b1f">${esc(l)}</text>`));
       y += lines.length * 24 + 12;
-      if (t.poster) { convo.push(poster(292, y, t.poster)); y += 312; } else y += 16;
+      y += 16;
     }
   }
   const bottom = H - 104;
@@ -90,30 +64,26 @@ function screen(turns) {
   return parts.join('');
 }
 
-const s1 = [
-  { user: 'Make a poster for our new dessert', ai: 'Here is a poster for your new dessert.', poster: 'plain' },
-  { user: 'Make it more premium', ai: 'I made it more premium with gold accents.', poster: 'gold' },
-  { user: 'More premium please', ai: 'Here is a more luxurious version in black and gold.', poster: 'black' },
-  { user: 'Even more premium. Luxurious.', ai: 'I added sparkle for an exclusive, premium feel.', poster: 'black2' },
-  { user: 'It’s for office workers near Seongsu station on their morning walk. Matcha basque cheesecake, 6,500 won. Warm morning light, calm, a little handwritten. Use my real photo.', ai: 'Here is a calm morning poster using your photo, with the price.', poster: 'specific' },
-];
 const s2 = [
   { user: 'Make a poster for our new drink', ai: 'Before I make it: who is it for, what’s the price, what one feeling should it give, and do you have a real photo of the drink?' },
 ];
 
-const frames = [];
-s1.forEach((_, i) => {
-  const file = `s1-${i + 1}.svg`;
-  writeFileSync(new URL(file, out), screen(s1.slice(0, i + 1)));
-  frames.push({ file, session: 1, caption: ['They ask for a dessert poster.', 'They ask for “more premium”.', '“More premium” again.', '“Even more premium” — the fourth vague request.', 'After the Caddie’s question, they write their own specific brief.'][i] });
-});
+const ACTUAL = 'actual-meta-ai';
+const MOCK = 'mock-up';
+const frames = [
+  { file: 'meta-ai-1.jpg', session: 1, provenance: ACTUAL, caption: 'They ask Meta AI for a premium poster for a new dessert. Meta AI makes one straight away.' },
+  { file: 'meta-ai-2.jpg', session: 1, provenance: ACTUAL, caption: '“Make it more premium.”' },
+  { file: 'meta-ai-3.jpg', session: 1, provenance: ACTUAL, caption: '“Still not premium enough. Make it more premium.”' },
+  { file: 'meta-ai-4.jpg', session: 1, provenance: ACTUAL, caption: '“Even more premium, please.” — the fourth vague request.' },
+  { file: 'meta-ai-5.jpg', session: 1, provenance: ACTUAL, caption: 'They write a specific brief: who, what, price, feeling, and no real photo yet. Meta AI also added opening hours nobody gave it — unverified.' },
+];
 s2.forEach((_, i) => {
   const file = `s2-${i + 1}.svg`;
   writeFileSync(new URL(file, out), screen(s2.slice(0, i + 1)));
-  frames.push({ file, session: 2, caption: 'A week later, with the Caddie card in the AI’s memory: the AI asks first.' });
+  frames.push({ file, session: 2, provenance: MOCK, caption: 'A week later, in a chat that starts with the Caddie card: the AI asks first.' });
 });
 writeFileSync(new URL('manifest.json', out), JSON.stringify({
-  note: 'Synthetic sample screens (fixture). The AI chat is a generic mock-up, not a real product.',
+  note: 'Session 1: actual Meta AI replies to a scripted, fictional café scenario (not a real user). Session 2: a generated mock-up of a generic AI chat.',
   frames,
-}, null, 2));
-console.log(`Wrote ${frames.length} sample screens to apps/web/public/samples/`);
+}, null, 2) + '\n');
+console.log(`Wrote the manifest (${frames.length} frames) and ${s2.length} mock-up screen(s) to apps/web/public/samples/`);

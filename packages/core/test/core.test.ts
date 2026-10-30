@@ -95,6 +95,18 @@ test('labels: coached after an intervention, independent without, ai-produced wh
   assert.equal(asked?.assistance, 'coached', 'the AI asking first comes from the Caddie card, not the person');
 });
 
+test('labels: a question asked before a later readable frame still counts as coaching', () => {
+  const vague = (id: string, extra: Partial<Moment> = {}) => moment({ id, reading: reading({ userRequest: 'More premium', ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false } }), ...extra });
+  const ask = { action: 'intervene', step: 'question', reason: '', quote: 'more premium', message: 'Who is it for?', note: null, missingIngredients: [], exampleBrief: null, guardrail: null, provenance: 'live-model', model: null, decidedAt: '' } as Moment['decision'];
+  const brief = reading({ userRequest: 'For office workers near the station, 6,500 won, calm morning', ingredients: { audience: true, price: true, mood: true, realPhoto: false, productDetail: true } });
+  // vague → vague + Caddie question → vague (quiet) → specific brief: coached, not independent.
+  assert.equal(observeChange(brief, [vague('a'), vague('b', { decision: ask }), vague('c')])?.assistance, 'coached');
+  // After the person improved once, an older question no longer covers a new improvement.
+  const improved = moment({ id: 'd', reading: reading({ userRequest: 'For office workers', ingredients: { audience: true, price: false, mood: false, realPhoto: false, productDetail: false } }), change: { addedIngredients: ['audience'], assistance: 'coached', aiAskedFirst: false, summary: '' } });
+  const more = reading({ userRequest: 'For office workers, 6,500 won', ingredients: { audience: true, price: true, mood: false, realPhoto: false, productDetail: false } });
+  assert.equal(observeChange(more, [vague('a'), vague('b', { decision: ask }), improved, vague('e', { reading: improved.reading })])?.assistance, 'independent');
+});
+
 test('practice labels exclude auto-opened and hinted attempts from independent', () => {
   assert.equal(labelPractice({ autoOpened: false, hintViewed: false, transcript: 'for families, 4,000 won' }), 'independent');
   assert.equal(labelPractice({ autoOpened: true, hintViewed: false, transcript: 'x y' }), 'coached');

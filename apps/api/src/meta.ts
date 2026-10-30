@@ -302,7 +302,23 @@ export async function generateImage(env: MetaEnv, spend: Spender, prompt: string
   }
 }
 
-/** Transcribe 16/24 kHz mono 16-bit WAV. */
+/**
+ * Keyword hints for the recognizer: unique single words from the screen
+ * (letters/digits only, 3–24 chars, at most 10). Phrases are split into words.
+ */
+export function transcribeKeywords(raw: string[]): string[] {
+  const out: string[] = [];
+  for (const phrase of raw) {
+    for (const w of phrase.normalize('NFKC').split(/[^\p{L}\p{N}]+/u)) {
+      if (w.length < 3 || w.length > 24 || out.some(x => x.toLowerCase() === w.toLowerCase())) continue;
+      out.push(w);
+      if (out.length === 10) return out;
+    }
+  }
+  return out;
+}
+
+/** Transcribe 16/24 kHz mono 16-bit WAV. A request rejected with keyword hints is retried once without them. */
 export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, keywords: string[] = [], f: Fetch = fetch): Promise<{ transcript: string; durationMs: number; costUsd: number }> {
   if (!liveEnabled(env)) throw new LiveCallsDisabled();
   const transcribeModel = models(env).transcribe;
@@ -312,19 +328,30 @@ export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, 
   const durationSec = info.seconds;
   if (durationSec > 120) throw new InvalidOutput('Voice answers are limited to 2 minutes.');
   const estimate = transcribeCost(Math.ceil(durationSec));
-  const ticket = await spend.reserve(estimate, 'transcribe');
-  const fd = new FormData();
-  fd.append('request', new Blob([JSON.stringify({ model: transcribeModel, audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English'], keywords: keywords.slice(0, 20) })], { type: 'application/json' }));
-  fd.append('audio', new Blob([wav], { type: 'audio/wav' }), 'answer.wav');
+  const once = async (hints: string[]) => {
+    const ticket = await spend.reserve(estimate, 'transcribe');
+    const fd = new FormData();
+    fd.append('request', new Blob([JSON.stringify({ model: transcribeModel, audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English'], ...(hints.length ? { keywords: hints } : {}) })], { type: 'application/json' }));
+    fd.append('audio', new Blob([wav], { type: 'audio/wav' }), 'answer.wav');
+    try {
+      const data = (await post(env, '/asr/transcribe', fd, {}, f, 60_000)) as { transcript?: string; audioDurationMs?: unknown };
+      // A missing, malformed or contradictory reported duration keeps the WAV-based reservation.
+      const reportedSec = verifiedAudioSeconds(data.audioDurationMs, durationSec);
+      const cost = reportedSec === null ? estimate : Math.min(estimate, transcribeCost(Math.floor(reportedSec)));
+      await spend.settle(ticket, cost);
+      return { transcript: (typeof data.transcript === 'string' ? data.transcript : '').trim(), durationMs: Math.round((reportedSec ?? durationSec) * 1000), costUsd: cost };
+    } catch (e) {
+      if (unbilled(e)) await spend.settle(ticket, 0);
+      const detail = e instanceof MetaError ? { status: e.status, type: e.type, code: e.code, message: e.message.slice(0, 200) } : { name: (e as Error).name };
+      console.error(JSON.stringify({ event: 'transcribe_failed', keywordCount: hints.length, seconds: Math.round(durationSec), ...detail }));
+      throw e;
+    }
+  };
+  const hints = transcribeKeywords(keywords);
   try {
-    const data = (await post(env, '/asr/transcribe', fd, {}, f, 60_000)) as { transcript?: string; audioDurationMs?: unknown };
-    // A missing, malformed or contradictory reported duration keeps the WAV-based reservation.
-    const reportedSec = verifiedAudioSeconds(data.audioDurationMs, durationSec);
-    const cost = reportedSec === null ? estimate : Math.min(estimate, transcribeCost(Math.floor(reportedSec)));
-    await spend.settle(ticket, cost);
-    return { transcript: (typeof data.transcript === 'string' ? data.transcript : '').trim(), durationMs: Math.round((reportedSec ?? durationSec) * 1000), costUsd: cost };
+    return await once(hints);
   } catch (e) {
-    if (unbilled(e)) await spend.settle(ticket, 0);
+    if (hints.length && e instanceof MetaError && e.status === 400) return once([]);
     throw e;
   }
 }

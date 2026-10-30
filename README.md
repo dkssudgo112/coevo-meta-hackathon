@@ -4,7 +4,7 @@
 
 Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer / Build for Your World). The product concept continues the author's earlier Coevo work; all code in this repository was written during the event.
 
-> **Status:** core product implemented and tested locally with live model calls **off**. Real Meta model calls, the Modal media service, and the public deployment are pending credit and account checks. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). Nothing in the app is simulated: when live calls are off, the app says so instead of inventing output.
+> **Status:** deployed at https://coevo-caddie.coevo-meta-hackathon.workers.dev with real Meta model calls behind an application-enforced budget (US$2.50 lifetime ceiling inside an approved US$3 total). Real-screen readings, interventions, Practice Range and Modal speech/video have run live; the real-phone camera benchmark and the full card-in-Meta-AI loop are still open. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). Nothing in the app is simulated: when a model call is off, refused or fails, the app says so instead of inventing output.
 
 ## The idea in one scene
 
@@ -20,7 +20,7 @@ They answer out loud — office workers near the station, 6,500 won, a calm morn
 | --- | --- |
 | **Phone · Caddie** (`/caddie`) | Points its camera at your monitor. On-device change detection sends a frame only when the screen changed and settled. Only the boxed screen area is uploaded. A NOW card and haptic nudge when the Caddie steps in; you answer by voice. |
 | **PC · Desk** (`/desk`) | A thin tab: QR pairing, a copy inbox for what the Caddie sends, and evidence rows per moment (frame · what you said · what the Caddie did · what changed). |
-| **Sample** (`/sample`) | No phone needed: replays synthetic screens; the Caddie's readings and replies are live model output. |
+| **Sample** (`/sample`) | No phone needed: replays a scripted, fictional café scenario — actual Meta AI replies for the first session, a labeled mock-up for the follow-up — while the Caddie's readings and replies are live model output. |
 
 **Meta models in the product**
 

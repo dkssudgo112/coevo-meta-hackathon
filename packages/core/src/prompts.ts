@@ -22,7 +22,7 @@ export interface ModelTask<T> {
   read: (json: unknown) => T;
 }
 
-const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote.`;
+const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote. Never mention clock times; refer to a moment by what happened in it.`;
 
 const ingredientsSchema = S.obj({
   audience: S.bool('Says who it is for: a specific customer group, reader, hiring team or audience.'),
@@ -218,7 +218,7 @@ export const manualTask: ModelTask<ManualPayload> = {
   name: 'manual',
   effort: 'low',
   maxOutputTokens: 1200,
-  instructions: `Write "My playbook": the procedure for the next time the person does this kind of task with an AI. 2–7 steps; each step pairs an action with what it checks; owner "ai" when the AI should do or ask it, "you" when the person must decide. Up to 4 pitfalls taken from this session. "forYourAI" lists instructions the AI should follow; "youDecide" lists choices only the person can make. "cardRule" is ONE imperative rule for the person's AI (at most 200 characters) that would have prevented the loop seen in this session, e.g. what the AI should ask before producing. Never invent numbers, prices or deadlines that were not in the evidence. ${STYLE}`,
+  instructions: `Write "My playbook": the procedure for the next time the person does this kind of task with an AI. 2–7 steps; each step pairs an action with what it checks; owner "ai" when the AI should do or ask it, "you" when the person must decide. Up to 4 pitfalls taken from this session. "forYourAI" lists instructions the AI should follow; "youDecide" lists choices only the person can make. "cardRule" is ONE rule the person will paste into their AI, written in the person's voice to the AI (first person: "Before you make …, ask me …"), at most 200 characters. It must hold for this whole kind of task, not just this session: no session-specific options, products or style choices; name what to ask for (e.g. who it is for, what exactly, the price or number, one feeling, whether a real photo exists). It should prevent the loop seen in this session. Never invent numbers, prices or deadlines that were not in the evidence. ${STYLE}`,
   schema: S.obj({
     title: S.str('Short title.', 80),
     whenToUse: S.str('When to use this playbook.', 160),
@@ -227,7 +227,7 @@ export const manualTask: ModelTask<ManualPayload> = {
     pitfalls: S.arr(S.str('Pitfall.', 160), 'Pitfalls.', 0, 4),
     forYourAI: S.arr(S.str('Instruction for the AI.', 200), 'For your AI.', 1, 5),
     youDecide: S.arr(S.str('Decision for the person.', 160), 'You decide.', 1, 5),
-    cardRule: S.str('One imperative rule for the AI.', 200),
+    cardRule: S.str('One rule in the person\'s voice to their AI ("Before you make …, ask me …"), general to this kind of task.', 200),
   }),
   read(json) {
     const o = R.obj(json, 'manual');
@@ -266,7 +266,7 @@ export const podcastTask: ModelTask<{ title: string; guest: string; lines: Omit<
   name: 'podcast',
   effort: 'medium',
   maxOutputTokens: 2200,
-  instructions: `Write a two-person podcast script (8–18 lines, 300–480 words in total, about 2–3 minutes spoken). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
+  instructions: `Write a two-person podcast script (8–14 lines, 200–280 words in total, about 80–110 seconds spoken). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
   schema: S.obj({
     title: S.str('Episode title.', 80),
     guest: S.str('Guest display name with their situation, e.g. "Jun, bakery owner".', 40),

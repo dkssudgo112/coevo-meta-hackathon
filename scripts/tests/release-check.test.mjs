@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
@@ -50,6 +51,21 @@ test('rejects account records and binary artifacts in the index', () => scenario
   assert.equal(result.status, 1);
   assert.match(result.stderr, /private path/);
   assert.match(result.stderr, /binary content/);
+}));
+
+test('accepts a binary only when its path and exact bytes were reviewed', () => scenario(({cwd, git, check}) => {
+  const bytes = Buffer.from([0xff, 0xd8, 0, 1, 2]);
+  mkdirSync(join(cwd, 'scripts'));
+  mkdirSync(join(cwd, 'assets'));
+  writeFileSync(join(cwd, 'assets', 'shot.jpg'), bytes);
+  writeFileSync(join(cwd, 'scripts', 'reviewed-assets.json'), JSON.stringify({ assets: [{ path: 'assets/shot.jpg', sha256: createHash('sha256').update(bytes).digest('hex') }] }));
+  git('add', 'assets/shot.jpg', 'scripts/reviewed-assets.json');
+  assert.equal(check('--staged').status, 0);
+  writeFileSync(join(cwd, 'assets', 'shot.jpg'), Buffer.concat([bytes, Buffer.from([9])]));
+  git('add', 'assets/shot.jpg');
+  const changed = check('--staged');
+  assert.equal(changed.status, 1);
+  assert.match(changed.stderr, /bytes changed since review/);
 }));
 
 test('fails closed on an empty index', () => scenario(({check}) => {

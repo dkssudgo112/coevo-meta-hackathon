@@ -17,15 +17,17 @@ import { bytesToDataUrl, id, now } from './util.ts';
 
 export const VOICES = { caddie: 'af_heart', guest: 'am_michael' } as const;
 
-function clock(iso: string): string {
-  return iso.slice(11, 16);
+/** Time since the session started ("+3:05"). Server clocks are UTC, so clock times would be wrong for the person. */
+function elapsed(iso: string, startIso: string): string {
+  const sec = Math.max(0, Math.round((Date.parse(iso) - Date.parse(startIso)) / 1000));
+  return `+${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
 /** Compact, quotable evidence text for content prompts. */
 export function evidenceText(ctx: Ctx, session: Session): string {
-  const lines: string[] = [`Session ${session.id}: tool=${session.tool ?? 'unknown'}; task=${session.task ?? 'unknown'}; fixture=${session.fixture}`];
+  const lines: string[] = [`Session ${session.id}: tool=${session.tool ?? 'unknown'}; task=${session.task ?? 'unknown'}; fixture=${session.fixture}. Times are minutes:seconds since the session started.`];
   for (const m of sessionMoments(ctx.store, session.id)) {
-    if (m.misread) { lines.push(`[${m.id}] ${clock(m.at)} (marked misread by the person; ignore)`); continue; }
+    if (m.misread) { lines.push(`[${m.id}] ${elapsed(m.at, session.startedAt)} (marked misread by the person; ignore)`); continue; }
     const r = m.reading;
     const parts: string[] = [];
     if (r?.legible && r.userRequest) parts.push(`person asked the AI: "${r.userRequest}"`);
@@ -37,7 +39,7 @@ export function evidenceText(ctx: Ctx, session: Session): string {
     else if (d?.note) parts.push(`Caddie stayed quiet: ${d.note}`);
     if (m.response) parts.push(`person ${m.response.kind}${m.response.transcript ? ` (voice): "${m.response.transcript}"` : ''}`);
     if (m.change) parts.push(`observed change: ${m.change.summary} [${m.change.assistance}]`);
-    if (parts.length) lines.push(`[${m.id}] ${clock(m.at)} ${parts.join(' | ')}`);
+    if (parts.length) lines.push(`[${m.id}] ${elapsed(m.at, session.startedAt)} ${parts.join(' | ')}`);
   }
   return lines.join('\n');
 }
@@ -98,11 +100,16 @@ export async function wrapSession(ctx: Ctx, sessionId: string): Promise<void> {
     };
     await ctx.store.put('content', item);
   }
-  for (const format of CONTENT_FORMATS) {
-    if (!ctx.store.alive('session', sessionId)) return;
-    const item = ctx.store.list('content').find(c => c.sessionId === sessionId && c.format === format);
-    if (item?.status === 'queued') await generate(ctx, item.id);
-  }
+  // Media formats start first and in parallel with the text formats: their scripts are
+  // needed early because rendering on the media service takes the longest.
+  const chain = async (formats: ContentFormat[]) => {
+    for (const format of formats) {
+      if (!ctx.store.alive('session', sessionId)) return;
+      const item = ctx.store.list('content').find(c => c.sessionId === sessionId && c.format === format);
+      if (item?.status === 'queued') await generate(ctx, item.id);
+    }
+  };
+  await Promise.all([chain(['note', 'manual', 'flashcards']), chain(['podcast', 'short'])]);
 }
 
 export async function generate(ctx: Ctx, contentId: string): Promise<void> {

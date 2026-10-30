@@ -1,35 +1,41 @@
 {
-  "note": "Synthetic sample screens (fixture). The AI chat is a generic mock-up, not a real product.",
+  "note": "Session 1: actual Meta AI replies to a scripted, fictional café scenario (not a real user). Session 2: a generated mock-up of a generic AI chat.",
   "frames": [
     {
-      "file": "s1-1.svg",
+      "file": "meta-ai-1.jpg",
       "session": 1,
-      "caption": "They ask for a dessert poster."
+      "provenance": "actual-meta-ai",
+      "caption": "They ask Meta AI for a premium poster for a new dessert. Meta AI makes one straight away."
     },
     {
-      "file": "s1-2.svg",
+      "file": "meta-ai-2.jpg",
       "session": 1,
-      "caption": "They ask for “more premium”."
+      "provenance": "actual-meta-ai",
+      "caption": "“Make it more premium.”"
     },
     {
-      "file": "s1-3.svg",
+      "file": "meta-ai-3.jpg",
       "session": 1,
-      "caption": "“More premium” again."
+      "provenance": "actual-meta-ai",
+      "caption": "“Still not premium enough. Make it more premium.”"
     },
     {
-      "file": "s1-4.svg",
+      "file": "meta-ai-4.jpg",
       "session": 1,
-      "caption": "“Even more premium” — the fourth vague request."
+      "provenance": "actual-meta-ai",
+      "caption": "“Even more premium, please.” — the fourth vague request."
     },
     {
-      "file": "s1-5.svg",
+      "file": "meta-ai-5.jpg",
       "session": 1,
-      "caption": "After the Caddie’s question, they write their own specific brief."
+      "provenance": "actual-meta-ai",
+      "caption": "They write a specific brief: who, what, price, feeling, and no real photo yet. Meta AI also added opening hours nobody gave it — unverified."
     },
     {
       "file": "s2-1.svg",
       "session": 2,
-      "caption": "A week later, with the Caddie card in the AI’s memory: the AI asks first."
+      "provenance": "mock-up",
+      "caption": "A week later, in a chat that starts with the Caddie card: the AI asks first."
     }
   ]
 }

@@ -26,7 +26,7 @@ export function AssistLabel({ value, extra }: { value: Assistance; extra?: strin
 }
 
 export function FixtureTag() {
-  return <span className="tag fixture" title="Synthetic sample data, not a real user session">Sample data</span>;
+  return <span className="tag fixture" title="Sample data from a scripted scenario, not a real user session">Sample data</span>;
 }
 
 export function clock(iso: string): string {

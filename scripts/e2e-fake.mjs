@@ -195,17 +195,41 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   const sess = (await call('/sessions', { method: 'POST', body: '{}' })).body;
   await sleep(2600);
   for (const seed of [0, 1]) await frame(seed);
-  const before = await (await fetch(`${fake}/stats`)).json();
+  // Both generation chains (text and media) are mid-call when the session is deleted.
   await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'note', ms: 6000 }) });
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'podcast', ms: 6000 }) });
   await call(`/sessions/${sess.id}/end`, { method: 'POST' });
-  await until(s => s.content.some(c => c.sessionId === sess.id && c.format === 'note' && c.status === 'generating'), 'note generating', 30);
+  try {
+    await until(s => ['note', 'podcast'].every(f => s.content.some(c => c.sessionId === sess.id && c.format === f && c.status === 'generating')), 'note and podcast generating', 30);
+  } catch (e) {
+    const s = await state();
+    console.log('DEBUG', JSON.stringify({ session: s.sessions.find(x => x.id === sess.id)?.wrapStatus, content: s.content.filter(c => c.sessionId === sess.id).map(c => `${c.format}:${c.status}`) }));
+    throw e;
+  }
+  const before = await (await fetch(`${fake}/stats`)).json();
   await call(`/sessions/${sess.id}`, { method: 'DELETE' });
   await sleep(12000);
   const st = await state();
   const after = await (await fetch(`${fake}/stats`)).json();
   check('deleting during content generation leaves no content or cards behind', !st.content.some(c => c.sessionId === sess.id) && !st.cards.some(c => c.sessionId === sess.id) && !st.sessions.some(x => x.id === sess.id));
   check('no new media jobs are dispatched for deleted content', after.jobsStarted === before.jobsStarted, `jobs ${before.jobsStarted} → ${after.jobsStarted}`);
-  check('no further generations ran after deletion (manual, flashcards, podcast, short)', ['manual', 'flashcards', 'podcast', 'short'].every(n => (after.calls[n] ?? 0) === (before.calls[n] ?? 0)));
+  check('no further generations ran after deletion (manual, flashcards, short)', ['manual', 'flashcards', 'short'].every(n => (after.calls[n] ?? 0) === (before.calls[n] ?? 0)));
+}
+
+// Media race: a job dispatched while the alarm is busy polling another must not be lost.
+{
+  await fetch(`${fake}/reset`);
+  const sess = (await call('/sessions', { method: 'POST', body: '{}' })).body;
+  await sleep(2600);
+  for (const seed of [0, 1]) await frame(seed);
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'media-poll', ms: 8000 }) });
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'short', ms: 7000 }) });
+  await call(`/sessions/${sess.id}/end`, { method: 'POST' });
+  let settled = null;
+  try {
+    settled = (await until(s => { const c = s.content.filter(x => x.sessionId === sess.id && (x.format === 'podcast' || x.format === 'short')); return c.length === 2 && c.every(x => x.status === 'ready' || x.status === 'failed') ? c : null; }, 'podcast and short settled', 60)).v;
+  } catch { /* reported below */ }
+  check('a short dispatched during a slow podcast poll still completes', Boolean(settled) && settled.every(x => x.status === 'ready'), settled ? settled.map(x => `${x.format} ${x.status}`).join(', ') : 'short never settled (job lost)');
 }
 
 const fin = await state();

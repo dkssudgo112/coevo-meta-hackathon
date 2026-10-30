@@ -20,9 +20,10 @@ function lastLegible(history: Moment[]): Moment | null {
 
 /**
  * Compare the new reading with the previous legible moment and label the change.
- * - coached: the Caddie intervened (question/ingredients) between the two moments.
+ * - coached: the Caddie intervened (question/ingredients/example) since the person's last
+ *   observed improvement (or the session start).
  * - ai-produced: the new request closely matches an example brief the Caddie supplied.
- * - independent: ingredients were added with no intervention in between.
+ * - independent: ingredients were added with no intervention in that window.
  */
 export function observeChange(current: Reading, history: Moment[], opts: { newSessionAfterCard?: boolean } = {}): ObservedChange | null {
   const prev = lastLegible(history);
@@ -31,7 +32,10 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
   const aiAskedFirst = current.aiAskedClarifyingQuestion;
   if (!added.length && !aiAskedFirst) return null;
 
-  const since = prev ? history.slice(history.indexOf(prev)) : history;
+  // Coaching counts from the person's last observed improvement (or the session start),
+  // not just the last readable frame: a question two frames ago still shaped this change.
+  const lastGain = [...history].reverse().find(m => !m.misread && (m.change?.addedIngredients.length ?? 0) > 0);
+  const since = lastGain ? history.slice(history.indexOf(lastGain)) : history;
   const interventions = since.filter(m => m.decision?.action === 'intervene');
   const example = [...since].reverse().find(m => m.decision?.step === 'example' && m.decision.exampleBrief);
   let assistance: Assistance = 'independent';

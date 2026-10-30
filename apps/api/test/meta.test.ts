@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CostUnverifiable, generateImage, InvalidAudio, ModelNotAllowed, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, type MetaEnv, type Spender } from '../src/meta.ts';
+import { CostUnverifiable, generateImage, InvalidAudio, ModelNotAllowed, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, transcribeKeywords, type MetaEnv, type Spender } from '../src/meta.ts';
 import { sparkMaxCost } from '../../../packages/core/src/budget.ts';
 import { readingTask } from '../../../packages/core/src/prompts.ts';
 
@@ -157,6 +157,26 @@ test('transcribe posts multipart request + audio parts', async () => {
   assert.equal(req.audioEncoding, 'WAV');
   assert.equal(req.model, 'muse-voice-transcribe-1.0');
   assert.ok(form!.get('audio') instanceof Blob);
+});
+
+test('transcribe sends single-word keyword hints and retries once without them after a 400', async () => {
+  assert.deepEqual(transcribeKeywords(['more premium', 'Premium dessert poster for Morning Table café', 'a']), ['more', 'premium', 'dessert', 'poster', 'for', 'Morning', 'Table', 'café']);
+  const l = ledger();
+  const sent: (string[] | undefined)[] = [];
+  const f = (async (_u: string, init: RequestInit) => {
+    const req = JSON.parse(await ((init.body as FormData).get('request') as Blob).text());
+    sent.push(req.keywords);
+    return req.keywords ? response({ error: { message: 'invalid keywords', type: 'invalid_request_error', code: null } }, 400) : response({ transcript: 'for office workers', audioDurationMs: 4000 });
+  }) as unknown as typeof fetch;
+  const r = await transcribe(env, l.spender, wavBytes(4), ['more premium'], f);
+  assert.equal(r.transcript, 'for office workers');
+  assert.deepEqual(sent, [['more', 'premium'], undefined]);
+  assert.ok(Math.abs(l.total() - r.costUsd) < 1e-12, 'the rejected first attempt is refunded; only the retry is charged');
+  // Other errors are not retried.
+  let calls = 0;
+  const g = (async () => { calls++; return response({ error: { message: 'busy' } }, 500); }) as unknown as typeof fetch;
+  await assert.rejects(transcribe(env, ledger().spender, wavBytes(4), ['premium'], g), MetaError);
+  assert.equal(calls, 1);
 });
 
 test('image generation returns bytes and bills $0.01', async () => {

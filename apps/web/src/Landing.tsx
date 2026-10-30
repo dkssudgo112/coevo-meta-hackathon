@@ -32,7 +32,7 @@ export function Landing() {
         {phone ? [caddie, desk] : [desk, caddie]}
         <div className="card choice">
           <h3>No phone handy?</h3>
-          <p className="muted">Replay a sample session. Screens are sample data. {modelSourceLine(health)}</p>
+          <p className="muted">Replay a sample session: a scripted, fictional café using actual Meta AI. {modelSourceLine(health)}</p>
           <a className="btn" href="/sample">Try a sample session</a>
         </div>
       </div>

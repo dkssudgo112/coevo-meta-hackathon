@@ -156,8 +156,9 @@ button, input, textarea { font: inherit; color: inherit; }
 .split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 400px); gap: 24px; align-items: start; }
 @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
 .phone-frame { border: 10px solid #1d2622; border-radius: 36px; overflow: hidden; height: 760px; overflow-y: auto; background: var(--bg); }
-.screen-sim { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: #fff; }
-.screen-sim img { width: 100%; display: block; }
+.screen-sim { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: #18181a; }
+/* Portrait screenshots are letterboxed so the phone stays in view. */
+.screen-sim img { width: 100%; max-height: 62vh; object-fit: contain; display: block; }
 
 /* Landing */
 .landing { max-width: 920px; margin: 0 auto; padding: 48px 24px; display: grid; gap: 32px; }

@@ -1,0 +1,35 @@
+{
+  "note": "Binary files allowed in the public repository. scripts/release-check.mjs accepts a binary only when its path and SHA-256 match an entry here. Add an entry only after reviewing the exact bytes.",
+  "assets": [
+    {
+      "path": "apps/web/public/samples/meta-ai-1.jpg",
+      "sha256": "61045a987dd9ba43523afb62733a45da13c9ec703637ccdaf384fc361173567b",
+      "review": "Cropped to the fictional café conversation only; no account area, sidebar or conversation URL; zero EXIF entries (JFIF + ICC profile only). Reviewed visually by Codex and Claude, 2026-10-30.",
+      "provenance": "Actual Meta AI (consumer web) replies to a scripted, fictional café scenario. Not a real user and not learning evidence."
+    },
+    {
+      "path": "apps/web/public/samples/meta-ai-2.jpg",
+      "sha256": "528a789695edf7565dfaa94b52d1784706d0480bf7d1d3165ff51c66c2a222e9",
+      "review": "Cropped to the fictional café conversation only; no account area, sidebar or conversation URL; zero EXIF entries (JFIF + ICC profile only). Reviewed visually by Codex and Claude, 2026-10-30.",
+      "provenance": "Actual Meta AI (consumer web) replies to a scripted, fictional café scenario. Not a real user and not learning evidence."
+    },
+    {
+      "path": "apps/web/public/samples/meta-ai-3.jpg",
+      "sha256": "7cf122a02fcbf54ace592b6fd70da54f5eb908627799bda254179c5bc2fbedc4",
+      "review": "Cropped to the fictional café conversation only; no account area, sidebar or conversation URL; zero EXIF entries (JFIF + ICC profile only). Reviewed visually by Codex and Claude, 2026-10-30.",
+      "provenance": "Actual Meta AI (consumer web) replies to a scripted, fictional café scenario. Not a real user and not learning evidence."
+    },
+    {
+      "path": "apps/web/public/samples/meta-ai-4.jpg",
+      "sha256": "411f3b8741c9154cc98fd736408da501e6fcd5a838d537c4aa4caf5f57958611",
+      "review": "Cropped to the fictional café conversation only; no account area, sidebar or conversation URL; zero EXIF entries (JFIF + ICC profile only). Reviewed visually by Codex and Claude, 2026-10-30.",
+      "provenance": "Actual Meta AI (consumer web) replies to a scripted, fictional café scenario. Not a real user and not learning evidence."
+    },
+    {
+      "path": "apps/web/public/samples/meta-ai-5.jpg",
+      "sha256": "b49f646e3cebf679b416687ba20b152fc7a94e06dba74e1e6be410e4b17cf84b",
+      "review": "Cropped to the fictional café conversation only; no account area, sidebar or conversation URL; zero EXIF entries (JFIF + ICC profile only). Reviewed visually by Codex and Claude, 2026-10-30.",
+      "provenance": "Actual Meta AI (consumer web) replies to a scripted, fictional café scenario. Not a real user and not learning evidence."
+    }
+  ]
+}

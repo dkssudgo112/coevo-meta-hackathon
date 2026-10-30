@@ -6,9 +6,14 @@ import { errorText, Flag, latestSession, modelSourceLine, sessionMoments, useHea
 import { LiveScreen } from '../phone/Live.tsx';
 import { SessionReview } from './Desk.tsx';
 
-interface Manifest { note: string; frames: { file: string; caption: string; session: number }[] }
+interface Manifest { note: string; frames: { file: string; caption: string; session: number; provenance: 'actual-meta-ai' | 'mock-up' }[] }
 
-/** Rasterize a sample SVG screen to JPEG, the same format the phone sends. */
+const SOURCE: Record<Manifest['frames'][number]['provenance'], string> = {
+  'actual-meta-ai': 'Actual Meta AI reply · scripted, fictional café',
+  'mock-up': 'Mock-up screen · generic AI chat',
+};
+
+/** Rasterize a sample screen (JPEG or SVG) to JPEG, the same format the phone sends. */
 async function screenJpeg(url: string): Promise<Blob> {
   const img = new Image();
   img.src = url;
@@ -44,7 +49,7 @@ export function SampleApp() {
       <div className="landing">
         <div className="row"><Flag state="watching" /><span className="eyebrow">Sample session</span></div>
         <h1>Watch the Caddie work, without a phone</h1>
-        <p className="muted">You’ll replay a café owner’s screens while they make a poster with an AI. The screens are synthetic sample data. {modelSourceLine(health)}</p>
+        <p className="muted">You’ll replay a café owner’s screens while they make a poster with Meta AI. The café is fictional and the requests are scripted; the first session’s Meta AI replies are real, the follow-up screen is a mock-up. {modelSourceLine(health)}</p>
         <div className="row"><button className="btn primary" onClick={start}>Start the sample</button></div>
         {err && <p className="faint" role="alert">{err}</p>}
       </div>
@@ -138,7 +143,7 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
     <div className="desk">
       <header className="desk-top">
         <Flag state="watching" />
-        <div className="grow"><h2>Sample session</h2><p className="faint">Synthetic sample screens (a generic AI chat mock-up, not a real product). {state ? modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels }) : ''}</p></div>
+        <div className="grow"><h2>Sample session</h2><p className="faint">Scripted, fictional café. Session 1 shows actual Meta AI replies; the follow-up screen is a mock-up. {state ? modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels }) : ''}</p></div>
         <button className="btn small" onClick={onRestart}>New sample</button>
       </header>
       {state && (state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}
@@ -147,6 +152,7 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
           <div className="row"><span className="eyebrow grow">Their screen · sample data</span><span className="faint">{manifest ? `${i + 1} / ${manifest.frames.length}` : ''}</span></div>
           {frame && <div className="screen-sim"><img src={`/samples/${frame.file}`} alt={frame.caption} /></div>}
           {frame && <p className="muted">{frame.caption}</p>}
+          {frame && <p className="faint">{SOURCE[frame.provenance] ?? 'Sample screen'}</p>}
           <div className="row wrap">
             {playing ? <button className="btn" onClick={() => { stop.current = true; }}>Pause</button> : <button className="btn primary" disabled={!manifest || !state?.workspace.liveCalls} onClick={play}>{i === 0 && !moments.length ? 'Play the sample' : 'Continue'}</button>}
             <button className="btn" disabled={playing || !manifest || i >= (manifest?.frames.length ?? 1) - 1} onClick={() => setI(x => x + 1)}>Skip frame</button>

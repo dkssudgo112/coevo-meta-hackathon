@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -14,6 +15,14 @@ function git(args, encoding) {
   if (result.status !== 0) throw new Error('Unable to inspect Git content. Publication check failed closed.');
   return result.stdout;
 }
+// Binaries are allowed only when their exact bytes were reviewed (path + SHA-256).
+// A missing list means no binary is allowed.
+function loadReviewed() {
+  let raw;
+  try { raw = readFileSync(path.join(root, 'scripts/reviewed-assets.json'), 'utf8'); } catch (error) { if (error.code === 'ENOENT') return new Map(); throw error; }
+  return new Map(JSON.parse(raw).assets.map(a => [a.path, a.sha256]));
+}
+const reviewed = loadReviewed();
 const credentialPatterns = [
   /LLM[_|][A-Za-z0-9_|.-]{25,}/,
   /\b(?:ak|as)-[A-Za-z0-9_-]{20,}/,
@@ -53,7 +62,11 @@ try {
       if (!stat.isFile()) { issues.push(`${file}: non-regular file requires manual review`); continue; }
       data = readFileSync(path.join(root, file));
     }
-    if (data.includes(0)) { issues.push(`${file}: binary content requires manual review`); continue; }
+    if (data.includes(0)) {
+      const sha = createHash('sha256').update(data).digest('hex');
+      if (reviewed.get(file) !== sha) issues.push(`${file}: binary content requires manual review${reviewed.has(file) ? ' (bytes changed since review)' : ''}`);
+      continue;
+    }
     const content = data.toString('utf8');
     if (credentialPatterns.some(re => re.test(content))) issues.push(`${file}: possible credential`);
     if (/\/(?:Users|home)\/[A-Za-z0-9_.-]+\//.test(content)) issues.push(`${file}: personal machine path`);

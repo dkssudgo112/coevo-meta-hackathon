@@ -194,18 +194,24 @@ export class Workspace extends DurableObject<Env> {
     if (!(await this.loadMeta())) return;
     const ctx = this.context();
     let next: number | null = null;
+    // New jobs can be added while this alarm awaits the media service, so the list is
+    // never written back from this snapshot: only jobs settled here are removed at the end.
     const jobs = (await this.ctx.storage.get<Job[]>('jobs')) ?? [];
-    const remainingJobs: Job[] = [];
+    const settled = new Set<string>();
+    const current = async (jobId: string) => ((await this.ctx.storage.get<Job[]>('jobs')) ?? []).some(j => j.jobId === jobId);
     for (const job of jobs) {
       const item = this.store.get('content', job.contentId);
-      if (!item || !this.store.alive('content', job.contentId)) continue; // deleted: drop the job, store nothing
+      if (!item || !this.store.alive('content', job.contentId)) { settled.add(job.jobId); continue; } // deleted: drop the job, store nothing
       if (Date.now() - job.startedAt > JOB_TIMEOUT_MS) {
+        settled.add(job.jobId);
         await this.store.put('content', { ...item, status: 'failed', error: 'Rendering took too long. Retry to render again.', updatedAt: now() });
         continue;
       }
       try {
         const r = await pollJob(this.env, job.jobId);
-        if (r.status === 'running') { remainingJobs.push(job); continue; }
+        if (r.status === 'running') continue;
+        settled.add(job.jobId);
+        if (!(await current(job.jobId))) continue; // replaced by a retry while polling: the newer job decides
         if (r.status === 'failed') { await this.store.put('content', { ...item, status: 'failed', error: r.error, updatedAt: now() }); continue; }
         if (!this.store.alive('content', item.id)) continue;
         const ext = item.format === 'podcast' ? 'm4a' : 'mp4';
@@ -222,10 +228,13 @@ export class Workspace extends DurableObject<Env> {
           await this.store.put('content', { ...fresh, status: 'ready', payload: { ...p, scenes, videoKey: key, durationSec: r.durationSec, renderTiming: r.renderTiming }, updatedAt: now() });
         }
       } catch (e) {
-        if (Date.now() - job.startedAt < JOB_TIMEOUT_MS) remainingJobs.push(job);
-        else await this.store.put('content', { ...item, status: 'failed', error: failureStatus(e).message, updatedAt: now() });
+        if (Date.now() - job.startedAt >= JOB_TIMEOUT_MS) {
+          settled.add(job.jobId);
+          await this.store.put('content', { ...item, status: 'failed', error: failureStatus(e).message, updatedAt: now() });
+        }
       }
     }
+    const remainingJobs = ((await this.ctx.storage.get<Job[]>('jobs')) ?? []).filter(j => !settled.has(j.jobId));
     await this.ctx.storage.put('jobs', remainingJobs);
     if (remainingJobs.length) next = 5_000;
 
