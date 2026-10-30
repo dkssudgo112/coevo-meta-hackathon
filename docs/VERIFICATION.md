@@ -142,4 +142,13 @@ Last updated: 2026-10-30 (night KST).
 
 ## Persona simulation (labeled `sim`)
 
-Planned after L2: persona sub-agents (café owner, cover-letter writer, privacy-skeptical user) run scripted tasks against the deployed app. Results are reported as **simulated persona tests**. They are not real-user validation.
+**Simulated persona tests — not real-user evidence.** Four model-played personas read the exact screen text, screenshots and the real model output of one live sample run (no app access, no network), and answered a fixed structure. Round 2 re-checked after the fixes.
+
+| Persona | Round 1 top findings | Fixed after round 1 | Round 2 |
+| --- | --- | --- | --- |
+| Café owner (English as a second language, busy) | Step order unclear and a long URL to type; answering only by voice; long English in podcast/flashcards; "will I pay?" | Numbered steps (computer first), shorter pairing text, "Type instead", spend shown as paid by the demo, plain-language reasons | not rerun |
+| Job seeker (cover letters, accepts fluent drafts) | Sample only shows the poster case; personal data vs the free-credit notice; card steps shown for Meta AI only | — (a cover-letter scene is planned for the demo; card steps exist per tool but are not shown in the sample) | not rerun |
+| Privacy-cautious office worker | What is sent, to whom, how long, how to delete; voice in an open office | Data table on the aim screen and in Privacy (recipients incl. Modal, what each delete removes, provider limits); typed answers; memory rebuilt from surviving records | Voice resolved; table partly (no retention period stated); on-device masking still missing |
+| Hackathon judge (3 min, no phone) | Sample link below the fold; budget for many live runs; wording "nothing is simulated" vs scripted screens; card behind the payoff screen differs | Sample link under the headline; README wording; caption names the earlier card's details | Sample link resolved; budget not resolved (needs a recorded run, see STATUS); scripted owner moves still labeled "coached" |
+
+Open recommendations from the simulations: a recorded live run as the default sample, on-device exclusion masks, a stated retention period, and a "scripted owner" marker in the sample.
