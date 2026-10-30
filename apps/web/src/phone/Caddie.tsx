@@ -3,7 +3,8 @@ import type { CropRect } from '../../../../packages/contracts/index.ts';
 import { loadCreds, post, saveCreds, type Creds } from '../lib/api.ts';
 import { useWorkspace } from '../lib/store.ts';
 import { cropImageFile, FrameSampler, startRearCamera, stopStream, uploadFrame, type SentTiming } from '../lib/capture.ts';
-import { errorText, latestSession } from '../ui/common.tsx';
+import { errorText, latestSession, sessionMoments } from '../ui/common.tsx';
+import { illegibleRun } from '../lib/moments.ts';
 import { AimScreen, CropEditor, PairScreen } from './Setup.tsx';
 import { LiveScreen } from './Live.tsx';
 
@@ -93,6 +94,18 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
       if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, [cameraOn, crop?.x, crop?.y, crop?.w, crop?.h, creds.token]);
+
+  // An unreadable frame is retried quietly (same view, once more) until three in a row fail;
+  // then the NOW card asks to tilt the phone or take one photo.
+  const retried = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state || !cameraOn) return;
+    const ms = sessionMoments(state, latestSession(state)?.id);
+    const lastFrame = [...ms].reverse().find(m => m.frame && !m.misread);
+    if (!lastFrame || lastFrame.readingStatus !== 'illegible' || retried.current === lastFrame.id) return;
+    retried.current = lastFrame.id;
+    if (illegibleRun(ms) < 3) sampler.current?.retrySoon();
+  }, [state, cameraOn]);
 
   const exitBenchmark = () => {
     try { sessionStorage.removeItem(BENCH_KEY); } catch { /* tab only */ }

@@ -47,6 +47,8 @@ export class FrameSampler {
   private full = document.createElement('canvas');
   private busy = false;
   private changeAt: number | null = null;
+  /** Epoch ms after which one unchanged, settled frame is sent anyway (quiet retry after an unreadable frame). */
+  private retryAt: number | null = null;
   crop: CropRect;
   private readonly video: HTMLVideoElement;
   private readonly creds: Creds;
@@ -76,6 +78,12 @@ export class FrameSampler {
   reset(crop?: CropRect): void {
     if (crop) this.crop = crop;
     this.detector.reset();
+    this.retryAt = null;
+  }
+
+  /** Send the same view once more after a short pause, even if nothing changed (the last one was unreadable). */
+  retrySoon(ms = 1500): void {
+    this.retryAt = Date.now() + ms;
   }
 
   private async tick(): Promise<void> {
@@ -87,7 +95,9 @@ export class FrameSampler {
     this.events.onVerdict?.(verdict);
     if (verdict.kind === 'unchanged') this.changeAt = null;
     else if (verdict.kind !== 'camera-moved' && this.changeAt === null) this.changeAt = Date.now();
-    if (verdict.kind !== 'send') return;
+    const retry = verdict.kind === 'unchanged' && this.retryAt !== null && Date.now() >= this.retryAt;
+    if (verdict.kind !== 'send' && !retry) return;
+    this.retryAt = null;
     this.busy = true;
     const timing: SentTiming = { changeAt: this.changeAt, sentAt: Date.now() };
     this.changeAt = null;

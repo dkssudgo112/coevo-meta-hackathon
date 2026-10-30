@@ -6,7 +6,7 @@ edl.json:
   "output": "out/demo.mp4",
   "segments": [
     {"card": {"title": "Coevo Caddie", "sub": "Built during the hackathon"}, "duration": 4, "caption": null},
-    {"src": "clips/desk.mov", "in": 2.0, "out": 10.0, "caption": "A café owner makes a poster with Meta AI. The phone beside the monitor is the Caddie."}
+    {"src": "clips/desk.mov", "in": 2.0, "out": 10.0, "crop": [0, 0, 1920, 1080], "caption": "A café owner makes a poster with Meta AI. The phone beside the monitor is the Caddie."}
   ]
 }
 Still segments hold an image, optionally over an audio excerpt:
@@ -132,7 +132,11 @@ def main(edl_path):
             else:
                 src = os.path.join(base, seg["src"])
                 dur = seg["out"] - seg["in"]
-                vf = f"[0:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x141917,fps={FPS}[b];[b][1:v]overlay=0:0,format=yuv420p[v]"
+                crop = ""
+                if seg.get("crop"):
+                    x0, y0, x1, y1 = seg["crop"]
+                    crop = f"crop={x1 - x0}:{y1 - y0}:{x0}:{y0},"
+                vf = f"[0:v]{crop}scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x141917,fps={FPS}[b];[b][1:v]overlay=0:0,format=yuv420p[v]"
                 audio = ["-map", "0:a"] if has_audio(src) else []
                 extra = [] if audio else ["-f", "lavfi", "-t", str(dur), "-i", "anullsrc=r=48000:cl=stereo"]
                 amap = audio or ["-map", "2:a"]

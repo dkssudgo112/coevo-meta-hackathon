@@ -20,6 +20,15 @@ const failNext = new Set();
 /** One-shot response delays per task name (ms), and simple stats for race tests. */
 const delayNext = new Map();
 const stats = { calls: {}, jobsStarted: 0 };
+/** One-shot ladder skip: the next intervention jumps to an example with no brief. 'regenerate' answers the
+ *  Worker's second request at the allowed step; 'refuse' skips ahead again so the Worker must stay quiet. */
+let skipAhead = null;
+let pendingRegenerate = null;
+/** One-shot: the next turn asks a new question (for checking the phone keeps an answer in progress). */
+let forceAsk = false;
+/** Number of upcoming readings that come back unreadable (legible=false). */
+let illegibleNext = 0;
+const PREMATURE = { action: 'intervene', step: 'example', reason: 'Skipping ahead.', quote: null, message: '[test] Copy this brief: A matcha poster for commuters, 6500 won, calm green.', note: null, missingIngredients: [], exampleBrief: null };
 const pause = ms => new Promise(r => setTimeout(r, ms));
 
 const none = { audience: false, price: false, mood: false, realPhoto: false, productDetail: false };
@@ -33,9 +42,10 @@ const READINGS = [
 ];
 
 function reading() {
+  if (illegibleNext > 0) { illegibleNext--; return { legible: false, tool: null, task: null, userRequest: null, userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, aiAskedFor: [], artifactVisible: false, artifactShows: [], vagueTerms: [], ingredients: none, confidence: 0.2 }; }
   const r = READINGS[readingIndex % READINGS.length];
   readingIndex++;
-  return { legible: true, tool: 'AI Assistant', task: r.aiAskedClarifyingQuestion ? 'poster for a new drink' : 'poster for a new dessert', userTyping: false, aiResponseSummary: r.aiAskedClarifyingQuestion ? 'Asked who it is for, the price, the feeling and for a photo before making it.' : 'Generated a poster.', artifactVisible: !r.aiAskedClarifyingQuestion, aiAskedFor: r.aiAskedClarifyingQuestion ? ['audience', 'price', 'mood', 'realPhoto'] : [], confidence: 0.9, ...r };
+  return { legible: true, tool: 'AI Assistant', task: r.aiAskedClarifyingQuestion ? 'poster for a new drink' : 'poster for a new dessert', userTyping: false, artifactKind: r.aiAskedClarifyingQuestion ? 'none' : 'design', artifactShows: r.aiAskedClarifyingQuestion ? [] : r.ingredients.price ? ['title', 'photo'] : ['title'], aiResponseSummary: r.aiAskedClarifyingQuestion ? 'Asked who it is for, the price, the feeling and for a photo before making it.' : 'Generated a poster.', artifactVisible: !r.aiAskedClarifyingQuestion, aiAskedFor: r.aiAskedClarifyingQuestion ? ['audience', 'price', 'mood', 'realPhoto'] : [], confidence: 0.9, ...r };
 }
 
 function decision(input) {
@@ -114,7 +124,14 @@ createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url === '/v1/responses') {
       const body = JSON.parse(raw.toString());
-      if (body.model === 'sam-3.1') return send(res, 200, message('<0f>0<|box;x1=128;y1=72;x2=1151;y2=647;w=1280;h=720;c=0.93|><|mask;x=0;y=0;data=2,2,!AA|>'));
+      if (body.model === 'sam-3.1') {
+        // Poster/monitor phrases get the big box; part phrases get a smaller box inside it, plus a
+        // decoy in the "chat" above the poster that the Worker must ignore.
+        const phrase = body.input?.[0]?.content?.[0]?.text ?? '';
+        const part = { 'price text': 'x1=300;y1=400;x2=600;y2=460', 'headline text': 'x1=300;y1=120;x2=900;y2=190', 'product photo': 'x1=400;y1=220;x2=1000;y2=380' }[phrase];
+        const boxes = part ? `<|box;x1=20;y1=5;x2=200;y2=40;w=1280;h=720;c=0.97|><|box;${part};w=1280;h=720;c=0.81|>` : '<|box;x1=128;y1=72;x2=1151;y2=647;w=1280;h=720;c=0.93|>';
+        return send(res, 200, message(`<0f>0${boxes}<|mask;x=0;y=0;data=2,2,!AA|>`));
+      }
       const name = body.text?.format?.name;
       stats.calls[name] = (stats.calls[name] ?? 0) + 1;
       if (delayNext.has(name)) { const ms = delayNext.get(name); delayNext.delete(name); await pause(ms); }
@@ -127,11 +144,19 @@ createServer(async (req, res) => {
         const seen = new Set(); const counts = new Map();
         for (const q of [...ctxIn.recentRequests, { text: r.userRequest, vagueTerms: r.vagueTerms }]) { if (!q.text || seen.has(q.text)) continue; seen.add(q.text); for (const t of q.vagueTerms) counts.set(t, (counts.get(t) ?? 0) + 1); }
         let best = null; for (const [term, count] of counts) if (!best || count > best.count) best = { term, count };
-        const d = decision({ firstSighting: ctxIn.firstSightingIfLegible, reading: r, repeatedVagueTerm: best && best.count >= 2 ? best : null, interventions: ctxIn.interventions, activeCards: ctxIn.activeCards });
+        let d = decision({ firstSighting: ctxIn.firstSightingIfLegible, reading: r, repeatedVagueTerm: best && best.count >= 2 ? best : null, interventions: ctxIn.interventions, activeCards: ctxIn.activeCards });
+        if (forceAsk) { forceAsk = false; d = { action: 'intervene', step: 'question', reason: 'Forced test question.', quote: null, message: '[test] A newer question: what price should the poster show?', note: null, missingIngredients: ['price'], exampleBrief: null }; }
+        if ((skipAhead === 'regenerate' || skipAhead === 'refuse') && d.action === 'intervene') {
+          pendingRegenerate = skipAhead === 'regenerate' ? d : null;
+          skipAhead = skipAhead === 'refuse' ? 'refuse-again' : 'answer';
+          d = PREMATURE;
+        }
         return send(res, 200, message({ reading: r, decision: d }));
       }
       if (name === 'caddie_decision') {
         const text = body.input[0].content[0].text;
+        if (text.includes('is not allowed yet') && skipAhead === 'refuse-again') { skipAhead = null; return send(res, 200, message(PREMATURE)); }
+        if (text.includes('is not allowed yet') && skipAhead === 'answer' && pendingRegenerate) { const d = pendingRegenerate; skipAhead = null; pendingRegenerate = null; return send(res, 200, message({ ...d, message: `${d.message} (regenerated)` })); }
         return send(res, 200, message(decision(JSON.parse(text.slice(text.indexOf('{'))))));
       }
       // Moment ids from the evidence text ("[m_…]"), so source links point at real moments.
@@ -157,7 +182,10 @@ createServer(async (req, res) => {
       const done = await Promise.race([p, new Promise(r => setTimeout(() => r(null), 50))]);
       return done ? send(res, done.status === 'failed' ? 500 : 200, done) : send(res, 202, { status: 'running' });
     }
-    if (url === '/reset') { readingIndex = 0; failNext.clear(); delayNext.clear(); return send(res, 200, { ok: true }); }
+    if (url === '/reset') { readingIndex = 0; failNext.clear(); delayNext.clear(); skipAhead = null; pendingRegenerate = null; forceAsk = false; illegibleNext = 0; return send(res, 200, { ok: true }); }
+    if (req.method === 'POST' && url === '/illegible') { illegibleNext = JSON.parse(raw.toString()).count; return send(res, 200, { ok: true }); }
+    if (req.method === 'POST' && url === '/force-ask') { forceAsk = true; return send(res, 200, { ok: true }); }
+    if (req.method === 'POST' && url === '/skip-ahead') { skipAhead = JSON.parse(raw.toString()).mode; return send(res, 200, { ok: true }); }
     if (req.method === 'POST' && url === '/delay') { const b = JSON.parse(raw.toString()); delayNext.set(b.name, b.ms); return send(res, 200, { ok: true }); }
     if (req.method === 'GET' && url === '/stats') return send(res, 200, stats);
     if (req.method === 'POST' && url === '/sent/clear') { sent.length = 0; return send(res, 200, { ok: true }); }

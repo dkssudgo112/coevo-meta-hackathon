@@ -4,7 +4,7 @@
 
 Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer / Build for Your World). The product concept continues the author's earlier Coevo work; all code in this repository was written during the event.
 
-> **Status:** deployed at https://coevo-caddie.coevo-meta-hackathon.workers.dev with real Meta model calls behind an application-enforced budget (US$2.50 lifetime ceiling inside an approved US$3 total). Real-screen readings, interventions, Practice Range and Modal speech/video have run live; the real-phone camera benchmark and the full card-in-Meta-AI loop are still open. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). What the Caddie says is never pre-written: its readings, decisions and content are live model output, and when a model call is off, refused or fails, the app says so instead of inventing output. The sample's screens are a scripted, fictional scenario, and the test build labels its fake model.
+> **Status:** deployed at https://coevo-caddie.coevo-meta-hackathon.workers.dev with real Meta model calls behind an application-enforced budget (US$2.50 lifetime ceiling inside an approved US$3 total). Real-screen readings, interventions, Practice Range, Modal speech/video and the Caddie card working inside one pinned Meta AI chat have run live; the real-phone camera benchmark and a real human voice are still open. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). What the Caddie says is never pre-written: its readings, decisions and content are live model output, and when a model call is off, refused or fails, the app says so instead of inventing output. The sample's screens are a scripted, fictional scenario, and the test build labels its fake model.
 
 ## The idea in one scene
 
@@ -18,18 +18,18 @@ They answer out loud — office workers near the station, 6,500 won, a calm morn
 
 | Part | What it does |
 | --- | --- |
-| **Phone · Caddie** (`/caddie`) | Points its camera at your monitor. On-device change detection sends a frame only when the screen changed and settled. Only the boxed screen area is uploaded (plus one disclosed setup photo if you ask it to find the screen). A NOW card and haptic nudge when the Caddie steps in; you answer by voice or type. |
+| **Phone · Caddie** (`/caddie`) | Points its camera at your monitor. On-device change detection sends a frame only when the screen changed and settled. Only the boxed screen area is uploaded (plus one disclosed setup photo if you ask it to find the screen). A NOW card and haptic nudge when the Caddie steps in; you answer by voice or type, and a new question never replaces an answer you are still giving. |
 | **PC · Desk** (`/desk`) | A thin tab: QR pairing, a copy inbox for what the Caddie sends, and evidence rows per moment (frame · what you said · what the Caddie did · what changed). |
 | **Sample** (`/sample`) | No phone needed. A scripted, fictional café scenario on screenshots of actual Meta AI replies. By default it replays a labeled recorded live run: the Caddie's real output, five formats, podcast and short, with no new model calls. "Run it live" makes fresh model calls on the shared demo budget. |
 
 **Meta models in the product**
 
 - **Muse Spark 1.3** — reads each camera frame into a structured moment, decides whether to intervene (and why it stays quiet), plans one shared learning design per session, and writes the five formats.
-- **SAM 3.1** — finds the monitor in the one disclosed setup photo so the phone can crop on-device from then on.
+- **SAM 3.1** — finds the monitor in the one disclosed setup photo so the phone can crop on-device from then on, and points at the poster's title, photo or price on a kept frame ("The price isn't visible."). The poster pointers have only been checked with a fake model so far.
 - **Muse Voice Transcribe** — your spoken answers and practice briefs.
 - **Muse Image** — Practice Range renders your spoken brief, and scenes for the short.
 
-Speech for the podcast and short uses the open-source **Kokoro-82M** model (Apache-2.0) on Modal, because Meta's API has no text-to-speech.
+Speech for the podcast and short uses the open-source **Kokoro-82M** model (Apache-2.0) on Modal, because Meta's API has no text-to-speech. With earphones in (you confirm it), the phone can also read new Caddie questions aloud with the browser's own speech synthesis; it is off by default.
 
 **After a session — five formats, five moments** (the Caddie decides which are worth making, with a one-line reason):
 note (right after) · **My playbook** manual split into "for your AI" and "you decide" (source of the Caddie card) · flashcards that apply the rule to new situations (10 min, then 1, 3, 7, 14 days) · a two-voice podcast with an objecting guest, where you can pause to ask and resume at the same line · a 30–45 s 9:16 short built on your own before/after screens.

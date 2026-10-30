@@ -60,6 +60,26 @@ export interface Ingredients {
 
 export const INGREDIENT_KEYS: readonly (keyof Ingredients)[] = ['audience', 'price', 'mood', 'realPhoto', 'productDetail'];
 
+export const ARTIFACT_PARTS = ['title', 'photo', 'price'] as const;
+export type ArtifactPart = (typeof ARTIFACT_PARTS)[number];
+export const ARTIFACT_KINDS = ['none', 'design', 'document', 'other'] as const;
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
+
+/**
+ * Visual coaching: SAM 3.1 points at a region of the person's artifact on the kept frame. When a part
+ * the person asked for is missing, the box marks the whole artifact and the text says what is missing.
+ */
+export interface Pointer {
+  part: ArtifactPart;
+  /** True when the part is on the artifact (box marks it); false when it is missing (box marks the artifact). */
+  found: boolean;
+  /** Normalized 0..1 box on the stored frame. */
+  box: { x: number; y: number; w: number; h: number };
+  confidence: number | null;
+  /** Short line, e.g. "The price isn't visible." */
+  text: string;
+}
+
 export interface Reading {
   legible: boolean;
   /** Name of the AI tool on screen, e.g. "Meta AI", or null when unsure. */
@@ -76,6 +96,14 @@ export interface Reading {
   /** Which details the AI asked for before producing (empty when it did not ask). Older readings may lack it. */
   aiAskedFor?: (keyof Ingredients)[];
   artifactVisible: boolean;
+  /** What the latest request tells the AI to fix or remove from its earlier result (a wrong or invented detail), or null. Older readings may lack it. */
+  correctsAI?: string | null;
+  /** The latest request explicitly tells the AI not to invent details, to use only the given facts, or to mark assumptions. */
+  asksNoInvention?: boolean;
+  /** What kind of result the AI shows: a designed image (poster, flyer, menu…), a text document, something else, or none. Older readings may lack it. */
+  artifactKind?: ArtifactKind;
+  /** For a visible poster-like artifact: which parts it clearly shows. Older readings may lack it. */
+  artifactShows?: ArtifactPart[];
   /** Vague style words the user leaned on, e.g. ["premium"]. */
   vagueTerms: string[];
   /** Ingredients present in the user's latest request. */
@@ -141,6 +169,9 @@ export interface Moment {
   timing?: MomentTiming | null;
   /** Captured in the disclosed benchmark test mode (frame kept for evaluation, max 20). */
   benchmark?: boolean;
+  /** SAM 3.1 pointers on the artifact (visual coaching), when a check ran for this moment. */
+  pointers?: Pointer[];
+  pointerCheck?: { status: 'done' | 'failed'; model: string; at: string; error?: string };
 }
 
 export interface MomentTiming {
@@ -161,6 +192,10 @@ export interface ObservedChange {
   /** Assistance label for the change, based on whether the Caddie had intervened. */
   assistance: Assistance;
   aiAskedFirst: boolean;
+  /** Discernment evidence: the request corrected this detail of the AI's earlier result. */
+  correctedDetail?: string | null;
+  /** Diligence evidence: the request told the AI not to invent details or to mark assumptions. */
+  askedNoInvention?: boolean;
   summary: string;
 }
 

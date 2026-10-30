@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { Assistance, Moment, Snapshot } from '../../../../packages/contracts/index.ts';
+import type { ArtifactPart, Assistance, Moment, Snapshot } from '../../../../packages/contracts/index.ts';
 import type { Creds } from '../lib/api.ts';
 import { useMedia } from '../lib/media.ts';
 
@@ -50,6 +50,42 @@ export function MediaImage({ creds, k, alt, className }: { creds: Creds | null; 
   return <img className={className ?? 'thumb'} src={url} alt={alt} />;
 }
 
+const PART_LABEL: Record<ArtifactPart, string> = { title: 'Title', photo: 'Photo', price: 'Price' };
+
+/**
+ * The kept frame with the regions SAM 3.1 pointed at (plan 6.1 visual coaching). A missing part is a
+ * dashed box around the whole artifact with what is missing; a found part is a solid labelled box.
+ */
+export function PointerFrame({ creds, moment, compact }: { creds: Creds | null; moment: Moment; compact?: boolean }) {
+  const ps = moment.pointers ?? [];
+  if (!ps.length || !moment.frame?.storedKey) return null;
+  const missing = ps.filter(p => !p.found);
+  const found = ps.filter(p => p.found);
+  return (
+    <figure className={`pointer-frame ${compact ? 'compact' : ''}`}>
+      <div className="pf-img">
+        <MediaImage creds={creds} k={moment.frame.storedKey} alt={`Your screen at ${clock(moment.at)}, with the parts the Caddie points at`} className="pf-pic" />
+        {ps.map((p, i) => {
+          // Labels of boxes that share a corner are stacked, not drawn on top of each other.
+          const near = (q: typeof p) => Math.abs(q.box.x - p.box.x) < 0.03 && Math.abs(q.box.y - p.box.y) < 0.03;
+          const k = ps.slice(0, i).filter(near).length;
+          const label = p.found ? PART_LABEL[p.part] : `Missing: ${PART_LABEL[p.part].toLowerCase()}`;
+          return (
+            <span key={i} className={`pf-box ${p.found ? 'found' : 'missing'}`} style={{ left: `${p.box.x * 100}%`, top: `${p.box.y * 100}%`, width: `${p.box.w * 100}%`, height: `${p.box.h * 100}%` }} aria-hidden="true">
+              <b style={{ top: `${k * 1.45}em` }}>{label}</b>
+            </span>
+          );
+        })}
+      </div>
+      <figcaption className="stack" style={{ gap: 2 }}>
+        {missing.map(p => <strong key={p.part}>{p.text}</strong>)}
+        {found.length > 0 && <span>{`On it: ${found.map(p => PART_LABEL[p.part].toLowerCase()).join(', ')}.`}</span>}
+        <span className="faint">Pointed out by SAM 3.1 on your kept frame{moment.frame.fixture ? ' (sample)' : ''}. It can miss small text.</span>
+      </figcaption>
+    </figure>
+  );
+}
+
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="notice">{children}</div>;
 }
@@ -84,6 +120,8 @@ export function changeText(m: Moment): string {
   const parts: string[] = [];
   if (c.addedIngredients.length) parts.push(`You added ${c.addedIngredients.map(k => INGREDIENT_TEXT[k] ?? k).join(', ')}.`);
   if (c.aiAskedFirst) parts.push('Your AI asked first.');
+  if (c.correctedDetail) parts.push(`You told the AI to fix: ${c.correctedDetail}.`);
+  if (c.askedNoInvention) parts.push('You told the AI not to invent details.');
   return parts.join(' ');
 }
 

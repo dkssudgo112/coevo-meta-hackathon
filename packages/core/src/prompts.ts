@@ -6,7 +6,7 @@ import type {
   ContentFormat, Flashcard, Ingredients, LadderStep, LearningDesign, ManualPayload, NotePayload, PodcastLine,
   Reading, ShortScene, ShortSceneRole,
 } from '../../contracts/index.ts';
-import { CONTENT_FORMATS, INGREDIENT_KEYS, LADDER } from '../../contracts/index.ts';
+import { ARTIFACT_KINDS, ARTIFACT_PARTS, CONTENT_FORMATS, INGREDIENT_KEYS, LADDER } from '../../contracts/index.ts';
 import type { JsonSchema } from './schema.ts';
 import { R, S, ShapeError } from './schema.ts';
 import type { Proposal } from './ladder.ts';
@@ -65,7 +65,11 @@ Report only what is visible. Never guess text you cannot read. If the conversati
 - aiAskedFor: when it asked, which details its questions ask for (audience = who it is for; price = a price or number; mood = a feeling or tone; realPhoto = whether the person has a real photo or own material; productDetail = what exactly it is). Empty when it did not ask.
 - aiResponseSummary: one sentence on what the AI did; name any concrete detail it added that the latest request did not give (e.g. opening hours, a slogan).
 - vagueTerms: style words in the latest request that carry no concrete instruction, lowercased (e.g. "premium", "luxurious", "better", "modern", "cute").
-- ingredients: judge only the latest user request.`,
+- ingredients: judge only the latest user request.
+- correctsAI: if the latest request tells the AI to fix, remove or replace a specific thing in its earlier result (for example "remove the opening hours, we don't have any", "the price is 6,500 won, not 6,000"), name that thing in a few words; else null. A new style wish ("more premium") is not a correction.
+- asksNoInvention: true only if the latest request explicitly tells the AI not to invent or add details, to use only the facts given, or to mark anything it assumed.
+- artifactKind: "design" when the AI's visible result is a poster, flyer, menu, banner, social post or other designed image; "document" for text such as a letter, email or report; "other" for anything else; "none" when no result is visible.
+- artifactShows: only when artifactKind is "design": which of these it clearly shows — "title" (a headline or product name), "photo" (a picture of the product), "price" (a readable price). Empty when there is no such artifact or none is visible. Never guess small text you cannot read.`,
   schema: S.obj({
     legible: S.bool('Whether the conversation text is readable.'),
     tool: S.nstr('AI tool name or null.', 40),
@@ -76,6 +80,10 @@ Report only what is visible. Never guess text you cannot read. If the conversati
     aiAskedClarifyingQuestion: S.bool('The AI asked questions before producing.'),
     aiAskedFor: S.arr(S.enumOf(INGREDIENT_KEYS, 'detail'), 'Details the AI asked for before producing; empty if it did not ask.', 0, 5),
     artifactVisible: S.bool('An image, poster, draft or document produced by the AI is visible.'),
+    correctsAI: S.nstr('What the latest request tells the AI to fix or remove from its earlier result, or null.', 80),
+    asksNoInvention: S.bool('The latest request tells the AI not to invent details or to mark assumptions.'),
+    artifactKind: S.enumOf(ARTIFACT_KINDS, 'Kind of visible AI result: design (poster, flyer…), document, other, or none.'),
+    artifactShows: S.arr(S.enumOf(ARTIFACT_PARTS, 'part'), 'Parts a visible poster-like artifact clearly shows; empty if none.', 0, 3),
     vagueTerms: S.arr(S.str('vague word', 30), 'Vague style words in the latest request.', 0, 6),
     ingredients: ingredientsSchema,
     confidence: S.num('0..1 confidence in this reading.', 0, 1),
@@ -93,6 +101,10 @@ Report only what is visible. Never guess text you cannot read. If the conversati
       aiAskedClarifyingQuestion: R.bool(o.aiAskedClarifyingQuestion, 'aiAskedClarifyingQuestion'),
       aiAskedFor: R.arr(o.aiAskedFor, 'aiAskedFor', (x, p) => R.oneOf(x, INGREDIENT_KEYS, p), 0, 5),
       artifactVisible: R.bool(o.artifactVisible, 'artifactVisible'),
+      correctsAI: legible && o.correctsAI !== undefined ? R.nstr(o.correctsAI, 'correctsAI', 80) : null,
+      asksNoInvention: legible && o.asksNoInvention !== undefined ? R.bool(o.asksNoInvention, 'asksNoInvention') : false,
+      artifactKind: o.artifactKind === undefined ? undefined : R.oneOf(o.artifactKind, ARTIFACT_KINDS, 'artifactKind'),
+      artifactShows: o.artifactShows === undefined ? [] : R.arr(o.artifactShows, 'artifactShows', (x, p) => R.oneOf(x, ARTIFACT_PARTS, p), 0, 3),
       vagueTerms: R.arr(o.vagueTerms, 'vagueTerms', (x, p) => R.str(x, p, 30).toLowerCase(), 0, 6),
       ingredients: readIngredients(o.ingredients, 'ingredients'),
       confidence: R.num(o.confidence, 'confidence', 0, 1),
@@ -111,6 +123,8 @@ export interface DecisionInput {
   activeCards: string[];
   memory: string[];
   secondsSinceLastIntervention: number | null;
+  /** The highest ladder step allowed for this decision (never skip ahead). */
+  highestStepAllowed: LadderStep;
 }
 
 export const decisionTask: ModelTask<Proposal> = {
@@ -126,6 +140,7 @@ Ladder (use the lowest step that can work, one step at a time):
 - question: ONE short question that makes the person supply a missing ingredient. Quote their exact words if it helps. Do not write the brief for them.
 - ingredients: a short list of what is missing (who it's for, a concrete number, one concrete feeling or tone, the person's own real material, specific details). For a poster that might be the price and a real photo; for a cover letter, one thing only this person did.
 - example: only if the person asked for an example or stayed stuck after ingredients. Give a short sample brief in their context and call it an example.
+Never use a step above highestStepAllowed in the input; a message written for a higher step is thrown away. Only the example step may contain a sample brief.
 Never repeat a question the AI already asked. One improvement at a time. Message at most 2 sentences and 160 characters. ${STYLE}
 Special cases:
 - firstSighting=true: stay quiet; in "note" say in at most 90 characters which tool and task you can see and that you will only speak when it helps.
@@ -381,6 +396,7 @@ export interface TurnContext {
   activeCards: string[];
   memory: string[];
   secondsSinceLastIntervention: number | null;
+  highestStepAllowed: LadderStep;
 }
 
 /** One call that reads the screen and decides, to cut latency. Same schemas and readers as the separate tasks. */

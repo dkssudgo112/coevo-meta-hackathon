@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ChangeDetector, meanAbsDiff } from '../src/change.ts';
-import { applyGuardrails, type Proposal } from '../src/ladder.ts';
-import { labelPractice, observeChange } from '../src/labels.ts';
+import { allowedStep, applyGuardrails, type Proposal } from '../src/ladder.ts';
+import { dimensionFor, labelPractice, observeChange } from '../src/labels.ts';
 import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
 import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
 import { applyHint, asksFromText, cardObserved } from '../src/cards.ts';
+import { choosePointers, insidePoster } from '../src/pointers.ts';
 import { decisionTask, readingTask, shortTask, podcastTask, manualTask, turnTask } from '../src/prompts.ts';
 import type { CaddieCard, Moment, Reading } from '../../contracts/index.ts';
 
@@ -56,9 +57,41 @@ test('guardrails never interrupt typing and block step skipping', () => {
   assert.equal(typing.action, 'stay-quiet');
   assert.equal(typing.guardrail, 'typing');
   const skip = applyGuardrails(proposal({ step: 'example', exampleBrief: 'x' }), { reading: reading(), history: [], nowMs: 0, activeCard: false });
-  assert.equal(skip.step, 'question');
+  assert.equal(skip.action, 'stay-quiet');
   assert.equal(skip.guardrail, 'ladder-step');
   assert.equal(skip.exampleBrief, null);
+});
+
+test('a first example is refused whole, never relabelled as a question that still holds the brief', () => {
+  const r = applyGuardrails(proposal({ step: 'example', message: 'Copy this brief: A matcha poster for commuters, 6500 won, calm green, with a concept illustration.', exampleBrief: null }), { reading: reading(), history: [], nowMs: 0, activeCard: false });
+  assert.equal(r.action, 'stay-quiet');
+  assert.equal(r.step, 'watch');
+  assert.equal(r.message, null);
+  assert.equal(r.guardrail, 'ladder-step');
+  assert.match(r.reason, /held back a full example; it has to try one question first/);
+  const ingredientsFirst = applyGuardrails(proposal({ step: 'ingredients' }), { reading: reading(), history: [], nowMs: 0, activeCard: false });
+  assert.equal(ingredientsFirst.guardrail, 'ladder-step');
+});
+
+test('a requested example with no sample brief is refused, not turned into an ingredients list', () => {
+  const at = new Date(0).toISOString();
+  const asked = moment({ decision: { action: 'intervene', step: 'question', reason: '', quote: null, message: 'Who is it for?', note: null, missingIngredients: [], exampleBrief: null, guardrail: null, provenance: 'live-model', model: 'x', decidedAt: at }, response: { kind: 'asked-example', transcript: null, at } });
+  assert.equal(allowedStep([asked]), 'example');
+  const empty = applyGuardrails(proposal({ step: 'example', message: 'Here is an example.', exampleBrief: null }), { reading: reading(), history: [asked], nowMs: 10, activeCard: false });
+  assert.equal(empty.action, 'stay-quiet');
+  assert.equal(empty.guardrail, 'missing-example');
+  assert.equal(empty.message, null);
+  const ok = applyGuardrails(proposal({ step: 'example', message: 'An example, change it to your words.', exampleBrief: 'A poster for commuters…' }), { reading: reading(), history: [asked], nowMs: 10, activeCard: false });
+  assert.equal(ok.action, 'intervene');
+  assert.equal(ok.step, 'example');
+  assert.equal(ok.exampleBrief, 'A poster for commuters…');
+});
+
+test('allowed step climbs one rung per intervention', () => {
+  const d = (step: 'question' | 'ingredients') => moment({ decision: { action: 'intervene', step, reason: '', quote: null, message: 'm', note: null, missingIngredients: [], exampleBrief: null, guardrail: null, provenance: 'live-model', model: 'x', decidedAt: new Date(0).toISOString() } });
+  assert.equal(allowedStep([]), 'question');
+  assert.equal(allowedStep([d('question')]), 'ingredients');
+  assert.equal(allowedStep([d('question'), d('ingredients')]), 'example');
 });
 
 test('guardrails apply cooldown, later multiplier, praise filter and quote grounding', () => {
@@ -266,4 +299,42 @@ test('podcast reader keeps a usable paid script despite cosmetic overruns, but n
   assert.equal(v.lines.length, 22);
   assert.throws(() => podcastTask.read({ title: 't', guest: 'g', lines: Array.from({ length: 8 }, (_, i) => ({ ...line(i), speaker: i === 3 ? 'narrator' : line(i).speaker })) }));
   assert.throws(() => podcastTask.read({ title: 't', guest: 'g', lines: [line(0), line(1)] }), 'too few lines for a conversation');
+});
+
+test('discernment and diligence come only from what the request explicitly says, once per request', () => {
+  const before = moment({ id: 'a', reading: reading({ userRequest: 'Make a poster for our new dessert' }) });
+  const fix = reading({ userRequest: 'Remove the opening hours, we do not have any', correctsAI: 'opening hours' });
+  const c1 = observeChange(fix, [before]);
+  assert.equal(c1?.correctedDetail, 'opening hours');
+  assert.deepEqual(dimensionFor(c1!), ['discernment']);
+  assert.equal(c1?.assistance, 'independent');
+  // The same request seen again in the next frame is not a second observation.
+  assert.equal(observeChange(fix, [before, moment({ id: 'b', reading: fix })]), null);
+  const careful = reading({ userRequest: 'Use only the facts I gave you, do not add anything', asksNoInvention: true });
+  assert.deepEqual(dimensionFor(observeChange(careful, [before])!), ['diligence']);
+  // A plain style wish is neither.
+  assert.equal(observeChange(reading({ userRequest: 'More premium please' }), [before]), null);
+  // After a Caddie intervention in the window, a correction is coached, never independent.
+  const asked = moment({ id: 'q', decision: { action: 'intervene', step: 'question', reason: '', quote: null, message: 'Who?', note: null, missingIngredients: [], exampleBrief: null, guardrail: null, provenance: 'live-model', model: null, decidedAt: '' } });
+  assert.equal(observeChange(fix, [before, asked])?.assistance, 'coached');
+});
+
+test('SAM pointers land on the poster, never on the same words in the chat above it', () => {
+  // Pixel regions from a real 820×900 Meta AI screenshot: poster x29–337/y344–729, price on it x118–250/y458–493.
+  const W = { w: 820, h: 900, c: 0.9 };
+  const poster = { x1: 29, y1: 344, x2: 337, y2: 729, ...W };
+  const priceInChat = { x1: 300, y1: 60, x2: 420, y2: 90, ...W, c: 0.95 };
+  const priceOnPoster = { x1: 118, y1: 458, x2: 250, y2: 493, ...W, c: 0.6 };
+  const ps = choosePointers(['price', 'photo'], ['price'], poster, { price: [priceInChat, priceOnPoster] });
+  const price = ps.find(p => p.part === 'price')!;
+  assert.equal(price.found, true);
+  assert.ok(Math.abs(price.box.x - 118 / 820) < 1e-9 && Math.abs(price.box.y - 458 / 900) < 1e-9, 'the poster price, not the more confident chat match');
+  const photo = ps.find(p => p.part === 'photo')!;
+  assert.equal(photo.found, false);
+  assert.equal(photo.text, 'Your product photo isn’t on it.');
+  assert.ok(Math.abs(photo.box.w - 309 / 820) < 1e-9, 'a missing part boxes the whole poster');
+  // Only chat matches: claim nothing for that part. No poster: no pointers at all.
+  assert.deepEqual(choosePointers(['price'], ['price'], poster, { price: [priceInChat] }), []);
+  assert.deepEqual(choosePointers(['price'], [], null, {}), []);
+  assert.equal(insidePoster(poster, poster), false, 'the poster itself is not a part');
 });

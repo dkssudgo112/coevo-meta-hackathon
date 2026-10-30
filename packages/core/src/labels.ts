@@ -30,7 +30,11 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
   const before = new Set(presentIngredients(prev?.reading ?? null));
   const added = presentIngredients(current).filter(k => !before.has(k));
   const aiAskedFirst = current.aiAskedClarifyingQuestion;
-  if (!added.length && !aiAskedFirst) return null;
+  // Discernment and diligence only from what the request explicitly says, and only once per request.
+  const newRequest = !!current.userRequest && current.userRequest !== prev?.reading?.userRequest;
+  const correctedDetail = newRequest && current.correctsAI ? current.correctsAI : null;
+  const askedNoInvention = newRequest && current.asksNoInvention === true;
+  if (!added.length && !aiAskedFirst && !correctedDetail && !askedNoInvention) return null;
 
   // Coaching counts from the person's last observed improvement (or the session start),
   // not just the last readable frame: a question two frames ago still shaped this change.
@@ -39,7 +43,7 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
   const interventions = since.filter(m => m.decision?.action === 'intervene');
   const example = [...since].reverse().find(m => m.decision?.step === 'example' && m.decision.exampleBrief);
   let assistance: Assistance = 'independent';
-  if (!added.length && aiAskedFirst) {
+  if (!added.length && aiAskedFirst && !correctedDetail && !askedNoInvention) {
     // The AI asking first is the effect of a Caddie card, not the person's own act.
     assistance = 'coached';
   } else if (example?.decision?.exampleBrief && current.userRequest && similarity(current.userRequest, example.decision.exampleBrief) >= 0.5) {
@@ -50,8 +54,10 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
   const parts: string[] = [];
   if (added.length) parts.push(`added ${added.join(', ')}`);
   if (aiAskedFirst) parts.push('the AI asked clarifying questions first');
+  if (correctedDetail) parts.push(`told the AI to fix: ${correctedDetail}`);
+  if (askedNoInvention) parts.push('told the AI not to invent details');
   void opts;
-  return { addedIngredients: added, assistance, aiAskedFirst, summary: parts.join('; ') };
+  return { addedIngredients: added, assistance, aiAskedFirst, correctedDetail, askedNoInvention, summary: parts.join('; ') };
 }
 
 export function strengthFor(assistance: Assistance, opts: { practice?: boolean; transfer?: boolean }): EvidenceStrength | null {
@@ -77,5 +83,7 @@ export function dimensionFor(change: ObservedChange): SkillDimension[] {
   const dims: SkillDimension[] = [];
   if (change.addedIngredients.length) dims.push('description');
   if (change.aiAskedFirst) dims.push('delegation');
+  if (change.correctedDetail) dims.push('discernment');
+  if (change.askedNoInvention) dims.push('diligence');
   return dims;
 }

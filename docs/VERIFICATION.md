@@ -18,11 +18,11 @@ This matrix tracks every approved requirement through three depth levels and rec
 
 **Status:** ☐ not started · ◐ in progress · ☑ done (with evidence) · ⚠ blocked (reason in notes)
 
-**Local fake-model journey** (`npm run test:e2e-fake`, TEST ONLY): with a scripted fake model server on 127.0.0.1 the whole server path passes 48/48 checks (incl. deletion during slow model calls and slow storage writes, a media job dispatched during a slow poll, and revoking a retained card) — frames → readings → quiet/intervene decisions with grounded quotes → voice answer → frameless reply → coached change → wrap with a reason per format → all five formats ready (123.8 s podcast, 40.8 s short, both downloadable) → card edit/approve/apply → next session "AI asked first" → card observed-working → practice labels (independent; coached after hint) → podcast Ask → flashcard interval → misread → frame deletion → revoke history → spend under cap. All of it is labeled `fixture`; it proves the server logic, not real model quality, camera legibility or deployment.
+**Local fake-model journey** (`npm run test:e2e-fake`, TEST ONLY): with a scripted fake model server on 127.0.0.1 the whole server path passes 60/60 checks (incl. deletion during slow model calls and slow storage writes, a media job dispatched during a slow poll, revoking a retained card, a skipped ladder step regenerated or refused, and SAM pointers kept inside the poster) — frames → readings → quiet/intervene decisions with grounded quotes → voice answer → frameless reply → coached change → wrap with a reason per format → all five formats ready (123.8 s podcast, 40.8 s short, both downloadable) → card edit/approve/apply → next session "AI asked first" → card observed-working → practice labels (independent; coached after hint) → podcast Ask → flashcard interval → misread → frame deletion → revoke history → spend under cap. All of it is labeled `fixture`; it proves the server logic, not real model quality, camera legibility or deployment.
 
 **Live end-to-end session** (deployed app, real models, scripted fictional café on five screenshots of actual Meta AI replies, synthetic voice): quiet notes → intervention at the question step quoting the person → spoken answer transcribed → Caddie reply → specific brief labeled coached → all five formats (note, My playbook, flashcards, 93 s podcast, 38.9 s 1080×1920 short) → card approved. Meta $0.163 + $0.08 media reservation. Not real-user or learning evidence.
 
-Last updated: 2026-10-30 (night KST).
+Last updated: 2026-10-30 (late night KST).
 
 ## A. Observation
 
@@ -36,20 +36,23 @@ Last updated: 2026-10-30 (night KST).
 | A6 | Photo fallback (single photo) | ◐ | ☐ | ☐ | code: phone photo + crop, Desk screenshot upload | |
 | A7 | Desk screen-share fallback (`getDisplayMedia`) | ◐ | ☐ | ☐ | code: Desk sampler | |
 | A8 | Raw frames discarded after reading; evidence frames kept and deletable | ◐ | ☐ | ☐ | integration: unreadable/disabled frame deleted; code: retention rule + delete API | |
+| A9 | Unreadable frames retried quietly; after three in a row "Tilt me a little, or take one photo."; model/network errors show "Caddie paused — connection." and never count as unreadable | ◐ | ◐ | ☐ | unit: run counting (errors neither count nor break the run); TEST build in the browser (photo mode): an unreadable photo shows the hint, an injected model 500 shows the paused state with one NOW card and no empty Caddie card | Camera-mode quiet retry needs `device` |
+| A10 | SAM 3.1 visual coaching: points at the poster's title, photo or price; a requested part that is missing is shown as "The price isn't visible." on the whole poster | ◐ | ☐ | ☐ | unit: SAM finds the poster first and only part boxes inside it count (regions from a real Meta AI screenshot: a more confident price match in the chat text is ignored); only for a designed result (a cover letter never gets poster coaching); fake e2e + TEST build in the browser: dashed "Missing: price" box on the poster, labelled title/photo boxes, caption names SAM 3.1; runs once per request after the decision, never delays the NOW card | Live SAM check on a real screenshot pending; accuracy on camera frames unmeasured |
 
 ## B. Caddie
 
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | B1 | Every decision has a reason, quiet included (live model) | ☑ | ◐ | ☐ | live session: quiet notes ("Second premium request, still converging, staying quiet."), cooldown note, intervention reason | |
-| B2 | Ladder question → ingredients → example; no skipping | ◐ | ☐ | ☐ | unit: guardrails; live: intervention at the question step quoting "more premium"; reply after the answer | Ingredients/example steps pending live |
-| B3 | NOW card + session flow, one primary action | ☐ | ☐ | ☐ | | |
-| B4 | Voice answer: record → 16 kHz WAV → Voice Transcribe | ☑ | ◐ | ☐ | live: 10 s synthetic answer transcribed (one place name misheard) → Caddie reply; keyword-hint 400 found and fixed (single words, retry without hints) | Browser microphone + human voice pending |
+| B2 | Ladder question → ingredients → example; no skipping | ◐ | ◐ | ☐ | unit: a skipped-ahead proposal is refused whole (never relabelled with its example text), a requested example without a brief is refused; fake e2e: the Worker asks the model once more for the allowed step (regenerated), a second skip stays quiet; the allowed step is now sent to the model; live: intervention at the question step quoting "more premium" | Ingredients/example steps pending live |
+| B3 | NOW card + session flow, one primary action; an answer in progress is never replaced | ◐ | ◐ | ☐ | TEST build in the browser: while a typed draft or a recording is open, a newer question waits (no swap, no buzz, "newer note" line), the answer is stored on the question it was started for, then the newer question appears and buzzes once | Device check pending |
+| B4 | Voice answer: record → 16 kHz WAV → Voice Transcribe | ☑ | ◐ | ☐ | live: 10 s synthetic answer transcribed (one place name misheard) → Caddie reply; keyword-hint 400 found and fixed (single words, retry without hints); unit + browser (delayed test microphone): a repeated tap while the microphone opens is ignored, cancelling before permission stops the late stream and starts no audio context | Real microphone + human voice pending |
 | B5 | Haptic nudge (`navigator.vibrate`), visual pulse fallback | ◐ | ☐ | ☐ | code: buzz + pulse on every new question, including the first of a quiet session; history on reopen does not buzz (bug found in review, fixed) | Device check pending; iOS Safari has no vibrate API |
 | B6 | Later defers with a longer cooldown; card stays in flow | ◐ | ☐ | ☐ | unit: later-cooldown | |
 | B7 | "That's not what I asked" marks a misread and drops its evidence | ☐ | ☐ | ☐ | | |
 | B8 | No interrupt while typing; praise removed; quotes must be grounded | ◐ | ☐ | ☐ | unit | |
 | B9 | First-sighting acknowledgement written by the model | ☑ | ☐ | ☐ | live: "See Meta AI making cafe poster; will speak only when helpful." | |
+| B10 | Live Caddie voice only with earphones (browser speech synthesis, opt-in) | ◐ | ◐ | ☐ | TEST build in the browser: off by default; turning it on needs "My earphones are in"; a new question is read once; it turns itself off when audio devices change; silent while an answer is in progress | Browsers cannot detect earphones reliably, so the person confirms; device check pending |
 
 ## C. Connection
 
@@ -66,7 +69,7 @@ Last updated: 2026-10-30 (night KST).
 | --- | --- | --- | --- | --- | --- | --- |
 | D1 | Moment = frame + reading + decision + response + observed change | ◐ | ☐ | ☐ | contracts | |
 | D2 | Four assistance labels by deterministic rules | ☑ | ◐ | ☐ | unit: labels incl. a question two frames earlier; live: specific brief after the Caddie's question → coached (mislabel found and fixed) | |
-| D3 | 4D observations (no levels or scores); unobserved is not failure | ◐ | ☐ | ☐ | unit: `dimensionFor` | |
+| D3 | 4D observations (no levels or scores); unobserved is not failure | ◐ | ☐ | ☐ | unit: description (added details), delegation (AI asked first, coached), discernment (the request tells the AI to fix a specific wrong or invented detail), diligence (the request tells the AI not to invent details) — each only from the request text, once per request, coached after any intervention | Discernment and diligence not yet observed live; the recorded sample shows none (its invented opening hours were not corrected) |
 | D4 | Source links from every card and content item to its moment/frame | ☑ | ◐ | ☐ | TEST build in the browser: "Made from" links on content and cards (phone and Desk), note quotes open the session with the moment highlighted and its kept frame shown; Back retraces content → source → content; Desk links scroll to the evidence row | |
 | D5 | Frame deletion keeps the label and marks "source removed" | ☑ | ◐ | ☐ | fake e2e: deleting a frame keeps its "with the Caddie" label and removes the stored image; Desk row shows "Source removed", the short storyboard "(frame deleted)" | Live check pending |
 | D6 | Desk evidence rows: FRAME, YOU SAID, CADDIE, THEN | ☐ | ☐ | ☐ | | |
@@ -100,7 +103,7 @@ Last updated: 2026-10-30 (night KST).
 | G2 | Spoken brief → transcript | ☑ | ◐ | ☐ | live Voice Transcribe on synthetic speech (macOS voice): 31 and 19 words; word-set similarity 0.86 to the script | Real human voice pending |
 | G3 | Muse Image renders the user's own words | ☑ | ◐ | ☐ | live: 3 portrait images (1024×1536) from spoken briefs, ~16 s per attempt incl. transcription and check | |
 | G4 | Ingredient check + exact label | ☑ | ◐ | ☐ | live: ingredient check + "independent · practice" label; unit/fake: coached after hint | |
-| G5 | Practice recovery and scope: 30 s cap, typed fallback marked typed, image-only redraw, session-scoped attempts deleted with their session | ◐ | ☐ | ☐ | fake e2e: 35 s recording refused (413), typed brief checked and marked typed, session deletion removes attempts/images/skill notes, practice opened from a finished session stays with it (browser), a TEST-simulated restart keeps the scenario and offers a retry | Live check and a real process restart for practice pending |
+| G5 | Practice recovery and scope: 30 s cap, typed fallback marked typed, image-only redraw, session-scoped attempts deleted with their session | ☑ | ◐ | ☐ | fake e2e: 35 s recording refused (413), typed brief checked and marked typed, session deletion removes attempts/images/skill notes, practice opened from a finished session stays with it (browser); a real local process restart (fake providers) during each of the four in-flight states recovered with Retry and kept a finished check and label (independently re-run by the reviewer) | Live check pending |
 
 ## H. Deployment and judging
 
@@ -133,7 +136,7 @@ Last updated: 2026-10-30 (night KST).
 | Screen | Waiting | Empty | Failure | Partial success | Retry | Return to context | Delete / revoke |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Phone · Pair | ☐ | ☐ | ☐ | — | ☐ | ☐ auto re-pair | — |
-| Phone · Live | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ pause |
+| Phone · Live | ◐ reading | ◐ "Work as usual" | ◐ paused — connection; can't read → tilt or photo | ☐ | ◐ quiet retry of an unreadable frame (camera, code) | ◐ answer in progress kept; newer question waits | ☐ pause |
 | Phone · Session wrap | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ card reject/revoke |
 | Phone · Players | ☐ | — | ☐ | ☐ | ☐ | ☐ podcast resume | — |
 | Phone · Practice Range | ☐ | — | ☐ | ☐ | ☐ | ☐ | — |

@@ -1,6 +1,6 @@
 # Current status
 
-Updated: October 30, 2026 (late night, KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
+Updated: October 30, 2026 (late night, KST, second update). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
 
 ## Deployed with real model calls
 
@@ -20,7 +20,16 @@ These runs use screenshots of **actual Meta AI replies** to a scripted café-own
 
 ## Fixed after live runs
 
-Live runs and reviews found problems that mocks had not: a lost media job when two renders overlapped, a coached change mislabeled as independent, a voice-answer rejection caused by multi-word keyword hints, a podcast script cut off by the output limit, work lost when the server restarted, UTC clock times in generated text, a card written in the wrong voice, a short title running off the frame, deletion races, answers from a deleted session reaching later prompts, a player crash when content arrived while it was open, and a rule parser that read "do not ask" backwards. Each fix has a regression test; the local fake-model journey passes 57/57 (test mode only). A real local process restart (fake models) recovered interrupted items with a retry.
+Live runs and reviews found problems that mocks had not: a lost media job when two renders overlapped, a coached change mislabeled as independent, a voice-answer rejection caused by multi-word keyword hints, a podcast script cut off by the output limit, work lost when the server restarted, UTC clock times in generated text, a card written in the wrong voice, a short title running off the frame, deletion races, answers from a deleted session reaching later prompts, a player crash when content arrived while it was open, a rule parser that read "do not ask" backwards, a microphone left on when a recording was cancelled before permission arrived, a skipped ladder step relabelled instead of refused, and a new question replacing an answer the person was still recording or typing. Each fix has a regression test; the local fake-model journey passes 60/60 (test mode only). A real local process restart (fake models) recovered interrupted items with a retry.
+
+## Built, checked only with fake models so far
+
+These run in the test build in a browser, with a scripted fake model and recorded vibration and speech calls. They are not yet checked with real models or on a phone.
+
+- **Visual coaching with SAM 3.1.** When the person's request names a price, a real photo or the product and a poster is on screen, SAM 3.1 points at that part on the kept frame. If the reading says it is missing, the whole poster is boxed with "The price isn't visible."
+- **Caddie voice through earphones.** Off by default. The person turns it on and confirms "My earphones are in"; new questions are then read by the browser's own speech synthesis. It turns itself off when the audio devices change.
+- **Unreadable screens and lost connections.** An unreadable camera frame is retried quietly; after three in a row the phone asks to tilt it or take one photo. A model or network failure shows "Caddie paused — connection." without an empty card.
+- **Judging and checking habits.** Besides describing and delegating, the habits list can now record judging the AI's output (the person tells the AI to fix a wrong or invented detail) and checking (the person tells the AI not to invent details), only from what the request explicitly says.
 
 ## Known issues
 
@@ -30,6 +39,7 @@ Live runs and reviews found problems that mocks had not: a lost media job when t
 
 - **Real phone camera:** the 20-frame benchmark (reading accuracy on camera frames, latency, SAM screen detection), haptics, and the camera-off indicator on pause.
 - **A real human voice** (only synthetic speech so far).
+- **SAM 3.1 pointing on posters with the real model**, and the earphone voice on a phone.
 - The three-minute demo video, simulated persona tests (to be labeled as simulations), and the submission texts.
 
 ## Publication

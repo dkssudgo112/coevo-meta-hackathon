@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { ContentItem, Moment, Session, SkillDimension, Snapshot } from '../../../../packages/contracts/index.ts';
 import { post, postBinary, api, type Creds } from '../lib/api.ts';
 import type { ConnState } from '../lib/store.ts';
 import { vibrate } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, DataTable, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, MediaImage, modelSourceLine, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, DataTable, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, MediaImage, modelSourceLine, PointerFrame, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
+import { connectionTrouble, illegibleRun } from '../lib/moments.ts';
 import { PracticeRange } from './Practice.tsx';
+import { ReadAloudSetting, useReadAloud } from './ReadAloud.tsx';
 
 export interface CameraInfo {
   mode: 'camera' | 'photo';
@@ -43,22 +45,34 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
   const [err, setErr] = useState('');
   const session = latestSession(state);
   const moments = sessionMoments(state, session?.id);
-  const asking = useMemo(() => [...moments].reverse().find(m => m.decision?.action === 'intervene' && !m.misread) ?? null, [moments]);
-  // Acting on the question in the work itself (new ingredients observed) also answers it.
-  const resolvedBy = useMemo(() => (asking ? moments.find(m => m.index > asking.index && m.change && !m.misread) ?? null : null), [moments, asking]);
+  const newestAsk = useMemo(() => [...moments].reverse().find(m => m.decision?.action === 'intervene' && !m.misread) ?? null, [moments]);
+  // While the person is recording or typing an answer, that question stays on screen: a newer
+  // question waits (no buzz, no swap) until the answer is sent or cancelled.
+  const [answeringId, setAnsweringId] = useState<string | null>(null);
+  const onAnswering = useCallback((id: string, active: boolean) => setAnsweringId(cur => (active ? id : cur === id ? null : cur)), []);
+  const pinned = answeringId ? moments.find(m => m.id === answeringId) ?? null : null;
+  useEffect(() => { if (answeringId && !pinned) setAnsweringId(null); }, [answeringId, pinned]);
+  const asking = pinned ?? newestAsk;
+  const waitingAsk = pinned && newestAsk && newestAsk.id !== pinned.id && !newestAsk.response ? newestAsk : null;
+  // Acting on the question in the work itself (new ingredients observed) also answers it — but not while answering it.
+  const resolvedBy = useMemo(() => (asking && !pinned ? moments.find(m => m.index > asking.index && m.change && !m.misread) ?? null : null), [moments, asking, pinned]);
   // undefined until the first snapshot arrives: whatever is already there is history and never buzzes;
   // every question that arrives after that buzzes, including the first one of a quiet session.
   const seenAsk = useRef<string | null | undefined>(undefined);
   const hydrated = state !== null;
+  const ra = useReadAloud();
+  useEffect(() => { if (answeringId) ra.stop(); }, [answeringId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (seenAsk.current === undefined) { seenAsk.current = asking?.id ?? null; return; }
-    if (asking && !asking.response && seenAsk.current !== asking.id) {
+    if (seenAsk.current === undefined) { seenAsk.current = newestAsk?.id ?? null; return; }
+    if (answeringId) return; // deferred: buzzes once the answer is sent or cancelled
+    if (newestAsk && !newestAsk.response && seenAsk.current !== newestAsk.id) {
       vibrate([60, 40, 60]); setPulse(true); setTimeout(() => setPulse(false), 1900);
-      seenAsk.current = asking.id;
+      ra.say(newestAsk.decision?.message ?? '');
+      seenAsk.current = newestAsk.id;
     }
-  }, [hydrated, asking?.id]);
+  }, [hydrated, newestAsk?.id, answeringId]);
 
   if (!state) return <div className="phone"><main><p className="faint" role="status">{conn === 'unauthorized' ? 'This phone is no longer paired.' : 'Connecting to your Desk…'}</p>{conn === 'unauthorized' && onUnpair && <button className="btn" onClick={onUnpair}>Pair again</button>}</main></div>;
 
@@ -89,7 +103,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
       )}
       <main>
         {(state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}
-        <NowCard creds={creds} state={state} session={session} moments={moments} asking={asking} resolvedBy={resolvedBy} pulse={pulse} onOpen={id => open({ kind: 'content', id })} onPractice={sid => open({ kind: 'practice', id: null, sessionId: sid })} act={act} />
+        <NowCard creds={creds} state={state} session={session} moments={moments} asking={asking} resolvedBy={resolvedBy} pulse={pulse} answering={!!pinned} waiting={!!waitingAsk} onAnswering={onAnswering} camera={camera} onReadAgain={ra.on ? ra.say : undefined} onOpen={id => open({ kind: 'content', id })} onPractice={sid => open({ kind: 'practice', id: null, sessionId: sid })} act={act} />
         {err && <p className="faint" role="alert">{err}</p>}
         <Flow state={state} session={session} moments={moments} onOpen={id => open({ kind: 'content', id })} />
         {session && session.status !== 'ended' && <button className="btn ghost" onClick={() => act(() => post(creds, `/sessions/${session.id}/end`))}>End this session</button>}
@@ -105,6 +119,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
               {camera && <button className="btn" onClick={() => { setDrawer(false); camera.onReaim(); }}>Re-aim the camera</button>}
               {camera && <label className="btn">Send one photo<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; if (f) { setDrawer(false); camera.onPhoto(f); } }} /></label>}
             </section>
+            <ReadAloudSetting ra={ra} />
             <Playbook creds={creds} state={state} />
             <Habits state={state} />
             <section className="stack">
@@ -146,32 +161,92 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
 }
 
 /** Answer in writing when speaking is not possible; it is stored and shown as typed. */
-function TypeInstead({ onSend }: { onSend: (text: string) => Promise<void> }) {
+function TypeInstead({ onSend, onActive }: { onSend: (text: string) => Promise<boolean>; onActive: (active: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [sending, setSending] = useState(false);
+  const active = open && (focused || sending || text.trim().length > 0);
+  useEffect(() => { onActive(active); }, [active]);
   if (!open) return <button className="linklike" onClick={() => setOpen(true)}>Can’t talk right now? Type instead</button>;
+  const send = async () => {
+    setSending(true);
+    const ok = await onSend(text.trim());
+    setSending(false);
+    if (ok) { setText(''); setOpen(false); }
+  };
   return (
-    <form className="stack" onSubmit={e => { e.preventDefault(); void onSend(text.trim()); }}>
+    <form className="stack" onSubmit={e => { e.preventDefault(); void send(); }}>
       <label className="faint" htmlFor="typed-answer">Your answer, in your own words. It is marked as typed. Only the text is sent.</label>
-      <textarea id="typed-answer" rows={2} maxLength={600} value={text} onChange={e => setText(e.target.value)} />
-      <div className="row"><button className="btn" type="submit" disabled={text.trim().length < 2}>Send answer</button><button className="btn ghost" type="button" onClick={() => setOpen(false)}>Cancel</button></div>
+      <textarea id="typed-answer" rows={2} maxLength={600} value={text} onChange={e => setText(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />
+      <div className="row"><button className="btn" type="submit" disabled={sending || text.trim().length < 2}>{sending ? 'Sending…' : 'Send answer'}</button><button className="btn ghost" type="button" onClick={() => { setText(''); setOpen(false); }}>Cancel</button></div>
     </form>
   );
 }
 
-function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, onOpen, onPractice, act }: { creds: Creds; state: Snapshot; session: Session | null; moments: Moment[]; asking: Moment | null; resolvedBy: Moment | null; pulse: boolean; onOpen: (id: string) => void; onPractice: (sessionId: string) => void; act: (fn: () => Promise<unknown>) => Promise<void> }) {
+/**
+ * The answer controls for one question. Keyed by the question's moment id, so a recording or a
+ * draft always belongs to the question it was started for and can never be sent to a newer one.
+ */
+function Answer({ creds, momentId, act, onAnswering }: { creds: Creds; momentId: string; act: (fn: () => Promise<unknown>) => Promise<void>; onAnswering: (id: string, active: boolean) => void }) {
+  const [voice, setVoice] = useState(false);
+  const [typed, setTyped] = useState(false);
+  useEffect(() => { onAnswering(momentId, voice || typed); }, [voice, typed]);
+  useEffect(() => () => onAnswering(momentId, false), []);
+  const path = `/moments/${momentId}/respond`;
+  return (
+    <>
+      <div className="actions">
+        <VoiceButton label="Answer" onActive={setVoice} onWav={wav => postBinary(creds, path, wav, 'audio/wav')} />
+        <button className="btn" disabled={voice} onClick={() => act(() => post(creds, path, { kind: 'later' }))}>Later</button>
+      </div>
+      <TypeInstead onActive={setTyped} onSend={async text => { let ok = false; await act(async () => { await post(creds, path, { kind: 'typed-answer', text }); ok = true; }); return ok; }} />
+    </>
+  );
+}
+
+function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, answering, waiting, onAnswering, camera, onReadAgain, onOpen, onPractice, act }: { creds: Creds; state: Snapshot; session: Session | null; moments: Moment[]; asking: Moment | null; resolvedBy: Moment | null; pulse: boolean; answering: boolean; waiting: boolean; onAnswering: (id: string, active: boolean) => void; camera?: CameraInfo; onReadAgain?: (text: string) => void; onOpen: (id: string) => void; onPractice: (sessionId: string) => void; act: (fn: () => Promise<unknown>) => Promise<void> }) {
   const last = moments[moments.length - 1];
 
   if (session?.status === 'ended') return <WrapCard creds={creds} state={state} session={session} onOpen={onOpen} onPractice={onPractice} />;
 
+  // Status first (unless a question is open): three unreadable frames in a row (any unreadable photo),
+  // or a model/network failure. Fewer unreadable camera frames are retried quietly and change nothing here.
+  const openQuestion = !!asking && !asking.response && !resolvedBy;
+  const lastFrame = [...moments].reverse().find(m => m.frame && !m.misread);
+  if (!openQuestion && lastFrame?.readingStatus === 'illegible' && lastFrame === [...moments].reverse().find(m => !m.misread) && (illegibleRun(moments) >= 3 || camera?.mode !== 'camera')) {
+    return (
+      <section className="now">
+        <div className="eyebrow">Now · Can’t read the screen</div>
+        <p className="message" style={{ fontSize: '1.3rem' }}>Tilt me a little, or take one photo.</p>
+        {camera && <label className="btn small">📷 Take one photo<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; if (f) camera.onPhoto(f); e.target.value = ''; }} /></label>}
+      </section>
+    );
+  }
+  if (!openQuestion && connectionTrouble(last)) {
+    // A model or network failure never becomes an empty card and never stops the person's work.
+    return (
+      <section className="now">
+        <div className="eyebrow">Now · Paused</div>
+        <p className="message" style={{ fontSize: '1.3rem' }}>Caddie paused — connection.</p>
+        <p className="faint" role="status">{last.readingStatus === 'error' ? last.readingError : last.decision?.reason} Keep working; it looks again on the next change.</p>
+      </section>
+    );
+  }
+
   const lastChange = [...moments].reverse().find(m => m.change && !m.misread);
-  if (lastChange && (!asking || lastChange.index > asking.index) && lastChange === [...moments].reverse().find(m => m.readingStatus === 'ok' && !m.misread)) {
+  // SAM pointers belong to the request currently on screen (they arrive a moment after the decision).
+  const latestOk = [...moments].reverse().find(m => m.frame && m.readingStatus === 'ok' && !m.misread);
+  const pointed = [...moments].reverse().find(m => m.pointers?.length && !m.misread);
+  const pointer = pointed && latestOk && pointed.reading?.userRequest === latestOk.reading?.userRequest ? <PointerFrame creds={creds} moment={pointed} /> : null;
+  if (!answering && lastChange && (!asking || lastChange.index > asking.index) && lastChange === [...moments].reverse().find(m => m.readingStatus === 'ok' && !m.misread)) {
     return (
       <section className="now" aria-live="polite">
         <div className="row"><span className="eyebrow grow">Now · Seen</span><span className="faint">{clock(lastChange.at)}</span></div>
         <p className="message" style={{ fontSize: '1.3rem' }}>{changeText(lastChange)}</p>
         {lastChange.reading?.userRequest && <p className="quote">{lastChange.reading.userRequest}</p>}
         <div className="row"><AssistLabel value={lastChange.change!.assistance} /></div>
+        {pointer}
         {lastChange.decision?.note && <p className="faint">{lastChange.decision.note}</p>}
       </section>
     );
@@ -194,14 +269,12 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
             <p className="faint">If you use it as is, it counts as “AI wrote it”.</p>
           </div>
         )}
-        <div className="actions">
-          <VoiceButton label="Answer" onWav={wav => postBinary(creds, `/moments/${asking.id}/respond`, wav, 'audio/wav')} />
-          <button className="btn" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'later' }))}>Later</button>
-        </div>
-        <TypeInstead onSend={text => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'typed-answer', text }))} />
+        <Answer key={asking.id} creds={creds} momentId={asking.id} act={act} onAnswering={onAnswering} />
+        {waiting && <p className="faint" role="status">The Caddie has a newer note. It will show after you send or cancel this answer.</p>}
         <div className="row wrap" style={{ gap: 16 }}>
           {d.step === 'ingredients' && <button className="linklike" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'asked-example' }))}>Show me an example</button>}
           <button className="linklike" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'misread' }))}>Misread: that’s not what I wrote</button>
+          {onReadAgain && d.message && <button className="linklike" onClick={() => onReadAgain(d.message!)}>🔈 Read it again</button>}
         </div>
         <p className="faint">Why: {d.reason}</p>
       </section>
@@ -214,6 +287,7 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
     return <section className="now"><div className="eyebrow">Now</div><p className="message">Work as usual.</p><p className="muted">The Caddie watches your screen and speaks up only when it helps. It never interrupts while you type.</p></section>;
   }
   if (last.readingStatus === 'pending') return <section className="now"><div className="eyebrow">Now</div><p className="muted" role="status">Reading your screen…</p></section>;
+  if (last.readingStatus === 'illegible') return <section className="now"><div className="eyebrow">Now</div><p className="muted" role="status">Reading your screen…</p></section>;
   if (last.readingStatus !== 'ok') {
     return <section className="now"><div className="eyebrow">Now · Status</div><p className="muted" role="status">{momentLine(last).text}</p></section>;
   }
@@ -222,6 +296,7 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
     <section className="now">
       <div className="row"><span className="eyebrow grow">Now · Quiet</span><span className="faint">{clock(quiet.at)}</span></div>
       <p className="message" style={{ fontSize: '1.2rem' }}>{quiet.decision?.note ?? 'Watching.'}</p>
+      {pointer}
       {quiet.decision?.reason && <p className="faint">Why quiet: {quiet.decision.reason}</p>}
     </section>
   );

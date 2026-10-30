@@ -1,11 +1,12 @@
 // Moment pipeline: reading → decision → guardrails → observed change → evidence.
 
-import type { CaddieCard, Decision, Moment, MomentTiming, Reading, Session, SkillObservation } from '../../../packages/contracts/index.ts';
-import { applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
+import { type ArtifactPart, type CaddieCard, type Decision, type Ingredients, type Moment, type MomentTiming, type Pointer, type Reading, type Session, type SkillObservation } from '../../../packages/contracts/index.ts';
+import { allowedStep, applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
 import { cardObserved } from '../../../packages/core/src/cards.ts';
+import { askedParts, choosePointers, PART_PHRASE, pickPoster } from '../../../packages/core/src/pointers.ts';
 import { dimensionFor, observeChange, presentIngredients, strengthFor } from '../../../packages/core/src/labels.ts';
 import { decisionTask, readingTask, turnTask, type DecisionInput, type TurnContext } from '../../../packages/core/src/prompts.ts';
-import { BudgetExceeded, CostUnverifiable, InvalidAudio, InvalidOutput, LiveCallsDisabled, MetaError, modelProvenance, ModelNotAllowed, RetryLater, runTask, type Spender } from './meta.ts';
+import { BudgetExceeded, CostUnverifiable, InvalidAudio, InvalidOutput, liveEnabled, LiveCallsDisabled, MetaError, modelProvenance, ModelNotAllowed, models, RetryLater, runTask, segmentBoxes, type Box, type Spender } from './meta.ts';
 import type { Env } from './env.ts';
 import type { Store } from './store.ts';
 import { id, now } from './util.ts';
@@ -94,6 +95,7 @@ export async function buildDecisionInput(ctx: Ctx, reading: Reading, history: Mo
     activeCards: appliedCards(ctx.store).map(c => `${c.text} [applied in ${c.targetTool}; ${c.scope}]`),
     memory: (await ctx.memory()).slice(-8),
     secondsSinceLastIntervention: last?.decision ? Math.round((Date.now() - Date.parse(last.decision.decidedAt)) / 1000) : null,
+    highestStepAllowed: allowedStep(history),
   };
 }
 
@@ -104,12 +106,39 @@ function ruleDecision(reason: string, guardrail: string): Decision {
 export async function decide(ctx: Ctx, reading: Reading, history: Moment[], extra = ''): Promise<{ decision: Decision; countMs: number; generateMs: number; calls: number }> {
   const input = await buildDecisionInput(ctx, reading, history);
   const res = await runTask(ctx.env, ctx.spender, decisionTask, { text: `${extra}${JSON.stringify(input)}` });
-  return { decision: guard(ctx, res.value, reading, history, res.model), countMs: res.countMs, generateMs: res.latencyMs, calls: res.calls };
+  const g = await guard(ctx, res.value, reading, history, res.model, extra);
+  return { decision: g.decision, countMs: res.countMs + g.countMs, generateMs: res.latencyMs + g.generateMs, calls: res.calls + g.calls };
 }
 
-function guard(ctx: Ctx, proposal: Proposal, reading: Reading, history: Moment[], model: string): Decision {
-  const guarded = applyGuardrails(proposal, { reading, history, nowMs: Date.now(), activeCard: matchedCard(ctx.store, reading) !== null });
-  return toDecision(guarded, model, now(), modelProvenance(ctx.env));
+/** Guardrails that refuse a whole proposal because it was written for a step not allowed yet. */
+const STEP_REFUSALS = new Set(['ladder-step', 'missing-example']);
+
+/**
+ * Apply the guardrails. When the model skipped ahead on the ladder (or offered an example with no
+ * sample brief), ask the real model once more for the allowed step; if that also fails, stay quiet.
+ * A refused message is never relabelled and shown under a lower step.
+ */
+async function guard(ctx: Ctx, proposal: Proposal, reading: Reading, history: Moment[], model: string, extra = ''): Promise<{ decision: Decision; countMs: number; generateMs: number; calls: number }> {
+  const gctx = { reading, history, nowMs: Date.now(), activeCard: matchedCard(ctx.store, reading) !== null };
+  const first = applyGuardrails(proposal, gctx);
+  const zero = { countMs: 0, generateMs: 0, calls: 0 };
+  if (!first.guardrail || !STEP_REFUSALS.has(first.guardrail)) return { decision: toDecision(first, model, now(), modelProvenance(ctx.env)), ...zero };
+  const allowed = allowedStep(history);
+  const why = first.guardrail === 'ladder-step'
+    ? `Your previous proposal used the "${proposal.step}" step, which is not allowed yet.`
+    : 'Your previous proposal used the example step without an exampleBrief.';
+  try {
+    const input = await buildDecisionInput(ctx, reading, history);
+    const res = await runTask(ctx.env, ctx.spender, decisionTask, { text: `${extra}${why} The highest step allowed now is "${allowed}". Decide again: use that step or a lower one, or stay quiet. ${JSON.stringify(input)}` });
+    const second = applyGuardrails(res.value, { ...gctx, nowMs: Date.now() });
+    const timing = { countMs: res.countMs, generateMs: res.latencyMs, calls: res.calls };
+    if (second.guardrail && STEP_REFUSALS.has(second.guardrail)) return { decision: toDecision(first, res.model, now(), modelProvenance(ctx.env)), ...timing };
+    const tag = `${first.guardrail}-regenerated${second.guardrail ? `+${second.guardrail}` : ''}`;
+    return { decision: toDecision({ ...second, guardrail: tag }, res.model, now(), modelProvenance(ctx.env)), ...timing };
+  } catch (e) {
+    console.log(JSON.stringify({ event: 'ladder_regenerate_failed', guardrail: first.guardrail, error: e instanceof Error ? e.name : 'unknown' }));
+    return { decision: toDecision(first, model, now(), modelProvenance(ctx.env)), ...zero };
+  }
 }
 
 /** Context for the combined turn: everything the decision needs except the reading itself. */
@@ -117,7 +146,7 @@ async function buildTurnContext(ctx: Ctx, history: Moment[]): Promise<TurnContex
   const legibleNone = !history.some(m => m.reading?.legible && !m.misread);
   const placeholder = { legible: true, tool: null, task: null, userRequest: null, userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, artifactVisible: false, vagueTerms: [], ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false }, confidence: 0 } satisfies Reading;
   const d = await buildDecisionInput(ctx, placeholder, history);
-  return { firstSightingIfLegible: legibleNone, recentRequests: d.recentRequests, interventions: d.interventions, activeCards: d.activeCards, memory: d.memory, secondsSinceLastIntervention: d.secondsSinceLastIntervention };
+  return { firstSightingIfLegible: legibleNone, recentRequests: d.recentRequests, interventions: d.interventions, activeCards: d.activeCards, memory: d.memory, secondsSinceLastIntervention: d.secondsSinceLastIntervention, highestStepAllowed: d.highestStepAllowed };
 }
 
 /** 'combined' reads and decides in one call (fewer round trips); 'separate' uses two calls. */
@@ -155,6 +184,38 @@ async function observeCards(ctx: Ctx, moment: Moment): Promise<void> {
       history: [...c.history, { status: 'observed-working', at: now(), by: 'observation', note: `${moment.reading?.tool ?? 'The AI'} asked for ${m.asked.map(k => INGREDIENT_LABEL[k]).join(', ')} before making it (moment ${moment.index + 1}).` }],
     }));
   }
+}
+
+/**
+ * Visual coaching (plan 6.1): when a kept frame shows a designed artifact (poster, flyer…) and the
+ * person's request named a price, a real photo or the product, SAM 3.1 first finds the poster, then the
+ * parts; only boxes inside the poster count, so the same words in the chat are never pointed at. A part
+ * the reading says is missing boxes the whole poster ("The price isn't visible."). Once per request
+ * text in a session, after the decision, so it never delays the NOW card.
+ */
+async function pointAtArtifact(ctx: Ctx, momentId: string, imageDataUrl: string, history: Moment[]): Promise<void> {
+  const moment = ctx.store.get('moment', momentId);
+  const r = moment?.reading;
+  if (!moment || !r?.artifactVisible || r.artifactKind !== 'design' || !r.artifactShows || moment.benchmark || !moment.frame?.storedKey || !liveEnabled(ctx.env)) return;
+  const asked = askedParts(r.ingredients);
+  if (!asked.length) return;
+  if (history.some(h => h.pointerCheck && h.reading?.userRequest === r.userRequest)) return;
+  const present = asked.filter(p => r.artifactShows!.includes(p)).slice(0, 2);
+  let model = 'sam-3.1';
+  try { model = models(ctx.env).segment; } catch { /* reported by the call below */ }
+  let pointers: Pointer[] = [];
+  let check: NonNullable<Moment['pointerCheck']>;
+  try {
+    const poster = pickPoster((await segmentBoxes(ctx.env, ctx.spender, imageDataUrl, 'poster')).boxes);
+    const partBoxes: Partial<Record<ArtifactPart, Box[]>> = {};
+    if (poster) for (const p of present) partBoxes[p] = (await segmentBoxes(ctx.env, ctx.spender, imageDataUrl, PART_PHRASE[p])).boxes;
+    pointers = choosePointers(asked, r.artifactShows, poster, partBoxes);
+    check = { status: 'done', model, at: now(), ...(poster ? {} : { error: 'No poster found on this frame.' }) };
+  } catch (e) {
+    check = { status: 'failed', model, at: now(), error: failureStatus(e).message };
+  }
+  if (!ctx.store.alive('moment', momentId)) return;
+  await ctx.store.update('moment', momentId, m => ({ ...m, pointers, pointerCheck: check }));
 }
 
 /** Decide whether to keep the frame as evidence; otherwise delete it from storage. */
@@ -228,7 +289,9 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
 
   let decision: Decision;
   if (combinedProposal) {
-    decision = guard(ctx, combinedProposal, reading, history, combinedModel);
+    const g = await guard(ctx, combinedProposal, reading, history, combinedModel);
+    decision = g.decision;
+    timing.countMs += g.countMs; timing.generateMs += g.generateMs; timing.calls += g.calls;
   } else {
     try {
       const d = await decide(ctx, reading, history);
@@ -247,6 +310,7 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
   if (!ctx.store.alive('moment', momentId)) return;
   await recordSkills(ctx, moment, session);
   await observeCards(ctx, moment);
+  await pointAtArtifact(ctx, momentId, imageDataUrl, history);
 }
 
 /** After a voice answer or an example request, the Caddie replies on a frameless moment. */

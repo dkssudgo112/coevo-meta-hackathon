@@ -24,7 +24,7 @@
     "check:release": "node scripts/release-check.mjs",
     "secrets:set": "python3 scripts/set-secret.py",
     "test:release": "node --test scripts/tests/release-check.test.mjs",
-    "test": "node --test 'packages/core/test/*.test.ts' 'apps/api/test/*.test.ts' scripts/tests/no-bypass.test.mjs",
+    "test": "node --test 'packages/core/test/*.test.ts' 'apps/api/test/*.test.ts' 'apps/web/test/*.test.ts' scripts/tests/no-bypass.test.mjs",
     "test:media": "python3 infra/modal/test_compose.py",
     "test:integration": "node scripts/integration.mjs",
     "samples": "node scripts/make-samples.mjs",

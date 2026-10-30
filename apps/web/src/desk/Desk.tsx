@@ -4,7 +4,7 @@ import type { InboxItem, Moment, Snapshot } from '../../../../packages/contracts
 import { api, createWorkspace, loadCreds, pairLink, post, saveCreds, type Creds } from '../lib/api.ts';
 import { useWorkspace } from '../lib/store.ts';
 import { FrameSampler, FULL, uploadFrame } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, modelSourceLine, PROVIDER_DATA_NOTICE, sessionMoments } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, modelSourceLine, PointerFrame, PROVIDER_DATA_NOTICE, sessionMoments } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME } from '../ui/Players.tsx';
 import { Habits } from '../phone/Live.tsx';
 
@@ -221,7 +221,8 @@ export function EvidenceRows({ creds, state, moments }: { creds: Creds; state: S
             <td>
               {m.frame ? (
                 <div className="stack" style={{ gap: 4 }}>
-                  <MediaImage creds={creds} k={m.frame.storedKey} alt={`Screen at ${clock(m.at)}`} />
+                  {m.pointers?.length ? <PointerFrame creds={creds} moment={m} compact /> : <MediaImage creds={creds} k={m.frame.storedKey} alt={`Screen at ${clock(m.at)}`} />}
+                  {m.pointerCheck?.status === 'failed' && <span className="faint">Pointer check failed: {m.pointerCheck.error}</span>}
                   <span className="faint">{clock(m.at)} · {m.frame.source}{m.frame.fixture ? ' · sample' : ''}</span>
                   {m.frame.storedKey && <button className="linklike" onClick={() => api(creds, `/frames/${m.frame!.id}`, { method: 'DELETE' })}>Delete frame</button>}
                   {!m.frame.storedKey && <span className="faint">{m.readingStatus === 'ok' ? 'Source removed' : 'Not kept'}</span>}

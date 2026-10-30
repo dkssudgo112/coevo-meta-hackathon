@@ -43,7 +43,7 @@ Composition: a real desk shot first (phone propped beside the monitor), then a s
 | 1:30–1:55 | Formats | Flashcard, the 141 s two-voice podcast (guest objection, advice narrowed), the 44 s short with the owner's before and after screens — each with its "why now"; the podcast is marked as made on request. |
 | 1:55–2:15 | Practice Range | Spoken brief → Muse Image → ingredient check (live run). |
 | 2:15–2:45 | **Climax** | A separate pinned Meta AI chat that starts with the app's card: "Make a poster for our new drink." Meta AI asks five questions first. Phone: "AI asked first as card says, staying quiet." The card turns *observed working*. |
-| 2:45–2:55 | Cameo | Another task in another AI tool (to be recorded; no claim until it runs live). |
+| 2:45–2:55 | Cameo | Another tool, another task: four screenshots of actual ChatGPT replies to a scripted, fictional cover letter ("Make it more professional." · "Still too plain. Make it more professional."). The live Caddie stayed quiet twice, then asked: "What is one real project you coordinated that you want in this letter?" |
 | 2:55–3:00 | Close | The four Meta models and their roles; live output on a scripted persona; one-line limitation (the rule works inside one pinned chat). |
 
 ## Draft texts (finalize only with verified numbers)
@@ -66,7 +66,7 @@ Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a
 **9 · Use of Meta products**
 
 - **Muse Spark 1.3** reads phone photos of any AI tool's screen into structured moments. It decides each intervention, or each silence, with deterministic guardrails. It writes one learning design per session and the five formats from it. It also writes and checks Practice Range requests.
-- **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards.
+- **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards. It also points at the poster's title, photo or price on a kept frame for visual coaching ("The price isn't visible.").
 - **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
 - **Muse Image** draws what a spoken practice brief produces, and the background scenes of the short.
 - **Meta AI** (consumer) is the demo's work tool. Its poster image generation and in-chat rule following were checked in a real account.
@@ -87,4 +87,5 @@ Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition 
 - S5: a 61.6 s two-voice episode rendered in 58 s end to end (one bounded run); product podcasts 93–141 s; shorts 38.9–44.3 s at 1080×1920.
 - S8: one full session (5 screens, a spoken answer, five formats including 3 images) cost $0.163 in Meta usage plus a $0.08 media reservation.
 - The card in Meta AI: sent as the first message of a pinned chat, it made Meta AI ask for audience, product, price and mood first; memory across new chats did not carry the rule.
+- Another tool: on four actual ChatGPT screens (scripted, fictional cover letter) the live Caddie read the tool and each request, stayed quiet twice, then asked one question; $0.038.
 - Persona simulations: see the labeled simulation section (never real-user evidence).

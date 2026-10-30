@@ -44,6 +44,21 @@ function stepIndex(step: LadderStep): number {
   return LADDER.indexOf(step);
 }
 
+const STEP_WORDS: Record<LadderStep, string> = {
+  watch: 'watching',
+  question: 'one question',
+  ingredients: 'a list of what is missing',
+  example: 'a full example',
+};
+
+/** Highest ladder step the Caddie may use next: one above the highest used so far (question first), or the example once the person asked for one. */
+export function allowedStep(history: Moment[]): LadderStep {
+  const interventions = history.filter(m => m.decision?.action === 'intervene');
+  if (interventions.some(m => m.response?.kind === 'asked-example')) return 'example';
+  const highest = interventions.reduce((max, m) => Math.max(max, stepIndex(m.decision!.step)), 0);
+  return LADDER[Math.max(stepIndex('question'), Math.min(highest + 1, stepIndex('example')))];
+}
+
 function quiet(reason: string, guardrail: string, note: string | null = null): Proposal & { guardrail: string } {
   return { action: 'stay-quiet', step: 'watch', reason, quote: null, message: null, note, missingIngredients: [], exampleBrief: null, guardrail };
 }
@@ -83,15 +98,16 @@ export function applyGuardrails(p: Proposal, ctx: LadderContext): Proposal & { g
     }
   }
 
-  // Ladder: never skip more than one step above the highest step used so far.
-  const highest = interventions.reduce((max, m) => Math.max(max, stepIndex(m.decision!.step)), 0);
-  const userAskedExample = interventions.some(m => m.response?.kind === 'asked-example');
-  let step: LadderStep = p.step === 'watch' ? 'question' : p.step;
+  // Ladder: never skip ahead. A step above the allowed one is refused as a whole (its message was
+  // written for that step), never relabelled; the pipeline may ask the model again for the allowed step.
+  const allowed = allowedStep(ctx.history);
+  const step: LadderStep = p.step === 'watch' ? 'question' : p.step;
   let guardrail: string | null = null;
-  const allowed = userAskedExample ? stepIndex('example') : Math.min(highest + 1, stepIndex('example'));
-  if (stepIndex(step) > allowed) {
-    step = LADDER[Math.max(allowed, 1)];
-    guardrail = 'ladder-step';
+  if (stepIndex(step) > stepIndex(allowed)) {
+    return quiet(`The Caddie held back ${STEP_WORDS[step]}; it has to try ${STEP_WORDS[allowed]} first.`, 'ladder-step');
+  }
+  if (step === 'example' && !p.exampleBrief) {
+    return quiet('The Caddie held back an example that had no sample brief in it.', 'missing-example');
   }
 
   let message = p.message ? stripBanned(p.message) : null;
@@ -105,11 +121,6 @@ export function applyGuardrails(p: Proposal, ctx: LadderContext): Proposal & { g
   }
 
   const exampleBrief = step === 'example' ? p.exampleBrief : null;
-  if (step === 'example' && !exampleBrief) {
-    step = 'ingredients';
-    guardrail = guardrail ?? 'missing-example';
-  }
-
   return { ...p, step, message, note: cleanNote(p.note), quote, exampleBrief, guardrail };
 }
 
