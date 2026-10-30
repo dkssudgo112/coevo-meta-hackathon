@@ -4,7 +4,7 @@ import { ChangeDetector, meanAbsDiff } from '../src/change.ts';
 import { allowedStep, applyGuardrails, type Proposal } from '../src/ladder.ts';
 import { dimensionFor, labelPractice, observeChange, practiceInputFixture, practiceSampleLine, skillFixture } from '../src/labels.ts';
 import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
-import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
+import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_APPROVED_TOTAL_USD, META_OPERATING_CEILING_USD, modalCap, PRICED_MODELS, PRICES, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
 import { applyHint, asksFromText, cardObserved } from '../src/cards.ts';
@@ -167,13 +167,21 @@ test('budget charges per day and caps', () => {
   let st = { day: '2026-10-31', spentUsd: 3.9 };
   assert.equal(remaining(st, CAPS.workspacePerDayUsd, now), CAPS.workspacePerDayUsd);
   st = charge(st, 0.5, now);
-  assert.equal(CAPS.globalLifetimeUsd, 2.5);
-  assert.equal(META_ABSOLUTE_MAX_USD - META_OPERATING_CEILING_USD, 0.5, '$0.50 margin under the approved $3');
-  assert.equal(lifetimeCap(undefined), 2.5);
-  assert.equal(lifetimeCap('abc'), 2.5);
+  assert.equal(CAPS.globalLifetimeUsd, 100);
+  assert.equal(META_OPERATING_CEILING_USD, META_APPROVED_TOTAL_USD, 'one lifetime total of $100, including earlier spend');
+  assert.equal(lifetimeCap(undefined), 100);
+  assert.equal(lifetimeCap('abc'), 100);
+  assert.equal(lifetimeCap('100'), 100);
   assert.equal(lifetimeCap('1.5'), 1.5, 'configuration may lower the ceiling');
-  assert.equal(lifetimeCap('10'), 2.5, 'configuration can never raise it');
-  assert.equal(modalCap('5'), 0.9);
+  assert.equal(lifetimeCap('2.5'), 2.5, 'the earlier lower ceiling is still respected if configured');
+  assert.equal(lifetimeCap('1000'), 100, 'configuration can never raise it above the approved total');
+  assert.equal(lifetimeCap('-5'), 100);
+  assert.equal(modalCap('5'), 0.9, 'Modal keeps its separate $0.90 ceiling');
+  assert.equal(modalCap('100'), 0.9);
+  assert.equal(PRICES.samPerImage, 0.0025, 'SAM 3.1 price unchanged');
+  assert.equal(PRICED_MODELS.segment['sam-3.1'].perImage, 0.0025);
+  assert.equal(CAPS.workspacePerDayUsd, 0.6);
+  assert.equal(CAPS.sampleWorkspaceUsd, 0.3);
   assert.equal(st.spentUsd, 0.5);
   assert.ok(Math.abs(sparkCost({ input_tokens: 1_000_000, output_tokens: 0 }) - 1.25) < 1e-9);
 });
@@ -243,6 +251,13 @@ test('lifetime ledger: never resets, never exceeds the cap under many concurrent
   assert.equal(ledgerAdjust(emptyLedger('x'), -5).spentUsd, 0);
   assert.equal(ledgerReserve(emptyLedger('x'), Number.NaN, 2.5).ok, false);
   assert.equal(ledgerReserve(emptyLedger('x'), -1, 2.5).ok, false);
+  // The raised ceiling keeps the earlier spend: $1.4059 already used leaves $98.5941.
+  const carried = { spentUsd: 1.4059, reservations: 170, since: '2026-10-30T09:54:05.675Z' };
+  assert.equal(ledgerReserve(carried, 98.5941, 100).ok, true);
+  assert.equal(ledgerReserve(carried, 98.5942, 100).ok, false, 'earlier spend counts toward the $100 total');
+  const r = ledgerReserve(carried, 1, 100);
+  assert.equal(r.ledger.since, carried.since, 'raising the ceiling never resets the ledger');
+  assert.equal(r.ledger.reservations, 171);
 });
 
 test('combined turn reuses the strict reading and decision readers', () => {

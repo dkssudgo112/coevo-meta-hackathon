@@ -57,3 +57,7 @@ A full live run of the public sample costs about $0.20 in Meta usage plus a medi
 ## October 30, 2026 — When a card counts as working
 
 A Caddie card counts as *observed working* only when it was applied (not merely approved), the screen shows the same AI tool and kind of task, and the AI asked for every detail the card names. Requirements come from the card's own words with a conservative reader: negated or unrecognized wording stays unverified rather than being guessed. What the Caddie remembers across sessions is rebuilt from records that still exist, so deleting a session or turning a card off takes effect on the next model call.
+
+## October 31, 2026 — Meta lifetime total raised to US$100
+
+The maintainer raised the approved Meta Model API total from US$3.00 to **US$100 in total, including what was already spent** ($1.4059 at the time). It is one lifetime total for the deployment, not per run, day or workspace, and not a reason to spend more than the work needs. The same global `Budget` object, ledger, start time, reservations and once-only settlement stay in place; only the ceiling changes, and configuration may still lower it but never raise it above $100. Per-workspace ($0.60/day) and per-sample ($0.30) limits are unchanged. Modal media keeps its separate $0.90 ceiling. This entry replaces the $3.00/$2.50 figures in the October 30 entries above.

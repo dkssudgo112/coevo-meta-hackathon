@@ -1,12 +1,17 @@
 // LOCAL TEST ONLY: exercises the real Budget Durable Object (not a mock) through
-// the admin route of a local Worker started with a test admin token and an
-// attempted cap of $10 (which must be clamped to the $2.50 operating ceiling).
-//   Phase 1:  node scripts/budget-test.mjs http://127.0.0.1:8790 fill
-//   (restart the Worker)
-//   Phase 2:  node scripts/budget-test.mjs http://127.0.0.1:8790 after-restart
+// the admin route of a local Worker started with a test admin token. No model is called.
+//   Run 1: start the Worker with COEVO_LIFETIME_CAP_USD=1000 (must be clamped to the $100 total),
+//          EXPECT_CAP=100 node scripts/budget-test.mjs http://127.0.0.1:8790 fill
+//          (restart the Worker on the same state)
+//          EXPECT_CAP=100 node scripts/budget-test.mjs http://127.0.0.1:8790 after-restart
+//   Run 2: fresh state, start the Worker with COEVO_LIFETIME_CAP_USD=2.5 (a lower limit is respected),
+//          EXPECT_CAP=2.5 node scripts/budget-test.mjs http://127.0.0.1:8790 fill
 // The local ledger is a test instance; the deployed Worker holds the real one.
 
 const [, , base = 'http://127.0.0.1:8790', phase = 'fill'] = process.argv;
+const CAP = Number(process.env.EXPECT_CAP ?? 100);
+// External reservations are at most $1 each, so a large ceiling is filled in $1 steps.
+const STEP = CAP >= 10 ? 1 : 0.02;
 const token = process.env.BUDGET_TEST_TOKEN ?? 'local-budget-test-token-0123456789';
 const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 let failed = 0;
@@ -35,18 +40,18 @@ if (phase === 'fill') {
   const afterDup = await ledger();
   check('20 concurrent duplicate settles → exactly one applied', dup.filter(d => d.applied).length === 1 && Math.abs(afterDup.meta.spentUsd - 0.04) < 1e-9, `$${afterDup.meta.spentUsd}`);
   const c = await (await reserve(0.05)).json();
-  writeFileSync(PENDING, JSON.stringify({ ticket: c.ticket }));
   const start = await ledger();
-  check('configured $10 is clamped to the $2.50 operating ceiling', start.meta.capUsd === 2.5, `cap ${start.meta.capUsd}`);
+  writeFileSync(PENDING, JSON.stringify({ ticket: c.ticket, since: start.meta.since, reservations: start.meta.reservations }));
+  check(CAP === 100 ? 'configured $1000 is clamped to the $100 approved total' : `a lower configured limit ($${CAP}) is respected`, start.meta.capUsd === CAP, `cap ${start.meta.capUsd}`);
   check('Modal ledger is separate with its own ceiling ≤ $0.90', start.modal.capUsd <= 0.9, `cap ${start.modal.capUsd}`);
-  const room = 2.5 - start.meta.spentUsd;
-  const n = 160;
-  const results = await Promise.all(Array.from({ length: n }, () => reserve(0.02)));
+  const room = CAP - start.meta.spentUsd;
+  const n = Math.ceil(room / STEP) + 40;
+  const results = await Promise.all(Array.from({ length: n }, () => reserve(STEP)));
   const okCount = results.filter(r => r.ok).length;
-  const expected = Math.floor((room + 1e-9) / 0.02);
+  const expected = Math.floor((room + 1e-9) / STEP);
   const after = await ledger();
-  check(`${n} concurrent $0.02 reservations: exactly ${expected} accepted`, okCount === expected, `accepted ${okCount}`);
-  check('ledger never exceeds the ceiling', after.meta.spentUsd <= 2.5 + 1e-9, `$${after.meta.spentUsd}`);
+  check(`${n} concurrent $${STEP} reservations: exactly ${expected} accepted`, okCount === expected, `accepted ${okCount}`);
+  check('ledger never exceeds the ceiling', after.meta.spentUsd <= CAP + 1e-9, `$${after.meta.spentUsd} of $${CAP}`);
   check('refused reservations answer 402', results.filter(r => !r.ok).every(r => r.status === 402));
   check('Meta reservations did not touch the Modal ledger', after.modal.spentUsd === start.modal.spentUsd);
   const bad = await fetch(`${base}/api/admin/reserve`, { method: 'POST', headers: H, body: JSON.stringify({ usd: 0.01 }) });
@@ -57,17 +62,19 @@ if (phase === 'fill') {
 
 if (phase === 'after-restart') {
   if (existsSync(PENDING)) {
-    const { ticket } = JSON.parse(readFileSync(PENDING, 'utf8'));
-    const before = (await ledger()).meta.spentUsd;
+    const { ticket, since } = JSON.parse(readFileSync(PENDING, 'utf8'));
+    const pre = (await ledger()).meta;
+    const before = pre.spentUsd;
+    check('after restart the ledger keeps its since and reservation count', pre.since === since && pre.reservations > 0, `since ${pre.since}, ${pre.reservations} reservations`);
     const r1 = await settle(ticket, 0.01);
     const r2 = await settle(ticket, 0);
     check('a ticket reserved before the restart settles exactly once after it', r1.applied === true && r2.applied === false && Math.abs(r2.spentUsd - (before - 0.04)) < 1e-9, `$${before} → $${r2.spentUsd}`);
   }
   const l = await ledger();
-  check('after restart the ledger is still near the ceiling (persisted, not reset)', l.meta.spentUsd >= 2.4 && l.meta.spentUsd <= 2.5 + 1e-9, `$${l.meta.spentUsd}`);
-  const fill = await Promise.all(Array.from({ length: 10 }, () => reserve(0.02)));
+  check('after restart the ledger is still near the ceiling (persisted, not reset)', l.meta.spentUsd >= CAP - 2 * STEP && l.meta.spentUsd <= CAP + 1e-9 && l.meta.capUsd === CAP, `$${l.meta.spentUsd} of $${l.meta.capUsd}`);
+  const fill = await Promise.all(Array.from({ length: 10 }, () => reserve(STEP)));
   const after = await ledger();
-  check('after restart the ceiling still holds', after.meta.spentUsd <= 2.5 + 1e-9 && fill.some(r => r.status === 402), `$${after.meta.spentUsd}`);
+  check('after restart the ceiling still holds', after.meta.spentUsd <= CAP + 1e-9 && fill.some(r => r.status === 402), `$${after.meta.spentUsd}`);
   check('external reservations are logged for audit', l.meta.external.length > 0, `${l.meta.external.length} entries`);
 }
 

@@ -4,7 +4,7 @@ Updated: October 31, 2026 (KST). For per-requirement evidence see [VERIFICATION.
 
 ## Deployed with real model calls
 
-https://coevo-caddie.coevo-meta-hackathon.workers.dev — Cloudflare Worker, Durable Objects, private R2 and static assets; Kokoro speech and video composition on Modal. Real Meta model calls are on behind an **application-enforced budget**: the maintainer approved US$3.00 in total for Meta Model API development and validation; the deployment's Budget object stops at a $2.50 lifetime ceiling (never reset), reserves the exact maximum before every call from counted input tokens, keeps reservations for ambiguous outcomes and settles each durable ticket once. Media rendering has its own, separate ceiling.
+https://coevo-caddie.coevo-meta-hackathon.workers.dev — Cloudflare Worker, Durable Objects, private R2 and static assets; Kokoro speech and video composition on Modal. Real Meta model calls are on behind an **application-enforced budget**: the deployment's Budget object stops at a US$100 lifetime total for Meta usage, including earlier spend (never reset), reserves the exact maximum before every call from counted input tokens, keeps reservations for ambiguous outcomes and settles each durable ticket once. Media rendering has its own, separate ceiling.
 
 ## Verified with real models (scripted, fictional café scenario)
 

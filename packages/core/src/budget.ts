@@ -13,12 +13,14 @@ export const PRICES = {
 } as const;
 
 /**
- * The maintainer approved US$3.00 in total for all Meta Model API development and
- * validation. The application stops at an operating ceiling of $2.50, keeping a
- * $0.50 margin. This is an application-enforced budget, not a provider billing cap.
+ * The maintainer approved US$100 in total for all Meta Model API use by this
+ * deployment, including what was already spent (Oct 31, 2026). It is one lifetime
+ * total, not per run, day or workspace. Every call reserves its exact maximum first,
+ * so the ledger can stop at the full approved total. This is an application-enforced
+ * budget, not a provider billing cap.
  */
-export const META_ABSOLUTE_MAX_USD = 3.0;
-export const META_OPERATING_CEILING_USD = 2.5;
+export const META_APPROVED_TOTAL_USD = 100;
+export const META_OPERATING_CEILING_USD = META_APPROVED_TOTAL_USD;
 /** Modal uses its own separately verified free balance ($1.00); stay below it. */
 export const MODAL_CEILING_USD = 0.9;
 
