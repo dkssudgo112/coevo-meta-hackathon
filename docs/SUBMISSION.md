@@ -66,7 +66,7 @@ Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a
 **9 · Use of Meta products**
 
 - **Muse Spark 1.3** reads phone photos of any AI tool's screen into structured moments. It decides each intervention, or each silence, with deterministic guardrails. It writes one learning design per session and the five formats from it. It also writes and checks Practice Range requests.
-- **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards. It also points at a poster's title, photo or price on a kept frame for visual coaching ("The price isn't visible."); finalize this line only after the live check returns boxes on the real poster.
+- **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards. It also points at a poster's price, title or product photo on a kept frame for visual coaching ("The price isn't visible."); on a real Meta AI screenshot it boxed the poster's price and title and ignored the same price in the chat.
 - **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
 - **Muse Image** draws what a spoken practice brief produces, and the background scenes of the short.
 - **Meta AI** (consumer) is the demo's work tool. Its poster image generation and in-chat rule following were checked in a real account.

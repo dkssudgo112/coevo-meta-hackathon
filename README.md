@@ -25,7 +25,7 @@ They answer out loud — office workers near the station, 6,500 won, a calm morn
 **Meta models in the product**
 
 - **Muse Spark 1.3** — reads each camera frame into a structured moment, decides whether to intervene (and why it stays quiet), plans one shared learning design per session, and writes the five formats.
-- **SAM 3.1** — finds the monitor in the one disclosed setup photo so the phone can crop on-device from then on, and points at the poster's title, photo or price on a kept frame ("The price isn't visible."). The poster pointers have only been checked with a fake model so far.
+- **SAM 3.1** — finds the monitor in the one disclosed setup photo so the phone can crop on-device from then on, and points at the poster's title, photo or price on a kept frame ("The price isn't visible."). The pointers were checked live once on a real Meta AI screenshot; finding the monitor on real phone photos (S2) is still to be measured.
 - **Muse Voice Transcribe** — your spoken answers and practice briefs.
 - **Muse Image** — Practice Range renders your spoken brief, and scenes for the short.
 
