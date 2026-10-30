@@ -152,7 +152,7 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
     return (
       <section className={`now asking ${pulse ? 'pulse' : ''}`} aria-live="polite">
         <div className="row"><span className="eyebrow grow">Now · {d.step === 'example' ? 'An example' : d.step === 'ingredients' ? 'What’s missing' : 'A question'}</span><span className="faint">{clock(d.decidedAt)}</span></div>
-        {d.quote && <p><span className="faint">You wrote</span> <span className="quote">{d.quote}</span></p>}
+        {d.quote && !(d.message ?? '').toLowerCase().includes(d.quote.toLowerCase()) && <p><span className="faint">You wrote</span> <span className="quote">{d.quote}</span></p>}
         <p className="message">{d.message}</p>
         {d.missingIngredients.length > 0 && <div className="row wrap">{d.missingIngredients.map(k => <span key={k} className="tag">{INGREDIENT_TEXT[k]}</span>)}</div>}
         {d.exampleBrief && (

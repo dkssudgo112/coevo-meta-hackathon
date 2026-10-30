@@ -60,23 +60,30 @@ function screen(turns) {
     `<rect x="0" y="56" width="220" height="${H - 56}" fill="#efeff2"/>`,
     `<text x="20" y="96" font-size="14" font-family="Helvetica, Arial" fill="#55555c">New chat</text>`,
   ];
+  // Conversation is laid out top-down, then scrolled so the latest turn sits just above
+  // the input box, like a real chat app. Anything above the header is clipped.
+  const convo = [];
   let y = 84;
   for (const t of turns.slice(-3)) {
     if (t.user) {
       const lines = wrapText(t.user, 58);
       const bw = Math.min(560, Math.max(...lines.map(l => l.length)) * 9.2 + 32);
-      parts.push(`<rect x="${W - 60 - bw}" y="${y}" width="${bw}" height="${lines.length * 24 + 20}" rx="16" fill="#4f6bed"/>`);
-      lines.forEach((l, i) => parts.push(`<text x="${W - 60 - bw + 16}" y="${y + 28 + i * 24}" font-size="17" font-family="Helvetica, Arial" fill="#ffffff">${esc(l)}</text>`));
+      convo.push(`<rect x="${W - 60 - bw}" y="${y}" width="${bw}" height="${lines.length * 24 + 20}" rx="16" fill="#4f6bed"/>`);
+      lines.forEach((l, i) => convo.push(`<text x="${W - 60 - bw + 16}" y="${y + 28 + i * 24}" font-size="17" font-family="Helvetica, Arial" fill="#ffffff">${esc(l)}</text>`));
       y += lines.length * 24 + 36;
     }
     if (t.ai) {
       const lines = wrapText(t.ai, 70);
-      parts.push(`<circle cx="268" cy="${y + 14}" r="12" fill="#4f6bed"/>`);
-      lines.forEach((l, i) => parts.push(`<text x="292" y="${y + 20 + i * 24}" font-size="17" font-family="Helvetica, Arial" fill="#1b1b1f">${esc(l)}</text>`));
+      convo.push(`<circle cx="268" cy="${y + 14}" r="12" fill="#4f6bed"/>`);
+      lines.forEach((l, i) => convo.push(`<text x="292" y="${y + 20 + i * 24}" font-size="17" font-family="Helvetica, Arial" fill="#1b1b1f">${esc(l)}</text>`));
       y += lines.length * 24 + 12;
-      if (t.poster) { parts.push(poster(292, y, t.poster)); y += 312; } else y += 16;
+      if (t.poster) { convo.push(poster(292, y, t.poster)); y += 312; } else y += 16;
     }
   }
+  const bottom = H - 104;
+  const shift = Math.min(0, bottom - y);
+  parts.push(`<defs><clipPath id="chat"><rect x="220" y="57" width="${W - 220}" height="${H - 57 - 92}"/></clipPath></defs>`);
+  parts.push(`<g clip-path="url(#chat)"><g transform="translate(0,${shift})">${convo.join('')}</g></g>`);
   parts.push(`<rect x="250" y="${H - 84}" width="${W - 310}" height="56" rx="28" fill="#ffffff" stroke="#d6d6db"/>`);
   parts.push(`<text x="280" y="${H - 50}" font-size="16" font-family="Helvetica, Arial" fill="#a0a0a8">Message AI Assistant</text>`);
   parts.push('</svg>');
