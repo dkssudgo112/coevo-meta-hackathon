@@ -259,10 +259,11 @@ function Sources({ ids, state, onSource }: { ids: string[]; state: Snapshot; onS
 }
 
 export function ContentBody({ item, state, creds, onSource }: { item: ContentItem; state: Snapshot; creds: Creds; onSource?: (momentId: string) => void }) {
+  const replay = useContext(ReplayContext);
   return (
     <div className="stack">
       {item.requestedByUser
-        ? <p className="faint"><strong>You asked for this one.</strong> The Caddie had skipped it: {item.whyNow}</p>
+        ? <p className="faint"><strong>{replay ? 'Made on request in this run.' : 'You asked for this one.'}</strong> The Caddie had skipped it: {item.whyNow}</p>
         : <p className="faint"><strong>Why now:</strong> {item.whyNow}</p>}
       <Sources ids={item.sourceMomentIds} state={state} onSource={onSource} />
       <StatusLine item={item} creds={creds} />

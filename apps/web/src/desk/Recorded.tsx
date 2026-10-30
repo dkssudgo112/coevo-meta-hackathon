@@ -129,12 +129,13 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
       <div className="desk">
         <header className="desk-top">
           <Flag state="watching" />
-          <div className="grow">
-            <h2>Sample session · <span className="tag">{run.label}</span></h2>
-            <p className="faint">Recorded {run.recordedOn} through the deployed app ({Object.values(run.models).join(' · ')}). Replayed without new model calls. {run.scenario}</p>
-          </div>
+          <h2 className="grow">Sample session <span className="tag">{run.label}</span></h2>
           <button className="btn small" onClick={onLive}>Run it live instead</button>
         </header>
+        <div className="stack" style={{ gap: 4 }}>
+          <p className="faint">Recorded {new Date(`${run.recordedOn}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} through the deployed app · {[...new Set(Object.values(run.models))].join(' · ')}. Replayed without new model calls.</p>
+          <p className="faint">{run.scenario}</p>
+        </div>
         <div className="split">
           <section className="stack">
             <div className="row"><span className="eyebrow grow">{step.kind === 'wrap' ? 'After session 1' : `Their screen · session ${step.m.session}`}</span><span className="faint">{i + 1} / {steps.length}</span></div>
