@@ -175,7 +175,7 @@ export interface Moment {
   interrupted?: boolean;
   /** SAM 3.1 pointers on the artifact (visual coaching), when a check ran for this moment. */
   pointers?: Pointer[];
-  pointerCheck?: { status: 'done' | 'failed'; model: string; at: string; error?: string };
+  pointerCheck?: { status: 'done' | 'failed'; model: string; at: string; error?: string; /** SAM output shape per phrase (no mask data), for diagnosis. */ trace?: { phrase: string; boxes: number; boxesOutsideCommentary: number; lanes: string[]; head: string }[] };
 }
 
 export interface MomentTiming {

@@ -649,9 +649,9 @@ export class Workspace extends DurableObject<Env> {
     try {
       const r = await segmentBoxes(this.env, this.spender(), bytesToDataUrl(bytes, size.mime), 'computer monitor screen');
       const best = r.boxes.sort((a, b) => (b.x2 - b.x1) * (b.y2 - b.y1) - (a.x2 - a.x1) * (a.y2 - a.y1))[0];
-      if (!best) return json({ crop: null, found: 0, latencyMs: r.latencyMs });
+      if (!best) return json({ crop: null, found: 0, latencyMs: r.latencyMs, trace: r.trace });
       const crop: CropRect = { x: best.x1 / best.w, y: best.y1 / best.h, w: (best.x2 - best.x1 + 1) / best.w, h: (best.y2 - best.y1 + 1) / best.h };
-      return json({ crop, found: r.boxes.length, confidence: best.c, latencyMs: r.latencyMs });
+      return json({ crop, found: r.boxes.length, confidence: best.c, latencyMs: r.latencyMs, trace: r.trace });
     } catch (e) {
       const f = failureStatus(e);
       return json({ crop: null, found: 0, error: f.message, status: f.status }, 200);

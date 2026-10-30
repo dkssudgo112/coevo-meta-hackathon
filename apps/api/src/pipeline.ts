@@ -206,10 +206,11 @@ async function pointAtArtifact(ctx: Ctx, momentId: string, imageDataUrl: string,
   let model = 'sam-3.1';
   try { model = models(ctx.env).segment; } catch { /* reported by the call below */ }
   let pointers: Pointer[] = [];
+  const trace: NonNullable<NonNullable<Moment['pointerCheck']>['trace']> = [];
   let check: NonNullable<Moment['pointerCheck']>;
   try {
     let calls = 0;
-    const sam = async (phrase: string) => { calls++; return (await segmentBoxes(ctx.env, ctx.spender, imageDataUrl, phrase)).boxes; };
+    const sam = async (phrase: string) => { calls++; const r = await segmentBoxes(ctx.env, ctx.spender, imageDataUrl, phrase); trace.push(r.trace); return r.boxes; };
     let poster: Box | null = null;
     for (const phrase of POSTER_PHRASES) { poster = pickPoster(await sam(phrase)); if (poster) break; }
     const partBoxes: Partial<Record<ArtifactPart, Box[]>> = {};
@@ -224,9 +225,9 @@ async function pointAtArtifact(ctx: Ctx, momentId: string, imageDataUrl: string,
       }
     }
     pointers = choosePointers(asked, r.artifactShows, poster, partBoxes);
-    check = { status: 'done', model, at: now(), ...(poster ? {} : { error: 'No poster found on this frame.' }) };
+    check = { status: 'done', model, at: now(), trace, ...(poster ? {} : { error: 'No poster found on this frame.' }) };
   } catch (e) {
-    check = { status: 'failed', model, at: now(), error: failureStatus(e).message };
+    check = { status: 'failed', model, at: now(), trace, error: failureStatus(e).message };
   }
   if (!ctx.store.alive('moment', momentId)) return;
   await ctx.store.update('moment', momentId, m => ({ ...m, pointers, pointerCheck: check }));

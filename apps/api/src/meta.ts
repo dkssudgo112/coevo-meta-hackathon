@@ -452,7 +452,9 @@ export function samOutput(r: ResponsesOutput): { text: string; finalText: string
 }
 
 /** Find objects matching a noun phrase. Returns pixel boxes in source-image coordinates. */
-export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: string, phrase: string, f: Fetch = fetch): Promise<{ boxes: Box[]; costUsd: number; latencyMs: number }> {
+export interface SamTrace { phrase: string; boxes: number; boxesOutsideCommentary: number; lanes: string[]; head: string }
+
+export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: string, phrase: string, f: Fetch = fetch): Promise<{ boxes: Box[]; costUsd: number; latencyMs: number; trace: SamTrace }> {
   const segmentModel = models(env).segment;
   const ticket = await spend.reserve(SAM_USD, 'segment');
   const started = Date.now();
@@ -468,8 +470,9 @@ export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: s
     const out = samOutput(raw);
     const boxes = parseSamBoxes(out.text);
     // Output shape only (lanes with phase and text length, box counts per lane; no mask data, image or keys).
-    console.log(JSON.stringify({ event: 'sam_output', phrase, boxes: boxes.length, boxesOutsideCommentary: parseSamBoxes(out.finalText).length, lanes: out.lanes, head: out.text.slice(0, 160).replace(/data=[^|]*/g, 'data=…') }));
-    return { boxes, costUsd: SAM_USD, latencyMs: Date.now() - started };
+    const trace: SamTrace = { phrase, boxes: boxes.length, boxesOutsideCommentary: parseSamBoxes(out.finalText).length, lanes: out.lanes, head: out.text.slice(0, 160).replace(/data=[^|]*/g, 'data=…') };
+    console.log(JSON.stringify({ event: 'sam_output', ...trace }));
+    return { boxes, costUsd: SAM_USD, latencyMs: Date.now() - started, trace };
   } catch (e) {
     // Status and error code only (no image, prompt or key), so provider outages are visible.
     console.error(JSON.stringify({ event: 'sam_failed', phrase, status: e instanceof MetaError ? e.status : null, code: e instanceof MetaError ? e.code ?? null : null, name: e instanceof Error ? e.name : 'unknown' }));
