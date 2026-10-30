@@ -1,0 +1,33 @@
+node_modules/
+.venv/
+dist/
+.wrangler/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+.modal.toml
+private/
+artifacts/
+coverage/
+
+# Local agent instructions and session/configuration state
+[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]
+.claude/
+.codex/
+.envrc
+.vscode/
+.idea/
+
+# Credential stores and private key material
+credentials.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx

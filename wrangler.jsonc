@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "coevo-meta-hackathon",
+  "main": "apps/api/src/index.ts",
+  "compatibility_date": "2026-10-30",
+  "workers_dev": false,
+  "observability": {"enabled": false},
+  "dev": {"ip": "127.0.0.1", "port": 8788}
+}

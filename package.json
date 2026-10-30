@@ -1,0 +1,34 @@
+{
+  "name": "coevo-meta-hackathon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "dev": "concurrently -k -n api,web \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "wrangler dev --local --ip 127.0.0.1 --port 8788",
+    "dev:web": "npm run dev --workspace @coevo/web",
+    "typecheck": "tsc --noEmit -p tsconfig.api.json && npm run typecheck --workspace @coevo/web",
+    "build": "npm run build --workspace @coevo/web && wrangler deploy --dry-run --outdir dist/worker",
+    "verify": "npm run typecheck && npm run build && npm run test:release && npm run doctor",
+    "meta:models": "node scripts/meta-check.mjs models",
+    "meta:smoke": "node scripts/meta-check.mjs smoke",
+    "muse": "node scripts/muse.mjs",
+    "check:release": "node scripts/release-check.mjs",
+    "secrets:set": "python3 scripts/set-secret.py",
+    "test:release": "node --test scripts/tests/release-check.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "concurrently": "10.0.6",
+    "typescript": "7.0.2",
+    "wrangler": "4.156.0"
+  }
+}
