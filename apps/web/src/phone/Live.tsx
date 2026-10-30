@@ -21,11 +21,12 @@ export interface CameraInfo {
 /** Content opened from a past session remembers it, so Back returns there (not to the live session). */
 type Sheet = { kind: 'content'; id: string } | { kind: 'practice'; id: string | null; sessionId: string | null } | { kind: 'session'; id: string; highlight?: string } | null;
 
-function Sheet({ title, onClose, back = 'Back to session', children }: { title: string; onClose: () => void; back?: string; children: ReactNode }) {
+function Sheet({ title, onClose, back = 'Back to session', waiting, children }: { title: string; onClose: () => void; back?: string; waiting?: boolean; children: ReactNode }) {
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
         <header><h2 className="grow">{title}</h2><button className="btn small" onClick={onClose}>{back}</button></header>
+        {waiting && <p className="faint" role="status">The Caddie has a new question. It waits until you go back.</p>}
         {children}
       </div>
     </div>
@@ -63,16 +64,19 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
   const ra = useReadAloud();
   useEffect(() => { if (answeringId) ra.stop(); }, [answeringId]);
 
+  // Reading something on the phone (a sheet or the menu) also defers the buzz and speech (plan 3.4).
+  const readingSheet = stack.length > 0 || drawer;
+  const unseenAsk = hydrated && seenAsk.current !== undefined && !!newestAsk && !newestAsk.response && seenAsk.current !== newestAsk.id;
   useEffect(() => {
     if (!hydrated) return;
     if (seenAsk.current === undefined) { seenAsk.current = newestAsk?.id ?? null; return; }
-    if (answeringId) return; // deferred: buzzes once the answer is sent or cancelled
+    if (answeringId || readingSheet) return; // deferred: buzzes once the answer is sent or the sheet is closed
     if (newestAsk && !newestAsk.response && seenAsk.current !== newestAsk.id) {
       vibrate([60, 40, 60]); setPulse(true); setTimeout(() => setPulse(false), 1900);
       ra.say(newestAsk.decision?.message ?? '');
       seenAsk.current = newestAsk.id;
     }
-  }, [hydrated, newestAsk?.id, answeringId]);
+  }, [hydrated, newestAsk?.id, answeringId, readingSheet]);
 
   if (!state) return <div className="phone"><main><p className="faint" role="status">{conn === 'unauthorized' ? 'This phone is no longer paired.' : 'Connecting to your Desk…'}</p>{conn === 'unauthorized' && onUnpair && <button className="btn" onClick={onUnpair}>Pair again</button>}</main></div>;
 
@@ -141,18 +145,18 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
       {sheet?.kind === 'content' && (() => {
         const item = state.content.find(c => c.id === sheet.id);
         return item ? (
-          <Sheet title={FORMAT_NAME[item.format]} onClose={back} back={backLabel}>
+          <Sheet title={FORMAT_NAME[item.format]} onClose={back} back={backLabel} waiting={unseenAsk}>
             <ContentBody item={item} state={state} creds={creds} onSource={m => open({ kind: 'session', id: item.sessionId, highlight: m })} />
           </Sheet>
         ) : null;
       })()}
       {sheet?.kind === 'practice' && (
-        <Sheet title="Practice Range" onClose={back} back={backLabel}>
+        <Sheet title="Practice Range" onClose={back} back={backLabel} waiting={unseenAsk}>
           <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={sheet.sessionId} onStart={id => replaceTop({ kind: 'practice', id, sessionId: sheet.sessionId })} />
         </Sheet>
       )}
       {sheet?.kind === 'session' && (
-        <Sheet title="Session" onClose={back} back={backLabel}>
+        <Sheet title="Session" onClose={back} back={backLabel} waiting={unseenAsk}>
           <SessionSummary creds={creds} state={state} sessionId={sheet.id} highlight={sheet.highlight} onOpen={id => open({ kind: 'content', id })} onPractice={sid => open({ kind: 'practice', id: null, sessionId: sid })} onSource={m => open({ kind: 'session', id: sheet.id, highlight: m })} />
         </Sheet>
       )}

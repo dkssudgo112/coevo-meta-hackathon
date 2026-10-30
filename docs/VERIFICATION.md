@@ -49,7 +49,7 @@ Last updated: 2026-10-30 (late night KST).
 | B4 | Voice answer: record → 16 kHz WAV → Voice Transcribe | ☑ | ◐ | ☐ | live: 10 s synthetic answer transcribed (one place name misheard) → Caddie reply; keyword-hint 400 found and fixed (single words, retry without hints); unit + browser (delayed test microphone): a repeated tap while the microphone opens is ignored, cancelling before permission stops the late stream and starts no audio context | Real microphone + human voice pending |
 | B5 | Haptic nudge (`navigator.vibrate`), visual pulse fallback | ◐ | ☐ | ☐ | code: buzz + pulse on every new question, including the first of a quiet session; history on reopen does not buzz (bug found in review, fixed) | Device check pending; iOS Safari has no vibrate API |
 | B6 | Later defers with a longer cooldown; card stays in flow | ◐ | ☐ | ☐ | unit: later-cooldown | |
-| B7 | "That's not what I asked" marks a misread and drops its evidence | ☐ | ☐ | ☐ | | |
+| B7 | "That's not what I asked" marks a misread and drops its evidence | ◐ | ☐ | ☐ | fake e2e: the moment is marked misread; code: misread moments are skipped by change labels, memory, unreadable-run counting and the NOW card | Exclusion not yet asserted end to end |
 | B8 | No interrupt while typing; praise removed; quotes must be grounded | ◐ | ☐ | ☐ | unit | |
 | B9 | First-sighting acknowledgement written by the model | ☑ | ☐ | ☐ | live: "See Meta AI making cafe poster; will speak only when helpful." | |
 | B10 | Live Caddie voice only with earphones (browser speech synthesis, opt-in) | ◐ | ◐ | ☐ | TEST build in the browser: off by default; turning it on needs "My earphones are in"; a new question is read once; it turns itself off when audio devices change; silent while an answer is in progress | Browsers cannot detect earphones reliably, so the person confirms; device check pending |
@@ -72,7 +72,7 @@ Last updated: 2026-10-30 (late night KST).
 | D3 | 4D observations (no levels or scores); unobserved is not failure | ◐ | ☐ | ☐ | unit: description (added details), delegation (AI asked first, coached), discernment (the request tells the AI to fix a specific wrong or invented detail), diligence (the request tells the AI not to invent details) — each only from the request text, once per request, coached after any intervention | Discernment and diligence not yet observed live; the recorded sample shows none (its invented opening hours were not corrected) |
 | D4 | Source links from every card and content item to its moment/frame | ☑ | ◐ | ☐ | TEST build in the browser: "Made from" links on content and cards (phone and Desk), note quotes open the session with the moment highlighted and its kept frame shown; Back retraces content → source → content; Desk links scroll to the evidence row | |
 | D5 | Frame deletion keeps the label and marks "source removed" | ☑ | ◐ | ☐ | fake e2e: deleting a frame keeps its "with the Caddie" label and removes the stored image; Desk row shows "Source removed", the short storyboard "(frame deleted)" | Live check pending |
-| D6 | Desk evidence rows: FRAME, YOU SAID, CADDIE, THEN | ☐ | ☐ | ☐ | | |
+| D6 | Desk evidence rows: FRAME, YOU SAID, CADDIE, THEN | ◐ | ☐ | ☐ | TEST build in the browser: rows per moment with kept frame, quote, Caddie line and label; source links scroll to and flash the row; SAM pointers drawn on the row's frame when present (typechecked, not visually inspected) | |
 
 ## E. AI growth
 
@@ -116,7 +116,7 @@ Last updated: 2026-10-30 (late night KST).
 | H5 | English docs, reproducible setup | ◐ | ☐ | ☐ | | |
 | H6 | Three-minute demo video | ☐ | ☐ | ☐ | | R7 |
 | H7 | Submission texts ready (not submitted) | ☐ | ☐ | ☐ | | R8 |
-| H8 | Public repository audit (release check, signed-out access) | ☐ | ☐ | ☐ | | |
+| H8 | Public repository audit (release check, signed-out access) | ☑ | ◐ | ☐ | Oct 30: signed-out requests to the repository page and raw docs return 200 and show the latest README; Gitleaks over the full history (59 commits): no leaks; no private, account, local-notes or secret paths in any commit; every commit uses the noreply address; the release check reads the staged index with an exact-hash allowlist for binaries | Re-run before submission; project license still the maintainer's decision |
 
 ## Technical spikes (approved plan §6.3)
 
