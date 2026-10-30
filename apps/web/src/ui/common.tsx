@@ -122,7 +122,7 @@ export function DataTable() {
     ['Typed answers', 'Meta Muse Spark, for the Caddie’s reply and your session content', 'Kept with the moment', 'Delete the session'],
     ['Practice briefs (spoken or typed)', 'Voice Transcribe if spoken, then Muse Spark to check it and Muse Image to draw it', 'The text, check and image are kept with the attempt', 'Delete the session (attempts opened in it)'],
     ['Note, playbook, flashcards, podcast, short', 'Written by Muse Spark from your session; the podcast script and the short’s narration and images go to Modal to make audio and video', 'Kept in this workspace until you delete them', 'Delete the session'],
-    ['Approved Caddie cards', 'Shown to the model as your current rules while approved', 'Kept even after their session is deleted, because they are your rules now', 'Revoke the card'],
+    ['Approved Caddie cards', 'Shown to the model as your current rules while approved', 'Kept even after their session is deleted, because they are your rules now', '“Turn off” stops the card being used; the card and its history are kept, not deleted'],
   ];
   return (
     <details className="data-table">
