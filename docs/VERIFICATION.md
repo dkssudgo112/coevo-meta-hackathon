@@ -30,9 +30,9 @@ Last updated: 2026-10-31 (KST).
 
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| A1 | Phone rear camera capture over HTTPS | ☐ | ☐ | ☐ | | Assumed setup, not measured |
-| A2 | Device-side crop to the screen before upload; setup frame disclosed | ◐ | ☐ | ☐ | code: `FrameSampler` crops on device; aim screen discloses the one setup photo | Needs `device` |
-| A3 | On-device change detection (send only after a settled change) | ◐ | ☐ | ☐ | unit: `packages/core/test` | Thresholds not tuned on a physical phone (assumed setup) |
+| A1 | Phone rear camera capture over HTTPS | ◐ | ☐ | ☐ | browser (assumed setup): the deployed phone screen at 390×844 with a controlled camera — a canvas showing a monitor with screenshots of actual Meta AI replies — started the camera and sent frames that live Muse Spark read correctly. A bug found this way is fixed: the camera never started when the Live screen first showed "Connecting…" | Physical phone camera not measured |
+| A2 | Device-side crop to the screen before upload; setup frame disclosed | ◐ | ◐ | ☐ | browser (assumed setup, live): corners dragged onto the drawn screen, frames uploaded as 772×511 device-cropped crops and read live; SAM found no monitor in the drawing and the app fell back to manual corners; code: `FrameSampler` crops on device; aim screen discloses the one setup photo | Needs `device` |
+| A3 | On-device change detection (send only after a settled change) | ◐ | ◐ | ☐ | unit: `packages/core/test` (incl. a 1.6% change sent, 0.8% noise not); browser (assumed setup): each screen change was sent once; measured on six actual AI-chat screens the steps were only 1.6–6.9% at 64 px, so the send threshold was lowered from 3.5% to 1.5% | Thresholds not tuned on a physical phone (assumed setup) |
 | A4 | SAM 3.1 finds the screen on the disclosed setup frame → crop suggestion | ☐ | ☐ | ☐ | | S2 |
 | A5 | Spark reads a frame → validated `Reading` | ☑ | ◐ | ☐ | live: actual Meta AI screens read correctly (request word-set 1.0, tool 1.0); live session read 5 screens in order, 6–9 s per turn | Phone-camera frames pending (S1) |
 | A6 | Photo fallback (single photo) | ◐ | ☐ | ☐ | code: phone photo + crop, Desk screenshot upload | |

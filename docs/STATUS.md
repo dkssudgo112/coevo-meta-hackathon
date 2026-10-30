@@ -35,6 +35,10 @@ These run in the test build in a browser, with a scripted fake model and recorde
 
 - **Workspaces placed in Hong Kong could not reach Meta's API (found and fixed Oct 31).** What looked like intermittent provider outages was where each workspace's server object was created. Meta calls are made from that object, which stays where it was first created; objects placed in Hong Kong got 404 `model_not_found` for every model, while the same calls from the US or the maintainer's computer worked (a free diagnostic probe showed both in the same minute). New workspaces are now created in Cloudflare's US jurisdiction, which fixes where they run. An older workspace that finds itself in a restricted region copies its data and token hashes to a new US workspace, and the paired phone and Desk switch to it on their next request with no re-pairing; the original is kept as it was. The recorded sample is unaffected.
 
+## Verified in the assumed setup (browser, controlled camera)
+
+The deployed phone screen at phone size, with a controlled camera (a canvas showing a monitor with screenshots of actual Meta AI replies), started the camera, cropped on the device, sent each screen change once and got live readings from Muse Spark. This run found and fixed two camera-path bugs: the camera never started if the Live screen first showed "Connecting…", and the change threshold (3.5%) missed real chat updates, which measured only 1.6–6.9% at the detector's resolution (now 1.5%).
+
 ## Assumed setup, not measured (accepted by the maintainer on Oct 31)
 
 The maintainer decided that, as in the earlier Coevo project, the phone is assumed to stand beside the monitor: the flow is checked in a phone-sized browser with controlled camera and microphone input and screenshots of actual AI replies, not on a physical phone. These physical characteristics are therefore **not measured**, and are not claimed:
