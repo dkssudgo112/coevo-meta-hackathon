@@ -30,7 +30,7 @@ Last updated: 2026-10-30 (late KST).
 | A2 | Device-side crop to the screen before upload; setup frame disclosed | ◐ | ☐ | ☐ | code: `FrameSampler` crops on device; aim screen discloses the one setup photo | Needs `device` |
 | A3 | On-device change detection (send only after a settled change) | ◐ | ☐ | ☐ | unit: `packages/core/test` | Thresholds need `device` tuning |
 | A4 | SAM 3.1 finds the screen on the disclosed setup frame → crop suggestion | ☐ | ☐ | ☐ | | S2 |
-| A5 | Spark reads a frame → validated `Reading` | ◐ | ☐ | ☐ | unit: schema readers | S1 |
+| A5 | Spark reads a frame → validated `Reading` | ☑ | ◐ | ☐ | live: real Meta AI screen capture read correctly (request word-set 1.0, tool 1.0) in 1 + 3 + 3 runs; live sample screens read in order | Phone-camera frames pending (S1) |
 | A6 | Photo fallback (single photo) | ◐ | ☐ | ☐ | code: phone photo + crop, Desk screenshot upload | |
 | A7 | Desk screen-share fallback (`getDisplayMedia`) | ◐ | ☐ | ☐ | code: Desk sampler | |
 | A8 | Raw frames discarded after reading; evidence frames kept and deletable | ◐ | ☐ | ☐ | integration: unreadable/disabled frame deleted; code: retention rule + delete API | |
@@ -39,8 +39,8 @@ Last updated: 2026-10-30 (late KST).
 
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| B1 | Every decision has a reason, quiet included (live model) | ◐ | ☐ | ☐ | unit: guardrails | |
-| B2 | Ladder question → ingredients → example; no skipping | ◐ | ☐ | ☐ | unit: guardrails | |
+| B1 | Every decision has a reason, quiet included (live model) | ☑ | ◐ | ☐ | live sample: quiet notes ("Two vague tries, not stuck yet.") and an intervention reason ("Three requests added no concrete details…") | |
+| B2 | Ladder question → ingredients → example; no skipping | ◐ | ☐ | ☐ | unit: guardrails; live: first intervention at the question step, quoting the user | Ingredients/example steps pending live |
 | B3 | NOW card + session flow, one primary action | ☐ | ☐ | ☐ | | |
 | B4 | Voice answer: record → 16 kHz WAV → Voice Transcribe | ◐ | ☐ | ☐ | unit: WAV encoder | S6 |
 | B5 | Haptic nudge (`navigator.vibrate`), visual pulse fallback | ☐ | ☐ | ☐ | | iOS Safari has no vibrate API |
@@ -94,10 +94,10 @@ Last updated: 2026-10-30 (late KST).
 
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| G1 | Scenario written by the live model; viewing the hint marks the attempt coached | ◐ | ☐ | ☐ | unit: labels | |
-| G2 | Spoken brief → transcript | ☐ | ☐ | ☐ | | |
-| G3 | Muse Image renders the user's own words | ☐ | ☐ | ☐ | | S7 |
-| G4 | Ingredient check + exact label | ◐ | ☐ | ☐ | unit: labels | |
+| G1 | Scenario written by the live model; viewing the hint marks the attempt coached | ☑ | ◐ | ☐ | live: 4 scenarios generated; unit + fake e2e: hint → coached | |
+| G2 | Spoken brief → transcript | ☑ | ◐ | ☐ | live Voice Transcribe on synthetic speech (macOS voice): 31 and 19 words; word-set similarity 0.86 to the script | Real human voice pending |
+| G3 | Muse Image renders the user's own words | ☑ | ◐ | ☐ | live: 3 portrait images (1024×1536) from spoken briefs, ~16 s per attempt incl. transcription and check | |
+| G4 | Ingredient check + exact label | ☑ | ◐ | ☐ | live: ingredient check + "independent · practice" label; unit/fake: coached after hint | |
 
 ## H. Deployment and judging
 
@@ -118,11 +118,11 @@ Last updated: 2026-10-30 (late KST).
 | --- | --- | --- | --- | --- |
 | S1 | Spark reading of 20 real phone-camera frames | ≥ 90% request text, 100% tool | ☐ | Needs R1 + R3 |
 | S2 | SAM 3.1 monitor detection | ≥ 18/20, ≤ 2 s | ☐ | Needs R1 + R3 |
-| S3 | Frame → card latency | p50 ≤ 6 s | ☐ | Needs R1 |
+| S3 | Frame → card latency | p50 ≤ 6 s | ◐ | Not yet measured on phone frames. Live, one real screen capture × 3 through the deployed app: separate read+decide p50 11.5 s (4 round trips) → combined turn p50 5.9 s client / 4.9 s server (2 round trips). Benchmark mode ready for the 20-frame phone run |
 | S4 | Meta AI (KR): image generation + rule changes behavior | both reproducible | ☑ (fallback) | Image: PASS (real 1152×2048 poster, private record). Memory across new chats: FAIL. Approved fallback PASS: rule as first message of a dedicated, pinned chat → Meta AI asked audience, price, mood and photo before generating (manual check by the maintainer's account; private record) |
 | S5 | Modal open TTS, two English voices, 60 s | acceptable quality, ≤ 60 s render, commercial-use license | ☐ | Needs R1 + R6 |
-| S6 | Voice Transcribe on 20 s answers | key words correct | ☐ | Needs R1 |
-| S7 | Muse Image portrait / 9:16 | ratio kept (text rendered in code) | ☐ | Needs R1 |
+| S6 | Voice Transcribe on 20 s answers | key words correct | ◐ | Live on synthetic speech (8–10 s clips): similarity 0.86; human voice pending |
+| S7 | Muse Image portrait / 9:16 | ratio kept (text rendered in code) | ☑ | Live: requested 1024x1536 → returned 2:3 portrait (0.667) ×3; shorts crop to 9:16 and render text in code. Meta AI consumer app also produced a 1152×2048 (9:16) poster (S4) |
 | S8 | Real cost of one full session | under caps | ☐ | Needs R1 |
 
 ## Screen states
