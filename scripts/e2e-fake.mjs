@@ -282,6 +282,17 @@ await freshWorkspace();
   await call(`/content/${note.id}/retry`, { method: 'POST' });
   const { v: retried } = await until(s => { const n = s.content.find(c => c.id === note.id); return n && (n.status === 'ready' || n.status === 'failed') ? n : null; }, 'note retried', 30);
   check('an interrupted item recovers on retry', retried.status === 'ready');
+  // Practice cut off by a restart (TEST simulation of a new instance): finished steps stay, retry works.
+  const pi = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false, sessionId: sess.id }) });
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'practice_check', ms: 8000 }) });
+  await call(`/practice/${pi.body.id}/attempt`, { method: 'POST', body: JSON.stringify({ text: 'For commuters, 4,000 won, calm.' }) });
+  await until(s => s.practice.find(x => x.id === pi.body.id && x.status === 'checking'), 'practice checking', 20);
+  await call('/test/restart', { method: 'POST' });
+  const cutP = (await state()).practice.find(x => x.id === pi.body.id);
+  await sleep(9000); // the TEST-simulated old call finishes; a real restart would have ended it
+  const again = await call(`/practice/${pi.body.id}/attempt`, { method: 'POST', body: JSON.stringify({ text: 'For commuters, 4,000 won, calm.' }) });
+  const reP = await until(s => s.practice.find(x => x.id === pi.body.id && (x.status === 'done' || x.status === 'failed')), 'practice retried', 30);
+  check('practice cut off by a restart shows a retry and keeps its scenario; the retry completes', cutP?.status === 'failed' && /restarted/.test(cutP?.error ?? '') && Boolean(cutP?.scenario) && again.res.ok && reP.v.status === 'done', `${cutP?.status} → ${reP.v.status}`);
   const pr = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false, sessionId: sess.id }) });
   await call(`/practice/${pr.body.id}/attempt`, { method: 'POST', body: JSON.stringify({ text: 'For students after school, 4,500 won, bright and playful.' }) });
   const prDone = await until(s => s.practice.find(x => x.id === pr.body.id && x.status === 'done'), 'session practice');

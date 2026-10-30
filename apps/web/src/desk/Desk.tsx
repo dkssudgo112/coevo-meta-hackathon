@@ -270,7 +270,7 @@ export function SessionReview({ creds, state, sessionId }: { creds: Creds; state
       <div className="row wrap"><h2 className="grow">{session.task ?? 'Session'}{session.tool ? ` · ${session.tool}` : ''}</h2>{session.fixture && <FixtureTag />}<span className="faint">{session.status}</span></div>
       {moments.length ? <div className="card" style={{ overflowX: 'auto' }}><EvidenceRows creds={creds} state={state} moments={moments} /></div> : <Empty>No moments yet.</Empty>}
       {session.design && <div className="card stack"><div className="eyebrow">What changed</div><p style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem' }}>{session.design.habit}</p><p className="faint">Counterpoint: {session.design.counterpoint}</p></div>}
-      {cards.map(c => <CardControls key={c.id} card={c} creds={creds} />)}
+      {cards.map(c => <CardControls key={c.id} card={c} creds={creds} state={state} onSource={showRow} />)}
       {items.length > 0 && (
         <div className="card">
           <div className="eyebrow">Made from this session</div>

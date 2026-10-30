@@ -82,13 +82,17 @@ export function cardObserved(card: CaddieCard, reading: Reading | null): { ok: b
  * person edits a card: unrecognized wording yields [] and the card is never auto-verified.
  */
 export function asksFromText(text: string): (keyof Ingredients)[] {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().replace(/’/g, "'");
   if (!/\bask\b|\bcheck\b|\bconfirm\b/.test(t)) return [];
+  // Negated or conditional wording ("do not ask me for the price") is not a request to ask:
+  // such rules stay unverified rather than being read backwards.
+  if (/\b(do not|don't|dont|never|without|no need to|stop|not)\b/.test(t)) return [];
   const found: (keyof Ingredients)[] = [];
   if (/who (it|this|the \w+) is for|\baudience\b|for whom|who (it's|its) for/.test(t)) found.push('audience');
   if (/\bprice\b|\bcost\b|\bbudget\b|\bnumbers?\b/.test(t)) found.push('price');
   if (/\bfeeling\b|\bmood\b|\btone\b|\bvibe\b/.test(t)) found.push('mood');
   if (/\bphoto\b|\bpicture\b|\bown (image|material)\b/.test(t)) found.push('realPhoto');
-  if (/what (it|this) is\b|what exactly|\bproduct\b|which (dessert|drink|item)/.test(t)) found.push('productDetail');
+  // "product photo" asks about a photo, not about what the product is.
+  if (/what (it|this) is\b|what exactly|\bproduct\b(?!\s+(photo|picture|image|shot)s?\b)|which (dessert|drink|item)/.test(t)) found.push('productDetail');
   return found;
 }

@@ -58,7 +58,7 @@ export function NoteView({ item, state, onSource }: { item: ContentItem; state: 
   );
 }
 
-export function CardControls({ card, creds, compact }: { card: CaddieCard; creds: Creds; compact?: boolean }) {
+export function CardControls({ card, creds, compact, state, onSource }: { card: CaddieCard; creds: Creds; compact?: boolean; state?: Snapshot; onSource?: (momentId: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(card.text);
   const [err, setErr] = useState('');
@@ -89,13 +89,14 @@ export function CardControls({ card, creds, compact }: { card: CaddieCard; creds
           {(card.status === 'applied' || card.status === 'observed-working') && <button className="btn ghost small" onClick={() => act('revoke')}>Turn off</button>}
         </div>
       )}
+      {state && <Sources ids={card.sourceMomentIds} state={state} onSource={onSource} />}
       {card.history.length > 1 && <p className="faint">{card.history.map(h => `${h.status} ${clock(h.at)}`).join(' → ')}</p>}
       {err && <p className="faint" role="alert">{err}</p>}
     </div>
   );
 }
 
-export function ManualView({ item, state, creds }: { item: ContentItem; state: Snapshot; creds: Creds }) {
+export function ManualView({ item, state, creds, onSource }: { item: ContentItem; state: Snapshot; creds: Creds; onSource?: (momentId: string) => void }) {
   const p = item.payload as ManualPayload | null;
   if (!p) return null;
   const card = state.cards.find(c => c.sessionId === item.sessionId && c.status !== 'rejected');
@@ -111,18 +112,19 @@ export function ManualView({ item, state, creds }: { item: ContentItem; state: S
         <div className="grow"><div className="eyebrow">For your AI</div><ul>{p.forYourAI.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
         <div className="grow"><div className="eyebrow">You decide</div><ul>{p.youDecide.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
       </div>
-      {card && <CardControls card={card} creds={creds} />}
+      {card && <CardControls card={card} creds={creds} state={state} onSource={onSource} />}
     </article>
   );
 }
 
 export function FlashcardsView({ item, creds }: { item: ContentItem; creds: Creds }) {
   const p = item.payload as FlashcardsPayload | null;
+  // All hooks stay above the early return: the item can arrive while this player is open.
   const [i, setI] = useState(0);
   const [shown, setShown] = useState(false);
+  const [err, setErr] = useState('');
   if (!p) return null;
   const c = p.cards[Math.min(i, p.cards.length - 1)];
-  const [err, setErr] = useState('');
   const review = async (result: 'applied' | 'unsure') => {
     setErr('');
     try { await post(creds, `/content/${item.id}/review`, { cardId: c.id, result }); } catch (e) { setErr(errorText(e)); return; }
@@ -231,10 +233,10 @@ export function ShortView({ item, creds, state }: { item: ContentItem; creds: Cr
   );
 }
 
-/** Where a piece of content came from: links back to the moments it was made from. */
-function Sources({ item, state, onSource }: { item: ContentItem; state: Snapshot; onSource?: (momentId: string) => void }) {
-  const ms = item.sourceMomentIds.map(id => state.moments.find(m => m.id === id)).filter((m): m is NonNullable<typeof m> => !!m);
-  if (!item.sourceMomentIds.length) return null;
+/** Where a piece of content or a card came from: links back to the moments it was made from. */
+function Sources({ ids, state, onSource }: { ids: string[]; state: Snapshot; onSource?: (momentId: string) => void }) {
+  const ms = ids.map(id => state.moments.find(m => m.id === id)).filter((m): m is NonNullable<typeof m> => !!m);
+  if (!ids.length) return null;
   if (!ms.length) return <p className="faint">Made from a moment that was since deleted.</p>;
   return (
     <p className="faint">
@@ -253,10 +255,10 @@ export function ContentBody({ item, state, creds, onSource }: { item: ContentIte
       {item.requestedByUser
         ? <p className="faint"><strong>You asked for this one.</strong> The Caddie had skipped it: {item.whyNow}</p>
         : <p className="faint"><strong>Why now:</strong> {item.whyNow}</p>}
-      <Sources item={item} state={state} onSource={onSource} />
+      <Sources ids={item.sourceMomentIds} state={state} onSource={onSource} />
       <StatusLine item={item} creds={creds} />
       {item.format === 'note' && <NoteView item={item} state={state} onSource={onSource} />}
-      {item.format === 'manual' && <ManualView item={item} state={state} creds={creds} />}
+      {item.format === 'manual' && <ManualView item={item} state={state} creds={creds} onSource={onSource} />}
       {item.format === 'flashcards' && <FlashcardsView item={item} creds={creds} />}
       {item.format === 'podcast' && <PodcastView item={item} creds={creds} />}
       {item.format === 'short' && <ShortView item={item} creds={creds} state={state} />}

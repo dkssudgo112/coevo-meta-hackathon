@@ -3,7 +3,7 @@ import type { ContentItem, Moment, Session, SkillDimension, Snapshot } from '../
 import { post, postBinary, api, type Creds } from '../lib/api.ts';
 import type { ConnState } from '../lib/store.ts';
 import { vibrate } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, DataTable, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, modelSourceLine, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, DataTable, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, MediaImage, modelSourceLine, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
 import { PracticeRange } from './Practice.tsx';
@@ -17,7 +17,7 @@ export interface CameraInfo {
 }
 
 /** Content opened from a past session remembers it, so Back returns there (not to the live session). */
-type Sheet = { kind: 'content'; id: string; from?: string } | { kind: 'practice'; id: string | null } | { kind: 'session'; id: string; highlight?: string } | null;
+type Sheet = { kind: 'content'; id: string } | { kind: 'practice'; id: string | null; sessionId: string | null } | { kind: 'session'; id: string; highlight?: string } | null;
 
 function Sheet({ title, onClose, back = 'Back to session', children }: { title: string; onClose: () => void; back?: string; children: ReactNode }) {
   return (
@@ -31,7 +31,13 @@ function Sheet({ title, onClose, back = 'Back to session', children }: { title: 
 }
 
 export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: { creds: Creds; state: Snapshot | null; conn: ConnState; camera?: CameraInfo; embedded?: boolean; onUnpair?: () => void }) {
-  const [sheet, setSheet] = useState<Sheet>(null);
+  // Sheets stack, so Back retraces the path (past session → content → source → back to content).
+  const [stack, setStack] = useState<NonNullable<Sheet>[]>([]);
+  const sheet: Sheet = stack[stack.length - 1] ?? null;
+  const open = (s: NonNullable<Sheet>) => setStack(st => [...st, s]);
+  const back = () => setStack(st => st.slice(0, -1));
+  const replaceTop = (s: NonNullable<Sheet>) => setStack(st => [...st.slice(0, -1), s]);
+  const backLabel = stack.length > 1 ? 'Back' : 'Back to session';
   const [drawer, setDrawer] = useState(false);
   const [pulse, setPulse] = useState(false);
   const [err, setErr] = useState('');
@@ -83,9 +89,9 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
       )}
       <main>
         {(state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}
-        <NowCard creds={creds} state={state} session={session} moments={moments} asking={asking} resolvedBy={resolvedBy} pulse={pulse} onOpen={id => setSheet({ kind: 'content', id })} act={act} />
+        <NowCard creds={creds} state={state} session={session} moments={moments} asking={asking} resolvedBy={resolvedBy} pulse={pulse} onOpen={id => open({ kind: 'content', id })} onPractice={sid => open({ kind: 'practice', id: null, sessionId: sid })} act={act} />
         {err && <p className="faint" role="alert">{err}</p>}
-        <Flow state={state} session={session} moments={moments} onOpen={id => setSheet({ kind: 'content', id })} />
+        <Flow state={state} session={session} moments={moments} onOpen={id => open({ kind: 'content', id })} />
         {session && session.status !== 'ended' && <button className="btn ghost" onClick={() => act(() => post(creds, `/sessions/${session.id}/end`))}>End this session</button>}
       </main>
 
@@ -95,7 +101,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
           <aside className="drawer" aria-label="Menu">
             <div className="row"><h2 className="grow">Caddie</h2><button className="btn small" onClick={() => setDrawer(false)}>Close</button></div>
             <section className="stack">
-              <button className="btn" onClick={() => { setDrawer(false); setSheet({ kind: 'practice', id: null }); }}>Practice Range</button>
+              <button className="btn" onClick={() => { setDrawer(false); setStack([{ kind: 'practice', id: null, sessionId: null }]); }}>Practice Range</button>
               {camera && <button className="btn" onClick={() => { setDrawer(false); camera.onReaim(); }}>Re-aim the camera</button>}
               {camera && <label className="btn">Send one photo<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; if (f) { setDrawer(false); camera.onPhoto(f); } }} /></label>}
             </section>
@@ -104,7 +110,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
             <section className="stack">
               <h3>Past sessions</h3>
               {[...state.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).map(s => (
-                <button key={s.id} className="btn" style={{ justifyContent: 'space-between' }} onClick={() => { setDrawer(false); setSheet({ kind: 'session', id: s.id }); }}>
+                <button key={s.id} className="btn" style={{ justifyContent: 'space-between' }} onClick={() => { setDrawer(false); setStack([{ kind: 'session', id: s.id }]); }}>
                   <span>{s.task ?? 'Session'}{s.fixture ? ' · sample' : ''}</span><span className="faint">{new Date(s.startedAt).toLocaleDateString('en-US')} {clock(s.startedAt)}</span>
                 </button>
               ))}
@@ -119,21 +125,20 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
 
       {sheet?.kind === 'content' && (() => {
         const item = state.content.find(c => c.id === sheet.id);
-        const back = sheet.from ? () => setSheet({ kind: 'session', id: sheet.from! }) : () => setSheet(null);
         return item ? (
-          <Sheet title={FORMAT_NAME[item.format]} onClose={back} back={sheet.from ? 'Back to that session' : 'Back to session'}>
-            <ContentBody item={item} state={state} creds={creds} onSource={m => setSheet({ kind: 'session', id: item.sessionId, highlight: m })} />
+          <Sheet title={FORMAT_NAME[item.format]} onClose={back} back={backLabel}>
+            <ContentBody item={item} state={state} creds={creds} onSource={m => open({ kind: 'session', id: item.sessionId, highlight: m })} />
           </Sheet>
         ) : null;
       })()}
       {sheet?.kind === 'practice' && (
-        <Sheet title="Practice Range" onClose={() => setSheet(null)}>
-          <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={session && session.status !== 'ended' ? session.id : null} onStart={id => setSheet({ kind: 'practice', id })} />
+        <Sheet title="Practice Range" onClose={back} back={backLabel}>
+          <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={sheet.sessionId} onStart={id => replaceTop({ kind: 'practice', id, sessionId: sheet.sessionId })} />
         </Sheet>
       )}
       {sheet?.kind === 'session' && (
-        <Sheet title="Session" onClose={() => setSheet(null)}>
-          <SessionSummary creds={creds} state={state} sessionId={sheet.id} highlight={sheet.highlight} onOpen={id => setSheet({ kind: 'content', id, from: sheet.id })} />
+        <Sheet title="Session" onClose={back} back={backLabel}>
+          <SessionSummary creds={creds} state={state} sessionId={sheet.id} highlight={sheet.highlight} onOpen={id => open({ kind: 'content', id })} onPractice={sid => open({ kind: 'practice', id: null, sessionId: sid })} onSource={m => open({ kind: 'session', id: sheet.id, highlight: m })} />
         </Sheet>
       )}
     </div>
@@ -154,10 +159,10 @@ function TypeInstead({ onSend }: { onSend: (text: string) => Promise<void> }) {
   );
 }
 
-function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, onOpen, act }: { creds: Creds; state: Snapshot; session: Session | null; moments: Moment[]; asking: Moment | null; resolvedBy: Moment | null; pulse: boolean; onOpen: (id: string) => void; act: (fn: () => Promise<unknown>) => Promise<void> }) {
+function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, onOpen, onPractice, act }: { creds: Creds; state: Snapshot; session: Session | null; moments: Moment[]; asking: Moment | null; resolvedBy: Moment | null; pulse: boolean; onOpen: (id: string) => void; onPractice: (sessionId: string) => void; act: (fn: () => Promise<unknown>) => Promise<void> }) {
   const last = moments[moments.length - 1];
 
-  if (session?.status === 'ended') return <WrapCard creds={creds} state={state} session={session} onOpen={onOpen} />;
+  if (session?.status === 'ended') return <WrapCard creds={creds} state={state} session={session} onOpen={onOpen} onPractice={onPractice} />;
 
   const lastChange = [...moments].reverse().find(m => m.change && !m.misread);
   if (lastChange && (!asking || lastChange.index > asking.index) && lastChange === [...moments].reverse().find(m => m.readingStatus === 'ok' && !m.misread)) {
@@ -222,7 +227,7 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
   );
 }
 
-function WrapCard({ creds, state, session, onOpen }: { creds: Creds; state: Snapshot; session: Session; onOpen: (id: string) => void }) {
+function WrapCard({ creds, state, session, onOpen, onPractice }: { creds: Creds; state: Snapshot; session: Session; onOpen: (id: string) => void; onPractice: (sessionId: string) => void }) {
   const items = state.content.filter(c => c.sessionId === session.id).sort(byFormat);
   const note = items.find(c => c.format === 'note' && c.status === 'ready');
   const card = state.cards.find(c => c.sessionId === session.id && c.status === 'proposed');
@@ -233,7 +238,8 @@ function WrapCard({ creds, state, session, onOpen }: { creds: Creds; state: Snap
       {session.wrapStatus === 'failed' && <div className="notice warn" role="alert">The wrap-up couldn’t be planned. <button className="btn small" onClick={() => post(creds, `/sessions/${session.id}/wrap`)}>Retry</button></div>}
       {session.design && <p className="message" style={{ fontSize: '1.2rem' }}>{session.design.habit}</p>}
       {note && <div className="card soft"><NoteView item={note} state={state} /></div>}
-      {card && <CardControls card={card} creds={creds} compact />}
+      {card && <CardControls card={card} creds={creds} compact state={state} />}
+      {session.design && <button className="btn" onClick={() => onPractice(session.id)}>Practice this in the Practice Range</button>}
       {items.length > 0 && (
         <div className="stack" style={{ gap: 6 }}>
           {items.map(i => (
@@ -345,17 +351,29 @@ function Privacy({ creds, state, session }: { creds: Creds; state: Snapshot; ses
   );
 }
 
-function SessionSummary({ creds, state, sessionId, highlight, onOpen }: { creds: Creds; state: Snapshot; sessionId: string; highlight?: string; onOpen: (id: string) => void }) {
+function SessionSummary({ creds, state, sessionId, highlight, onOpen, onPractice, onSource }: { creds: Creds; state: Snapshot; sessionId: string; highlight?: string; onOpen: (id: string) => void; onPractice: (sessionId: string) => void; onSource: (momentId: string) => void }) {
   const s = state.sessions.find(x => x.id === sessionId);
   const mark = useRef<HTMLDivElement>(null);
   useEffect(() => { mark.current?.scrollIntoView({ block: 'center' }); }, [highlight]);
   if (!s) return <Empty>This session was deleted.</Empty>;
   const ms = sessionMoments(state, s.id);
+  const cards = state.cards.filter(c => c.sessionId === s.id);
   return (
     <div className="stack">
       <p className="faint">{s.tool ?? 'Unknown tool'} · {new Date(s.startedAt).toLocaleString('en-US')}{s.fixture ? ' · sample data' : ''}</p>
-      {ms.map(m => <div key={m.id} ref={m.id === highlight ? mark : undefined} className={`flow-item ${m.misread ? 'misread' : ''} ${m.id === highlight ? 'source' : ''}`} aria-current={m.id === highlight ? 'true' : undefined}><time>{clock(m.at)}</time><span>{momentLine(m).text} {m.change && <AssistLabel value={m.change.assistance} />}</span></div>)}
+      {ms.map(m => (
+        <div key={m.id} ref={m.id === highlight ? mark : undefined} className={`flow-item ${m.misread ? 'misread' : ''} ${m.id === highlight ? 'source' : ''}`} aria-current={m.id === highlight ? 'true' : undefined}>
+          <time>{clock(m.at)}</time>
+          <span className="stack" style={{ gap: 6 }}>
+            <span>{momentLine(m).text} {m.change && <AssistLabel value={m.change.assistance} />}</span>
+            {/* The source moment shows its actual frame when one was kept. */}
+            {m.id === highlight && m.frame && (m.frame.storedKey ? <MediaImage creds={creds} k={m.frame.storedKey} alt={`Your screen at ${clock(m.at)}`} /> : <span className="faint">The frame of this moment was deleted.</span>)}
+          </span>
+        </div>
+      ))}
       {state.content.filter(c => c.sessionId === s.id).sort(byFormat).map(c => <button key={c.id} className="btn" onClick={() => onOpen(c.id)}>{FORMAT_NAME[c.format]} · {c.status}</button>)}
+      {cards.map(c => <CardControls key={c.id} card={c} creds={creds} compact state={state} onSource={onSource} />)}
+      {s.design && <button className="btn" onClick={() => onPractice(s.id)}>Practice this in the Practice Range</button>}
       {s.status === 'ended' && s.wrapStatus !== 'planned' && <button className="btn" onClick={() => post(creds, `/sessions/${s.id}/wrap`)}>Wrap up this session</button>}
     </div>
   );

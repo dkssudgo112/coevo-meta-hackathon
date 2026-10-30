@@ -251,6 +251,11 @@ test('requirements are recognized from an edited rule, or left unknown', () => {
   assert.deepEqual(asksFromText('Before drafting, ask me whether I have a real photo.'), ['realPhoto']);
   assert.deepEqual(asksFromText('Verify each quoted claim against the source.'), []);
   assert.deepEqual(asksFromText('Make posters warmer.'), []);
+  // Codex's cases: a negated rule is never read as "ask"; "product photo" is a photo question.
+  assert.deepEqual(asksFromText('Before you make a poster, do not ask me for the price.'), []);
+  assert.deepEqual(asksFromText("Don't ask who it's for; just make it."), []);
+  assert.deepEqual(asksFromText('Before drafting, ask whether a real product photo exists.'), ['realPhoto']);
+  assert.deepEqual(asksFromText('Ask me which product it is and the price.'), ['price', 'productDetail']);
 });
 
 test('podcast reader keeps a usable paid script despite cosmetic overruns, but not a wrong speaker', () => {

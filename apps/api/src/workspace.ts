@@ -5,6 +5,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { CaptureSource, CropRect, FrameRef, Moment, PodcastPayload, ServerEvent, Session, ShortPayload, Snapshot, WorkspaceSummary } from '../../../packages/contracts/index.ts';
 import { CAPS, charge, dayKey, remaining, type BudgetState } from '../../../packages/core/src/budget.ts';
 import { parseWav } from '../../../packages/core/src/wav.ts';
+import { asksFromText } from '../../../packages/core/src/cards.ts';
 import { BudgetExceeded, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
 import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, sessionMoments, type Ctx } from './pipeline.ts';
@@ -113,6 +114,20 @@ export class Workspace extends DurableObject<Env> {
     }
     for (const s of this.store.list('session')) {
       if (s.wrapStatus === 'planning') await this.store.put('session', { ...s, wrapStatus: 'failed' }); // the wrap-up shows Retry
+    }
+    // Practice steps run in memory too: keep what finished (scenario, transcript, check) and offer a retry.
+    const cut = 'Interrupted when the server restarted. Try again.';
+    for (const p of this.store.list('practice')) {
+      if (p.status === 'scenario') await this.store.put('practice', { ...p, status: 'failed', error: cut });
+      else if (p.status === 'transcribing' || p.status === 'checking') await this.store.put('practice', { ...p, status: 'failed', error: cut, imageStatus: p.imageStatus === 'generating' ? 'failed' : p.imageStatus });
+      else if (p.status === 'done' && p.imageStatus === 'generating') await this.store.put('practice', { ...p, imageStatus: 'failed', error: cut });
+    }
+    // Cards made before checked details existed: derive them once from the exact rule text,
+    // recorded in the card's history; wording that is not recognized stays unverified.
+    for (const c of this.store.list('card')) {
+      if (c.asks !== undefined) continue;
+      const asks = asksFromText(c.text);
+      await this.store.put('card', { ...c, asks, history: [...c.history, { status: c.status, at: now(), by: 'caddie', note: asks.length ? `Checked details read from the rule text: ${asks.join(', ')}.` : 'This rule\'s wording cannot be checked automatically.' }] });
     }
   }
 
