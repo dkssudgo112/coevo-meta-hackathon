@@ -176,24 +176,10 @@ button, input, textarea { font: inherit; color: inherit; }
 .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
 .choice { display: grid; gap: 10px; align-content: start; }
 .landing { max-width: 1040px; }
-.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
-@media (max-width: 820px) { .hero { grid-template-columns: 1fr; } }
+.hero { display: grid; gap: 16px; }
 .lead { font-size: 1.12rem; max-width: 560px; }
 .setup-figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
-.setup-svg { width: 100%; max-width: 520px; height: auto; }
-.sd-line { stroke: var(--line); stroke-width: 2; }
-.sd-device { fill: var(--surface); stroke: var(--ink); stroke-width: 2.5; }
-.sd-screen { fill: var(--surface-2); }
-.sd-phone-screen { fill: var(--bg); stroke: var(--line); }
-.sd-bubble { fill: var(--line); }
-.sd-bubble-me { fill: var(--accent-soft); }
-.sd-art { fill: color-mix(in srgb, var(--coached) 30%, var(--surface)); }
-.sd-input { fill: var(--surface); stroke: var(--line); }
-.sd-cone { fill: color-mix(in srgb, var(--accent) 10%, transparent); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 5; }
-.sd-card { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
-.sd-dot { fill: var(--ink); }
-.sd-stand { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
-.sd-label { font: 600 13px var(--sans); fill: var(--ink-2); }
+.setup-figure img { width: 100%; height: auto; border-radius: var(--radius); border: 1px solid var(--line); display: block; }
 .steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
 .step { display: grid; gap: 8px; align-content: start; }
 .step-n { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; }

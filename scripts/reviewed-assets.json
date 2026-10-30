@@ -54,6 +54,12 @@
       "sha256": "0fc009afbf29220cd8643370501dc820d106a73e60df57524f1b656ea6c4c194",
       "review": "Final three-minute demo (161.0 s, 1920x1080 H.264 + AAC, 5,568,362 bytes). Codex reviewed these exact bytes on 2026-10-31: every scene, full decode, no credentials, private account screens, personal data, local paths or raw IDs; each scene tagged with its run; assumed setup and still captures stated.",
       "provenance": "Rendered by scripts/demo/assemble.py from still captures of the deployed phone screen during one live run (controlled camera on reviewed Meta AI screenshots, synthetic voice), the published recorded live run (replay clip, podcast excerpt, short), a screen recording of a stored Practice sample result, and reviewed Meta AI / ChatGPT screenshots of scripted, fictional scenarios."
+    },
+    {
+      "path": "apps/web/public/img/setup-guide.jpg",
+      "sha256": "e9b78bf40cc508207917225acdca788ce35f4c1f93ba0681180473c8d2ff5633",
+      "review": "JPEG (quality 86, no EXIF) of private/demo/shotcraft/assets/coevo-setup-guide.png (sha256 5380675d35d4bdff3350b50d3392e06501c70e4b6dcb596d9a4bb2eba93b7bd8), which Codex reviewed for public use on 2026-10-31: no credentials, accounts or real user data; the QR symbol is decorative and non-functional; English text inspected. Same pixels, re-encoded by Claude for the web.",
+      "provenance": "Instructional illustration generated for this project at the maintainer's request (image generation), not an app screenshot. Labeled as an illustration wherever it appears."
     }
   ]
 }
