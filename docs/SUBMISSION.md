@@ -32,19 +32,19 @@ Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-develope
 
 ## Three-minute storyboard
 
-Composition (maintainer's decision, Oct 31): the phone is **assumed** to stand beside the monitor, as in the earlier Coevo project. The video says so on screen ("Concept setup"), then shows real browser recordings: the deployed phone screen at phone size with a controlled camera (a monitor showing screenshots of actual Meta AI replies) and the recorded live run. Every Caddie line on screen is real model output; the café owner is a scripted, fictional persona and says so; spoken input is a synthetic voice; the follow-up chat is a separate recorded session that began with the card, not an elapsed week. Lines below are quoted from verified runs.
+Composition (maintainer's decision, Oct 31): the phone is **assumed** to stand beside the monitor, as in the earlier Coevo project. The opening card says so. The run scenes are still captures of the deployed app at phone size, taken during one live run with a controlled camera (a monitor showing screenshots of actual Meta AI replies) and a synthetic voice; each is shown beside the Meta AI screen the camera saw at that moment. Every Caddie line on screen is real model output; the café owner is a scripted, fictional persona. A tag on each scene names its run: this run, an earlier recorded live run (replay, podcast, short), a separate Practice sample session, a separate pinned-chat check with an earlier card, and a separate ChatGPT run. The full cut is 2:40.
 
-| Time | Scene | Shows (source) |
+| Time | Scene | What is shown |
 | --- | --- | --- |
-| 0:00–0:12 | Concept setup | Title card: a new implementation built during the hackathon from the earlier Coevo concept; "Concept setup: phone assumed beside the monitor; controlled camera and synthetic voice; real model output." |
-| 0:12–0:40 | Split screen | Three vague requests ("Make it more premium." · "Still not premium enough. Make it more premium."); quiet notes such as "Saw premium revision with poster; holding quiet."; then the question card: "What is your new dessert — flavor, size, what makes it different?" (recorded live run) |
-| 0:40–1:05 | The owner's brief | The specific brief appears in Meta AI; the Caddie: "You added who it's for, a concrete number, a concrete feeling, specific details." labeled *with the Caddie*. (A spoken answer and its transcribed reply exist from another live run.) |
-| 1:05–1:30 | Wrap | "You repeated 'more premium' three times before giving audience, product, price, and mood." Note and My playbook; the proposed card. |
-| 1:30–1:55 | Formats | Flashcard, the 141 s two-voice podcast (guest objection, advice narrowed), the 44 s short with the owner's before and after screens — each with its "why now"; the podcast is marked as made on request. |
-| 1:55–2:15 | Practice Range | The live request "Please design a window poster for our cafe's new honey oat latte for morning commuters." → a typed scripted brief → Muse Image poster → "You supplied audience, price, mood, product detail, and real photo." (sample-labeled; a spoken synthetic-voice attempt exists too, where "six thousand won" was transcribed as "6,001"). |
-| 2:15–2:45 | **Climax** | A separate pinned Meta AI chat that starts with the app's card: "Make a poster for our new drink." Meta AI asks five questions first. Phone: "AI asked first as card says, staying quiet." The card turns *observed working*. |
-| 2:45–2:55 | Cameo | Another tool, another task: four screenshots of actual ChatGPT replies to a scripted, fictional cover letter ("Make it more professional." · "Still too plain. Make it more professional."). The live Caddie stayed quiet twice, then asked: "What is one real project you coordinated that you want in this letter?" |
-| 2:55–3:00 | Close | The four Meta models and their roles; live output on a scripted persona; one-line limitation (the rule works inside one pinned chat). |
+| 0:00–0:08 | Title | A new implementation built during the hackathon from the earlier Coevo concept; "Assumed setup: phone beside the monitor, controlled camera, synthetic voice." |
+| 0:08–0:28 | This run | Phone setup (only the boxed area is sent); "Make it more premium." → quiet, with the reason; the third vague request → "What exactly is your new dessert — flavor and what makes it special?" |
+| 0:28–0:46 | Answer | The synthetic spoken answer plays ("It is matcha Basque cheesecake…"), then: "You named matcha, but the poster still shows berry. Tell AI your price, your real matcha photo, and who it's for." |
+| 0:46–1:03 | Brief and wrap | The full brief, labeled *with the Caddie*, SAM 3.1's price marker; session end: note, playbook, flashcards and a short; no podcast: "No real objection or trade-off was stated." |
+| 1:03–1:48 | Earlier recorded run | The /sample replay (no new model calls); its podcast, made on request (guest objection, advice narrowed); its vertical short. |
+| 1:48–1:59 | Practice Range | "Please design a window poster for our cafe's new honey oat latte for morning commuters." → a typed scripted brief → Muse Image poster → all five ingredients (sample-labeled). |
+| 1:59–2:13 | Pinned-chat check | A separate pinned Meta AI chat that began with an earlier card: Meta AI asks five questions first; the Caddie: "AI asked first as card says, staying quiet." This run's new card stays proposed. |
+| 2:13–2:27 | Cameo | Actual ChatGPT replies to a scripted, fictional cover letter; the Caddie stayed quiet twice, then asked: "What is one real project you coordinated that you want in this letter?" |
+| 2:27–2:40 | Close | The four Meta models and their jobs; live model output with scripted personas; physical camera accuracy not measured. |
 
 ## Draft texts (finalize only with verified numbers)
 

@@ -26,7 +26,7 @@ export function DemoPage() {
         <ul className="stack" style={{ paddingLeft: 20 }}>
           <li><strong>Real model output.</strong> Every Caddie reading, question, note, playbook, flashcard, podcast script, short and practice image comes from the deployed app: Muse Spark 1.3, SAM 3.1, Muse Voice Transcribe and Muse Image; podcast and short voices are Kokoro-82M on Modal.</li>
           <li><strong>Scripted people, actual AI replies.</strong> The café owner and the job applicant are scripted and fictional. The Meta AI and ChatGPT screens are actual replies to those scripts.</li>
-          <li><strong>Assumed setup.</strong> The phone is assumed to stand beside the monitor. The phone screen is a real recording of the app in a phone-sized browser with a controlled camera input and a synthetic voice; no physical phone camera or human voice appears.</li>
+          <li><strong>Assumed setup.</strong> The phone is assumed to stand beside the monitor. The phone screens are captures of the deployed app in a phone-sized browser, taken during a live run with a controlled camera input and a synthetic voice; no physical phone camera or human voice appears. A tag on each scene says which run it comes from.</li>
           <li><strong>The card in Meta AI</strong> was checked in a separate pinned Meta AI chat that began with an earlier card from the app; Meta AI did not carry the rule into other new chats in our check.</li>
         </ul>
       </section>
