@@ -54,6 +54,12 @@ export class Budget extends DurableObject<Env> {
     return true;
   }
 
+  /** Read-only list of tickets (newest last) for cost breakdowns; never changes the ledger. */
+  async tickets(since?: string): Promise<(Ticket & { id: string })[]> {
+    const rows = await this.ctx.storage.list<Ticket>({ prefix: 't:' });
+    return [...rows].map(([k, t]) => ({ ...t, id: k.slice(2) })).filter(t => !since || t.at >= since).sort((a, b) => a.at.localeCompare(b.at));
+  }
+
   async ticket(ticketId: string): Promise<Ticket | null> {
     return (await this.ctx.storage.get<Ticket>(`t:${ticketId}`)) ?? null;
   }

@@ -49,6 +49,11 @@ async function admin(req: Request, env: Env, path: string): Promise<Response> {
     const [meta, modal] = [book('meta'), book('modal')];
     return json({ meta: { ...(await meta.status(ledgerScope(env, 'meta'))), external: await meta.externalLog() }, modal: { ...(await modal.status(ledgerScope(env, 'modal'))), external: await modal.externalLog() } });
   }
+  if (path === '/api/admin/tickets' && req.method === 'GET') {
+    const q = new URL(req.url).searchParams;
+    const kind = q.get('ledger') === 'modal' ? 'modal' : 'meta';
+    return json({ ledger: kind, tickets: await book(kind).tickets(q.get('since') ?? undefined) });
+  }
   if (path === '/api/admin/reserve' && req.method === 'POST') {
     const b2 = (await req.json().catch(() => ({}))) as { usd?: number; label?: string; ledger?: string };
     const kind = b2.ledger === 'modal' ? 'modal' : b2.ledger === 'meta' ? 'meta' : null;
