@@ -277,25 +277,39 @@ export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T
       return { value, costUsd: cost, model: m, latencyMs: Date.now() - started, countMs, calls };
     } catch (e) {
       lastError = e instanceof ShapeError || e instanceof SyntaxError ? new InvalidOutput(`Invalid ${task.name} output: ${(e as Error).message}`) : (e as Error);
+      // Field path and rule only (e.g. "lines[3].text: longer than 500"); never the generated text.
+      const reason = e instanceof ShapeError ? e.message.slice(0, 160) : e instanceof SyntaxError ? 'unparseable JSON' : /^Incomplete output/.test((e as Error).message) ? (e as Error).message.slice(0, 80) : (e as Error).name;
+      console.error(JSON.stringify({ event: 'invalid_output', task: task.name, attempt, reason, outputTokens: raw.usage?.output_tokens ?? null }));
       if (!(lastError instanceof InvalidOutput) || attempt === 1) throw lastError;
     }
   }
   throw lastError ?? new InvalidOutput('Unknown');
 }
 
-/** Generate one image. Returns raw bytes (PNG). */
-export async function generateImage(env: MetaEnv, spend: Spender, prompt: string, size: '1024x1536' | '1024x1024' | '1536x1024', f: Fetch = fetch): Promise<{ bytes: Uint8Array; mime: string; costUsd: number }> {
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/**
+ * Generate one image as JPEG (several times smaller than PNG for photographic scenes,
+ * which keeps media jobs well under the renderer's request limit). Returns the bytes
+ * and the provider's base64, so callers never re-encode.
+ */
+export async function generateImage(env: MetaEnv, spend: Spender, prompt: string, size: '1024x1536' | '1024x1024' | '1536x1024', f: Fetch = fetch): Promise<{ bytes: Uint8Array; b64: string; mime: string; costUsd: number }> {
   const imageModel = models(env).image;
   const ticket = await spend.reserve(IMAGE_USD, 'image');
   try {
     const data = (await post(env, '/images/generations', JSON.stringify({
-      model: imageModel, prompt, n: 1, size, response_format: 'b64_json', output_format: 'png', reasoning_strength: 'low',
+      model: imageModel, prompt, n: 1, size, response_format: 'b64_json', output_format: 'jpeg', reasoning_strength: 'low',
       tool_enablement: { enable_image_search: false, enable_web_search: false, enable_shell: false },
     }), { 'Content-Type': 'application/json' }, f, 120_000)) as { data?: { b64_json?: string }[] };
     const b64 = data.data?.[0]?.b64_json;
     if (!b64) throw new InvalidOutput('Image response had no data.');
     await spend.settle(ticket, IMAGE_USD);
-    return { bytes: Uint8Array.from(atob(b64), c => c.charCodeAt(0)), mime: 'image/png', costUsd: IMAGE_USD };
+    return { bytes: b64ToBytes(b64), b64, mime: 'image/jpeg', costUsd: IMAGE_USD };
   } catch (e) {
     await spend.settle(ticket, unbilled(e) ? 0 : IMAGE_USD);
     throw e;

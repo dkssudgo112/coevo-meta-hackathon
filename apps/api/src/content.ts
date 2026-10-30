@@ -170,23 +170,23 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
         await setItem(ctx, base, { status: 'generating', payload });
         const jobScenes: ShortJobScene[] = [];
         for (const [i, s] of scenes.entries()) {
-          let bytes: Uint8Array | null = null;
+          let b64: string | null = null;
           if (s.evidence) {
             const frame = (s.evidence === 'before' ? before : after)?.frame;
             const obj = frame?.storedKey ? await ctx.r2.get(frame.storedKey) : null;
-            bytes = obj ? new Uint8Array(await obj.arrayBuffer()) : null;
+            b64 = obj ? bytesToDataUrl(new Uint8Array(await obj.arrayBuffer()), 'image/jpeg').split(',')[1] : null;
           } else if (s.imagePrompt) {
             ensureAlive(ctx, base.id);
             const img = await generateImage(ctx.env, ctx.spender, `${s.imagePrompt}. Vertical composition, calm natural light, no text, no letters, no logos.`, '1024x1536');
             ensureAlive(ctx, base.id); // deleted while the image was being made: do not store it
-            const key = `w/${ctx.wsId}/short/${base.id}/${i}.png`;
+            const key = `w/${ctx.wsId}/short/${base.id}/${i}.jpg`;
             await ctx.r2.put(key, img.bytes, { httpMetadata: { contentType: img.mime } });
             // Deleted while the object was being written: remove it so nothing is left behind.
             if (!contentAlive(ctx, base.id)) { await ctx.r2.delete(key); throw new Gone(); }
             scenes[i] = { ...s, imageKey: key };
-            bytes = img.bytes;
+            b64 = img.b64;
           }
-          jobScenes.push({ role: s.role, narration: s.narration, imageB64: bytes ? bytesToDataUrl(bytes, 'image/png').split(',')[1] : null, diagram: s.diagram, label: s.evidence ? (s.evidence === 'before' ? 'Before · your screen' : 'After · your screen') : null });
+          jobScenes.push({ role: s.role, narration: s.narration, imageB64: b64, diagram: s.diagram, label: s.evidence ? (s.evidence === 'before' ? 'Before · your screen' : 'After · your screen') : null });
         }
         await setItem(ctx, base, { payload: { ...payload, scenes } });
         ensureAlive(ctx, base.id);
@@ -325,7 +325,7 @@ export async function practiceAttempt(ctx: Ctx, practiceId: string, wav: Uint8Ar
     ]);
     let imageKey: string | null = null;
     if (image.status === 'fulfilled') {
-      imageKey = `w/${ctx.wsId}/practice/${practiceId}.png`;
+      imageKey = `w/${ctx.wsId}/practice/${practiceId}.jpg`;
       await ctx.r2.put(imageKey, image.value.bytes, { httpMetadata: { contentType: image.value.mime } });
       if (!ctx.store.alive('practice', practiceId)) { await ctx.r2.delete(imageKey); return; }
     }

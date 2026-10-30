@@ -36,14 +36,32 @@ function guard(env: MediaEnv): void {
   if (!mediaConfigured(env)) throw new MediaUnavailable('The media service is not configured.');
 }
 
+/** The renderer's ingress refuses bodies over 12,000,000 bytes; stay clear of it. */
+export const MAX_JOB_BYTES = 11_500_000;
+
 export async function startJob(env: MediaEnv, job: MediaJob, f: typeof fetch = fetch): Promise<string> {
   guard(env);
-  const res = await f(`${env.MODAL_MEDIA_URL}/jobs`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.MODAL_MEDIA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(job),
-    signal: AbortSignal.timeout(30_000),
-  });
+  const body = JSON.stringify(job);
+  // Size, timing and status only; never the job's text or images.
+  const log = (extra: Record<string, unknown>) => console.log(JSON.stringify({ event: 'media_dispatch', kind: job.kind, bytes: body.length, ...extra }));
+  if (body.length > MAX_JOB_BYTES) {
+    log({ ok: false, reason: 'too_large' });
+    throw new MediaUnavailable(`This ${job.kind} is too large to render (${(body.length / 1e6).toFixed(1)} MB). Retry to make it again.`);
+  }
+  const t0 = Date.now();
+  let res: Response;
+  try {
+    res = await f(`${env.MODAL_MEDIA_URL}/jobs`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.MODAL_MEDIA_TOKEN}`, 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (e) {
+    log({ ok: false, ms: Date.now() - t0, error: (e as Error).name });
+    throw e;
+  }
+  log({ ok: res.ok, ms: Date.now() - t0, status: res.status });
   if (!res.ok) throw new MediaUnavailable(`Media service rejected the job (${res.status}).`);
   const data = (await res.json()) as { job_id?: string };
   if (!data.job_id) throw new MediaUnavailable('Media service returned no job id.');

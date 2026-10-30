@@ -154,7 +154,8 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
         <div className="row"><span className="eyebrow grow">Now · {d.step === 'example' ? 'An example' : d.step === 'ingredients' ? 'What’s missing' : 'A question'}</span><span className="faint">{clock(d.decidedAt)}</span></div>
         {d.quote && !(d.message ?? '').toLowerCase().includes(d.quote.toLowerCase()) && <p><span className="faint">You wrote</span> <span className="quote">{d.quote}</span></p>}
         <p className="message">{d.message}</p>
-        {d.missingIngredients.length > 0 && <div className="row wrap">{d.missingIngredients.map(k => <span key={k} className="tag">{INGREDIENT_TEXT[k]}</span>)}</div>}
+        {/* The question step asks one question only; the list of missing details is the next ladder step. */}
+        {d.step !== 'question' && d.missingIngredients.length > 0 && <div className="row wrap">{d.missingIngredients.map(k => <span key={k} className="tag">{INGREDIENT_TEXT[k]}</span>)}</div>}
         {d.exampleBrief && (
           <div className="card soft stack">
             <div className="eyebrow">Example brief · AI-written</div>

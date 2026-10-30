@@ -97,6 +97,14 @@ if (which === 'practice') {
       const img = new Uint8Array(await (await fetch(`${base}/api/w/${w.workspaceId}/media/${x.imageKey}`, { headers: auth })).arrayBuffer());
       const v = new DataView(img.buffer);
       if (img[0] === 0x89) ratio = Number((v.getUint32(16) / v.getUint32(20)).toFixed(3));
+      else if (img[0] === 0xff && img[1] === 0xd8) {
+        // JPEG: walk the markers to the start-of-frame segment for width/height.
+        for (let o = 2; o + 9 < img.length;) {
+          const marker = img[o + 1], len = v.getUint16(o + 2);
+          if (marker >= 0xc0 && marker <= 0xc3) { ratio = Number((v.getUint16(o + 7) / v.getUint16(o + 5)).toFixed(3)); break; }
+          o += 2 + len;
+        }
+      }
     }
     const e = expectAudio.find(y => y.file === f);
     rows.push({ file: f, status: x?.status, ms: Date.now() - t0, transcriptWords: x?.transcript ? x.transcript.split(/\s+/).length : 0, transcriptSimilarity: e && x?.transcript ? Number(sim(x.transcript, e.text).toFixed(2)) : null, imageStatus: x?.imageStatus, imageRatio: ratio, assistance: x?.assistance, error: x?.error ?? null });

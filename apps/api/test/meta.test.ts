@@ -184,6 +184,8 @@ test('image generation returns bytes and bills $0.01', async () => {
   const f = (async () => response({ data: [{ b64_json: btoa('png-bytes') }] })) as unknown as typeof fetch;
   const r = await generateImage(env, l.spender, 'a poster', '1024x1536', f);
   assert.equal(new TextDecoder().decode(r.bytes), 'png-bytes');
+  assert.equal(r.mime, 'image/jpeg');
+  assert.equal(r.b64, btoa('png-bytes'), 'the provider base64 is passed through, never re-encoded');
   assert.ok(Math.abs(l.total() - 0.01) < 1e-9);
 });
 
@@ -302,4 +304,17 @@ test('a transient token-count failure is retried once (counting is unbilled)', a
   const g = (async (url: string) => { if (url.endsWith('/input_tokens')) { bad++; return response({ error: { message: 'bad', type: 'invalid_request_error', code: null } }, 400); } return ok('{}'); }) as unknown as typeof fetch;
   await assert.rejects(runTask(env, ledger().spender, readingTask, { text: 'x' }, g), CostUnverifiable);
   assert.equal(bad, 1, 'a 400 is not retried');
+});
+
+test('media jobs over the renderer limit fail fast with a clear message and are never sent', async () => {
+  const { startJob, MAX_JOB_BYTES } = await import('../src/media.ts');
+  const { MediaUnavailable } = await import('../src/media.ts');
+  let sent = false;
+  const f = (async () => { sent = true; return new Response(JSON.stringify({ job_id: 'x' })); }) as unknown as typeof fetch;
+  const menv = { COEVO_ALLOW_LIVE_CALLS: 'true', MODAL_MEDIA_URL: 'https://media.example', MODAL_MEDIA_TOKEN: 't' } as never;
+  const big = { kind: 'short', title: 't', voice: 'af_heart', scenes: [{ role: 'hook', narration: 'n', imageB64: 'A'.repeat(MAX_JOB_BYTES), diagram: null, label: null }] } as never;
+  await assert.rejects(startJob(menv, big, f), (e: Error) => e instanceof MediaUnavailable && /too large to render/.test(e.message));
+  assert.equal(sent, false);
+  const ok = await startJob(menv, { kind: 'short', title: 't', voice: 'af_heart', scenes: [] } as never, f);
+  assert.equal(ok, 'x');
 });
