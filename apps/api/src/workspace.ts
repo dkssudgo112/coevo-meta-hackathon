@@ -448,6 +448,22 @@ export class Workspace extends DurableObject<Env> {
         console.log(JSON.stringify({ event: 'egress_probe', ...r }));
         return json(r);
       }
+      if (path === '/diag/sam' && method === 'POST' && this.env.COEVO_EGRESS_DIAG === 'true') {
+        // Diagnosis window only: SAM 3.1 on one posted image for at most 4 noun phrases ($0.0025 each,
+        // through the budget authority). Returns boxes and output shape per phrase; nothing is stored.
+        if (Date.now() - this.lastDiagAt < 30_000) return error(429, 'too_fast', 'One probe per 30 seconds.');
+        this.lastDiagAt = Date.now();
+        const phrases = (url.searchParams.get('phrases') ?? '').split(',').map(x => x.trim()).filter(x => /^[a-z ]{2,40}$/.test(x)).slice(0, 4);
+        const bytes = new Uint8Array(await req.arrayBuffer());
+        const size = imageSize(bytes);
+        if (!size || bytes.length > MAX_FRAME_BYTES || !phrases.length) return error(400, 'bad_input', 'One JPEG/PNG and 1–4 lowercase phrases.');
+        const out = [];
+        for (const phrase of phrases) {
+          try { const r = await segmentBoxes(this.env, this.spender(), bytesToDataUrl(bytes, size.mime), phrase); out.push({ phrase, boxes: r.boxes, trace: r.trace }); }
+          catch (e) { out.push({ phrase, error: failureStatus(e).message }); }
+        }
+        return json({ width: size.width, height: size.height, results: out });
+      }
       if (path === '/benchmark' && method === 'GET') return this.benchmarkExport(url.searchParams.get('images') === '1');
       if (path === '/benchmark' && method === 'DELETE') return this.benchmarkDelete();
       if (seg[0] === 'frames' && seg.length === 1 && method === 'POST') return this.frame(req);
