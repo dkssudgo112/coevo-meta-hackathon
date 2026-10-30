@@ -146,6 +146,11 @@ await call(`/practice/${hinted.body.id}/hint`, { method: 'POST' });
 await call(`/practice/${hinted.body.id}/attempt`, { method: 'POST', body: wav(3), headers: { 'Content-Type': 'audio/wav' } });
 const hd = await until(s => s.practice.find(x => x.id === hinted.body.id && x.status === 'done'), 'hinted practice');
 check('practice after viewing the hint is labeled coached', hd.v.assistance === 'coached');
+const long = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false }) });
+const tooLong = await call(`/practice/${long.body.id}/attempt`, { method: 'POST', body: wav(35), headers: { 'Content-Type': 'audio/wav' } });
+await call(`/practice/${long.body.id}/attempt`, { method: 'POST', body: JSON.stringify({ text: 'For office workers near the station, 6,500 won, a calm morning feel.' }) });
+const ty = await until(s => s.practice.find(x => x.id === long.body.id && (x.status === 'done' || x.status === 'failed')), 'typed practice');
+check('practice: a 35 s recording is refused; a typed brief is checked and marked typed', tooLong.res.status === 413 && ty.v.status === 'done' && ty.v.briefSource === 'typed' && ty.v.transcript?.startsWith('For office workers'), `${tooLong.res.status} · ${ty.v.briefSource}`);
 
 const ask = await call(`/content/${podcast.id}/ask?at=12`, { method: 'POST', body: JSON.stringify({ question: 'Why not just say premium?' }) });
 check('podcast Ask returns an answer and records it', ask.res.ok && (await state()).content.find(c => c.id === podcast.id).payload.asks.length === 1);
@@ -175,6 +180,14 @@ const exp = await call('/benchmark?images=1');
 check('benchmark export has readings, timing and images', exp.res.ok && exp.body.frames.length === 2 && exp.body.frames.every(f => f.timing && f.image?.startsWith('data:image/') && f.userRequest) && /TEST MODE/.test(exp.body.label), `p50 ${exp.body.summary?.p50ServerMs} ms`);
 const del2 = await call('/benchmark', { method: 'DELETE' });
 check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 && !(await state()).moments.some(m => m.benchmark));
+
+// The race and recovery checks below run in a fresh workspace, so the main journey's
+// spend does not push them into the per-workspace daily cap.
+{
+  const fresh = await (await fetch(`${base}/api/workspaces`, { method: 'POST' })).json();
+  const paired = await (await fetch(`${base}/api/w/${fresh.workspaceId}/pair`, { method: 'POST', body: JSON.stringify({ pairSecret: fresh.pairSecret }), headers: { 'Content-Type': 'application/json' } })).json();
+  creds = { ws: fresh.workspaceId, token: paired.phoneToken };
+}
 
 // Deletion races: a late model response must never recreate deleted content.
 {
@@ -216,6 +229,31 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   check('no further generations ran after deletion (manual, flashcards, short)', ['manual', 'flashcards', 'short'].every(n => (after.calls[n] ?? 0) === (before.calls[n] ?? 0)));
 }
 
+// Restart during a wrap (TEST hook): cut-off and queued items fail at once and can be retried.
+{
+  await fetch(`${fake}/reset`);
+  const sess = (await call('/sessions', { method: 'POST', body: '{}' })).body;
+  await sleep(2600);
+  for (const seed of [0, 1]) await frame(seed);
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'note', ms: 8000 }) });
+  await call(`/sessions/${sess.id}/end`, { method: 'POST' });
+  await until(s => s.content.some(c => c.sessionId === sess.id && c.format === 'note' && c.status === 'generating'), 'note generating', 30);
+  await call('/test/restart', { method: 'POST' });
+  const after = (await state()).content.filter(c => c.sessionId === sess.id);
+  const note = after.find(c => c.format === 'note');
+  check('after a restart, interrupted items fail at once with a retry', note?.status === 'failed' && /restarted/.test(note?.error ?? '') && !after.some(c => c.status === 'queued'), after.map(c => `${c.format}:${c.status}`).join(', '));
+  await sleep(9000); // let the old (TEST: still alive) call finish before retrying
+  await call(`/content/${note.id}/retry`, { method: 'POST' });
+  const { v: retried } = await until(s => { const n = s.content.find(c => c.id === note.id); return n && (n.status === 'ready' || n.status === 'failed') ? n : null; }, 'note retried', 30);
+  check('an interrupted item recovers on retry', retried.status === 'ready');
+  const pr = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false, sessionId: sess.id }) });
+  await call(`/practice/${pr.body.id}/attempt`, { method: 'POST', body: JSON.stringify({ text: 'For students after school, 4,500 won, bright and playful.' }) });
+  const prDone = await until(s => s.practice.find(x => x.id === pr.body.id && x.status === 'done'), 'session practice');
+  await call(`/sessions/${sess.id}`, { method: 'DELETE' });
+  const gone = await state();
+  const img = prDone.v.imageKey ? await call(`/media/${prDone.v.imageKey}`) : null;
+  check('deleting a session removes its practice attempts, images and skill notes', !gone.practice.some(x => x.id === pr.body.id) && !gone.skills.some(k => k.practiceId === pr.body.id) && (!img || img.res.status === 404));
+}
 // Deletion during a slow object write (TEST hook): nothing stays behind in storage.
 {
   await fetch(`${fake}/reset`);
@@ -249,6 +287,11 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   // An approved card outlives its session and can still be revoked afterwards.
   const { v: card } = await until(s => s.cards.find(c => c.sessionId === sess.id && c.status === 'proposed'), 'card proposed', 30);
   await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'approve' }) });
+  // Approve → edit: the Desk copy and the card's requirements follow the edited rule.
+  await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'edit', text: 'Before drafting, ask me whether I have a real photo.' }) });
+  const ed = await state();
+  const edCard = ed.cards.find(c => c.id === card.id), edCopy = ed.inbox.find(i => i.refId === card.id);
+  check('editing an approved card updates its copy text and requirements', /real photo/.test(edCopy?.text ?? '') && JSON.stringify(edCard?.asks) === '["realPhoto"]', `${edCopy?.text} · asks ${JSON.stringify(edCard?.asks)}`);
   await call(`/sessions/${sess.id}`, { method: 'DELETE' });
   const kept = (await state()).cards.find(c => c.id === card.id);
   await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'revoke' }) });

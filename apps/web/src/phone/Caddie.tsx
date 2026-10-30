@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CropRect } from '../../../../packages/contracts/index.ts';
-import { loadCreds, saveCreds, type Creds } from '../lib/api.ts';
+import { loadCreds, post, saveCreds, type Creds } from '../lib/api.ts';
 import { useWorkspace } from '../lib/store.ts';
-import { cropImageFile, FrameSampler, startRearCamera, stopStream, uploadFrame } from '../lib/capture.ts';
+import { cropImageFile, FrameSampler, startRearCamera, stopStream, uploadFrame, type SentTiming } from '../lib/capture.ts';
 import { errorText, latestSession } from '../ui/common.tsx';
 import { AimScreen, CropEditor, PairScreen } from './Setup.tsx';
 import { LiveScreen } from './Live.tsx';
@@ -38,6 +38,18 @@ export function CaddieApp() {
 
 function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: CropRect | null; onReaim: () => void; onUnpair: () => void }) {
   const { state, conn } = useWorkspace(creds);
+  // Benchmark only: when a sent frame's card arrives, report change→card and upload→card to the server.
+  const pendingTiming = useRef(new Map<string, SentTiming>());
+  useEffect(() => {
+    if (!state || !pendingTiming.current.size) return;
+    for (const [id, t] of [...pendingTiming.current]) {
+      const m = state.moments.find(x => x.id === id);
+      if (!m?.decision) continue;
+      pendingTiming.current.delete(id);
+      const shown = Date.now();
+      post(creds, `/moments/${id}/client-timing`, { changeToCardMs: t.changeAt === null ? null : shown - t.changeAt, uploadToCardMs: shown - t.sentAt }).catch(() => { /* timing is optional */ });
+    }
+  }, [state]);
   const [bench] = useState(benchmarkMode);
   const [benchStopped, setBenchStopped] = useState(false);
   const benchCount = state ? state.moments.filter(m => m.benchmark).length : 0;
@@ -67,7 +79,7 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
       stream = s;
       sampler.current = new FrameSampler(videoRef.current!, creds, crop, 'camera', {
         onVerdict: v => setMessage(v.kind === 'camera-moved' ? 'Camera moved — hold still or re-aim' : v.kind === 'settling' ? 'Screen is changing…' : 'Watching your screen'),
-        onSent: () => setMessage('Sent the boxed screen area'),
+        onSent: (id, t) => { setMessage('Sent the boxed screen area'); if (bench) pendingTiming.current.set(id, t); },
         onError: (m, status) => { if (status === 409) sampler.current?.stop(); if (status !== 429) setMessage(m); },
       });
       sampler.current.benchmark = bench;

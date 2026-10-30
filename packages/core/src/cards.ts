@@ -65,11 +65,30 @@ export function cardObserved(card: CaddieCard, reading: Reading | null): { ok: b
   if (card.status !== 'applied' && card.status !== 'observed-working') return no;
   const tool = toolKey(card.targetTool);
   if (!tool || tool === 'yourai' || tool !== toolKey(reading.tool)) return no;
-  const scopeTask = card.scope.replace(/^Tasks like:\s*/i, '');
-  const cardWords = words(scopeTask);
-  if (cardWords.size && ![...words(reading.task)].some(w => cardWords.has(w))) return no;
+  // The kind of task must be known on both sides and overlap; unknown is not evidence.
+  const cardWords = words(card.scope.replace(/^Tasks like:\s*/i, ''));
+  const readWords = words(reading.task);
+  if (!cardWords.size || !readWords.size || ![...readWords].some(w => cardWords.has(w))) return no;
+  // Every detail the card names must have been asked for. A card without known
+  // requirements (older or edited into an unrecognized rule) stays unverified.
+  const want = card.asks ?? [];
+  if (!want.length) return no;
   const asked = reading.aiAskedFor ?? [];
-  const want = card.asks?.length ? card.asks : null;
-  const hits = want ? asked.filter(k => want.includes(k)) : asked;
-  return hits.length >= Math.min(2, want?.length ?? 2) ? { ok: true, asked: hits } : no;
+  return want.every(k => asked.includes(k)) ? { ok: true, asked: want } : no;
+}
+
+/**
+ * Details a rule text asks the AI to request, recognized from plain wording. Used when the
+ * person edits a card: unrecognized wording yields [] and the card is never auto-verified.
+ */
+export function asksFromText(text: string): (keyof Ingredients)[] {
+  const t = text.toLowerCase();
+  if (!/\bask\b|\bcheck\b|\bconfirm\b/.test(t)) return [];
+  const found: (keyof Ingredients)[] = [];
+  if (/who (it|this|the \w+) is for|\baudience\b|for whom|who (it's|its) for/.test(t)) found.push('audience');
+  if (/\bprice\b|\bcost\b|\bbudget\b|\bnumbers?\b/.test(t)) found.push('price');
+  if (/\bfeeling\b|\bmood\b|\btone\b|\bvibe\b/.test(t)) found.push('mood');
+  if (/\bphoto\b|\bpicture\b|\bown (image|material)\b/.test(t)) found.push('realPhoto');
+  if (/what (it|this) is\b|what exactly|\bproduct\b|which (dessert|drink|item)/.test(t)) found.push('productDetail');
+  return found;
 }

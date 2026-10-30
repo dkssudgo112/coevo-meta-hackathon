@@ -23,9 +23,16 @@ export function canvasJpeg(canvas: HTMLCanvasElement, quality = 0.85): Promise<B
   return new Promise((res, rej) => canvas.toBlob(b => (b ? res(b) : rej(new Error('encode'))), 'image/jpeg', quality));
 }
 
+export interface SentTiming {
+  /** Epoch ms when a change from the last sent frame was first seen (null if unknown). */
+  changeAt: number | null;
+  /** Epoch ms when the upload started. */
+  sentAt: number;
+}
+
 export interface SamplerEvents {
   onVerdict?: (v: ChangeVerdict) => void;
-  onSent?: (momentId: string) => void;
+  onSent?: (momentId: string, timing: SentTiming) => void;
   onError?: (message: string, status?: number) => void;
 }
 
@@ -39,6 +46,7 @@ export class FrameSampler {
   private thumb = document.createElement('canvas');
   private full = document.createElement('canvas');
   private busy = false;
+  private changeAt: number | null = null;
   crop: CropRect;
   private readonly video: HTMLVideoElement;
   private readonly creds: Creds;
@@ -77,13 +85,17 @@ export class FrameSampler {
     const px = g.getImageData(0, 0, this.thumb.width, this.thumb.height).data;
     const verdict = this.detector.sample(toGray(px), performance.now());
     this.events.onVerdict?.(verdict);
+    if (verdict.kind === 'unchanged') this.changeAt = null;
+    else if (verdict.kind !== 'camera-moved' && this.changeAt === null) this.changeAt = Date.now();
     if (verdict.kind !== 'send') return;
     this.busy = true;
+    const timing: SentTiming = { changeAt: this.changeAt, sentAt: Date.now() };
+    this.changeAt = null;
     try {
       drawCrop(this.video, this.crop, this.full, 1280);
       const blob = await canvasJpeg(this.full);
       const id = await uploadFrame(this.creds, blob, this.source, true, this.benchmark);
-      this.events.onSent?.(id);
+      this.events.onSent?.(id, timing);
     } catch (e) {
       const err = e as Error & { status?: number };
       this.events.onError?.(err.message, err.status);

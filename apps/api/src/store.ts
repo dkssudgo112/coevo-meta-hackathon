@@ -66,6 +66,7 @@ export class Store {
       return !(entity === 'card' && this.maps.get('card')!.has(data.id));
     }
     if (entity === 'skill' && typeof data.momentId === 'string' && this.tombs.has(`moment:${data.momentId}`)) return true;
+    if (entity === 'skill' && typeof data.practiceId === 'string' && this.tombs.has(`practice:${data.practiceId}`)) return true;
     return false;
   }
 

@@ -9,7 +9,7 @@ import { designTask, flashcardsTask, manualTask, noteTask, podcastAskTask, podca
 import { isGroundedQuote, speechSeconds } from '../../../packages/core/src/text.ts';
 import { firstDue, nextDue } from '../../../packages/core/src/spaced.ts';
 import { labelPractice, strengthFor } from '../../../packages/core/src/labels.ts';
-import { applyHint } from '../../../packages/core/src/cards.ts';
+import { applyHint, asksFromText } from '../../../packages/core/src/cards.ts';
 import { generateImage, modelProvenance, runTask, transcribe } from './meta.ts';
 import { MediaUnavailable, startJob, type ShortJobScene } from './media.ts';
 import { failureStatus, sessionMoments, type Ctx } from './pipeline.ts';
@@ -122,7 +122,7 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
   if (!item) return;
   const session = ctx.store.get('session', item.sessionId);
   if (!session?.design) return;
-  const base = await setItem(ctx, item, { status: 'generating', error: null, attempts: item.attempts + 1 });
+  const base = await setItem(ctx, item, { status: 'generating', error: null, attempts: item.attempts + 1, runner: ctx.runner });
   await ctx.watchdog?.();
   const text = `Learning design:\n${JSON.stringify(session.design)}\n\nEvidence:\n${evidenceText(ctx, session)}`;
   const srcs = sources(ctx, session);
@@ -248,12 +248,22 @@ export async function cardAction(ctx: Ctx, cardId: string, action: CardAction, t
   if (action === 'edit') {
     const t = (text ?? '').trim();
     if (t.length < 8 || t.length > 300) return { error: 'invalid_text' };
-    next = { ...card, text: t, provenance: 'user', history: [...card.history, { status: card.status, at, by: 'user', note: 'Edited the rule text.' }] };
+    // The edited rule decides what counts as "working": requirements come from its own words
+    // (none recognized → never auto-verified), and the copy text follows the edit.
+    const asks = asksFromText(t);
+    next = { ...card, text: t, asks, provenance: 'user', history: [...card.history, { status: card.status, at, by: 'user', note: asks.length ? 'Edited the rule text.' : 'Edited the rule text; the Caddie cannot check this rule automatically.' }] };
   } else {
     const status = ({ approve: 'approved', reject: 'rejected', revoke: 'revoked', applied: 'applied' } as const)[action];
     next = { ...card, status, history: [...card.history, { status, at, by: 'user', note: null }] };
   }
   await ctx.store.put('card', next);
+  if (action === 'edit') {
+    const copy = ctx.store.list('inbox').find(i => i.refId === next.id && i.kind === 'caddie-card');
+    if (copy) {
+      const hint = applyHint(next.targetTool, next.text);
+      await ctx.store.put('inbox', { ...copy, text: hint.text, applyHint: hint.how, at, copiedAt: null });
+    }
+  }
   if (action === 'approve') {
     const hint = applyHint(next.targetTool, next.text);
     await ctx.store.put('inbox', { id: id('in'), kind: 'caddie-card', text: hint.text, applyHint: hint.how, refId: next.id, at, copiedAt: null });
@@ -311,25 +321,46 @@ export async function startPractice(ctx: Ctx, autoOpened: boolean, sessionId: st
   }
 }
 
-export async function practiceAttempt(ctx: Ctx, practiceId: string, wav: Uint8Array): Promise<void> {
+/** Draw the practice poster from the person's own brief and store it; null when drawing failed. */
+async function practiceImage(ctx: Ctx, practiceId: string, brief: string): Promise<string | null> {
+  const img = await generateImage(ctx.env, ctx.spender, `A promotional poster. The owner's brief, in their own words: "${brief}". Render no small text.`, '1024x1536');
+  const key = `w/${ctx.wsId}/practice/${practiceId}.jpg`;
+  await ctx.r2.put(key, img.bytes, { httpMetadata: { contentType: img.mime } });
+  if (!ctx.store.alive('practice', practiceId)) { await ctx.r2.delete(key); throw new Gone(); }
+  return key;
+}
+
+/** Redraw only the image of a finished attempt; the brief, check and label stay as they are. */
+export async function practiceRetryImage(ctx: Ctx, practiceId: string): Promise<void> {
+  const p = ctx.store.get('practice', practiceId);
+  if (!p || p.status !== 'done' || p.imageStatus !== 'failed' || !p.transcript) return;
+  await ctx.store.put('practice', { ...p, imageStatus: 'generating', error: null });
+  try {
+    const key = await practiceImage(ctx, practiceId, p.transcript);
+    await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, imageKey: key, imageStatus: 'ready' });
+  } catch (e) {
+    if (e instanceof Gone || !ctx.store.alive('practice', practiceId)) return;
+    await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, imageStatus: 'failed', error: failureStatus(e).message });
+  }
+}
+
+export async function practiceAttempt(ctx: Ctx, practiceId: string, input: { wav: Uint8Array } | { text: string }): Promise<void> {
   let p = ctx.store.get('practice', practiceId);
   if (!p || (p.status !== 'open' && p.status !== 'failed') || !p.scenario) return;
-  p = await ctx.store.put('practice', { ...p, status: 'transcribing', error: null });
+  const briefSource = 'text' in input ? 'typed' : 'spoken';
+  p = await ctx.store.put('practice', { ...p, status: 'text' in input ? 'checking' : 'transcribing', error: null, briefSource });
   try {
-    const { transcript } = await transcribe(ctx.env, ctx.spender, wav);
-    if (!transcript) throw new Error('No speech was detected. Try again closer to the microphone.');
+    const transcript = 'text' in input ? input.text.trim() : (await transcribe(ctx.env, ctx.spender, input.wav)).transcript;
+    if (!transcript) throw new Error('No speech was detected. Try again closer to the microphone, or type the brief.');
+    if (!ctx.store.alive('practice', practiceId)) return;
     p = await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, transcript, status: 'checking', imageStatus: 'generating' });
     const examples = ctx.store.list('moment').map(m => m.decision?.exampleBrief).filter((x): x is string => !!x);
     const [check, image] = await Promise.allSettled([
-      runTask(ctx.env, ctx.spender, practiceCheckTask, { text: `Practice request: ${p.scenario}\nSpoken brief: "${transcript}"` }),
-      generateImage(ctx.env, ctx.spender, `A promotional poster. The owner's brief, in their own words: "${transcript}". Render no small text.`, '1024x1536'),
+      runTask(ctx.env, ctx.spender, practiceCheckTask, { text: `Practice request: ${p.scenario}\n${briefSource === 'typed' ? 'Typed' : 'Spoken'} brief: "${transcript}"` }),
+      practiceImage(ctx, practiceId, transcript),
     ]);
-    let imageKey: string | null = null;
-    if (image.status === 'fulfilled') {
-      imageKey = `w/${ctx.wsId}/practice/${practiceId}.jpg`;
-      await ctx.r2.put(imageKey, image.value.bytes, { httpMetadata: { contentType: image.value.mime } });
-      if (!ctx.store.alive('practice', practiceId)) { await ctx.r2.delete(imageKey); return; }
-    }
+    if (!ctx.store.alive('practice', practiceId)) return;
+    const imageKey = image.status === 'fulfilled' ? image.value : null;
     if (check.status === 'rejected') throw check.reason;
     const assistance = labelPractice({ autoOpened: p.autoOpened, hintViewed: p.hintViewed, transcript }, examples);
     p = await ctx.store.put('practice', {
@@ -338,8 +369,10 @@ export async function practiceAttempt(ctx: Ctx, practiceId: string, wav: Uint8Ar
     });
     await ctx.store.put('skill', { id: id('sk'), dimension: 'description', assistance, strength: strengthFor(assistance, { practice: true }), momentId: null, practiceId, note: check.value.value.note, at: now(), fixture: modelProvenance(ctx.env) === 'fixture' });
   } catch (e) {
+    if (e instanceof Gone || !ctx.store.alive('practice', practiceId)) return;
     const msg = e instanceof Error && e.name === 'Error' ? e.message : failureStatus(e).message;
-    await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, status: 'failed', error: msg, imageStatus: ctx.store.get('practice', practiceId)!.imageStatus === 'generating' ? 'failed' : ctx.store.get('practice', practiceId)!.imageStatus });
+    const cur = ctx.store.get('practice', practiceId)!;
+    await ctx.store.put('practice', { ...cur, status: 'failed', error: msg, imageStatus: cur.imageStatus === 'generating' ? 'failed' : cur.imageStatus });
   }
 }
 

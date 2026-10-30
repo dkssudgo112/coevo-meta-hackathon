@@ -26,6 +26,8 @@ export interface Ctx {
   trackJob: (contentId: string, jobId: string) => Promise<void>;
   /** Make sure the stuck-generation watchdog runs soon after an item could stall. */
   watchdog?: () => Promise<void>;
+  /** Id of this server instance; stored on items it is generating. */
+  runner?: string;
 }
 
 export function failureStatus(e: unknown): { status: Moment['readingStatus']; message: string } {

@@ -23,23 +23,25 @@ function momentTime(state: Snapshot, momentId: string | null): string | null {
 
 export function StatusLine({ item, creds }: { item: ContentItem; creds: Creds }) {
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
   if (item.status === 'generating' || item.status === 'queued') return <p className="faint" role="status">{item.status === 'queued' ? 'Queued' : 'Making it now…'}</p>;
   if (item.status === 'failed' || item.status === 'skipped') {
     return (
       <div className={item.status === 'failed' ? 'notice warn' : 'notice'} role={item.status === 'failed' ? 'alert' : undefined}>
         <div className="row wrap">
           <span className="grow">{item.status === 'failed' ? item.error : `Not made: ${item.whyNow}`}</span>
-          <button className="btn small" disabled={busy} onClick={async () => { setBusy(true); try { await post(creds, `/content/${item.id}/retry`); } finally { setBusy(false); } }}>
+          <button className="btn small" disabled={busy} onClick={async () => { setBusy(true); setErr(''); try { await post(creds, `/content/${item.id}/retry`); } catch (e) { setErr(errorText(e)); } finally { setBusy(false); } }}>
             {item.status === 'failed' ? 'Retry' : 'Make it anyway'}
           </button>
         </div>
+        {err && <p className="faint" role="alert">{err}</p>}
       </div>
     );
   }
   return null;
 }
 
-export function NoteView({ item, state }: { item: ContentItem; state: Snapshot }) {
+export function NoteView({ item, state, onSource }: { item: ContentItem; state: Snapshot; onSource?: (momentId: string) => void }) {
   const p = item.payload as NotePayload | null;
   if (!p) return null;
   return (
@@ -47,7 +49,9 @@ export function NoteView({ item, state }: { item: ContentItem; state: Snapshot }
       <h3>{p.title}</h3>
       <p style={{ whiteSpace: 'pre-wrap' }}>{p.body}</p>
       {p.quotes.map((q, i) => (
-        <p key={i}><span className="quote">{q.text}</span> {momentTime(state, q.momentId) && <span className="faint">· seen at {momentTime(state, q.momentId)}</span>}</p>
+        <p key={i}><span className="quote">{q.text}</span> {momentTime(state, q.momentId) && (onSource && q.momentId
+          ? <button className="linklike" onClick={() => onSource(q.momentId!)}>· seen at {momentTime(state, q.momentId)}</button>
+          : <span className="faint">· seen at {momentTime(state, q.momentId)}</span>)}</p>
       ))}
       {p.remaining.length > 0 && (<div><div className="eyebrow">Still open</div><ul>{p.remaining.map((r, i) => <li key={i}>{r}</li>)}</ul></div>)}
     </article>
@@ -118,8 +122,10 @@ export function FlashcardsView({ item, creds }: { item: ContentItem; creds: Cred
   const [shown, setShown] = useState(false);
   if (!p) return null;
   const c = p.cards[Math.min(i, p.cards.length - 1)];
+  const [err, setErr] = useState('');
   const review = async (result: 'applied' | 'unsure') => {
-    await post(creds, `/content/${item.id}/review`, { cardId: c.id, result });
+    setErr('');
+    try { await post(creds, `/content/${item.id}/review`, { cardId: c.id, result }); } catch (e) { setErr(errorText(e)); return; }
     setShown(false);
     setI(x => (x + 1) % p.cards.length);
   };
@@ -132,6 +138,7 @@ export function FlashcardsView({ item, creds }: { item: ContentItem; creds: Cred
         {shown ? <p className="muted" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>{c.answer}</p> : <button className="btn" onClick={() => setShown(true)}>Show the answer</button>}
       </div>
       {shown && <div className="row"><button className="btn primary grow" onClick={() => review('applied')}>I’d do this</button><button className="btn grow" onClick={() => review('unsure')}>Not sure yet</button></div>}
+      {err && <p className="faint" role="alert">{err}</p>}
       <p className="faint">“I’d do this” brings the card back in 1, 3, 7, then 14 days. “Not sure yet” brings it back in 10 minutes. Self-ratings are not counted as evidence.</p>
     </article>
   );
@@ -139,7 +146,8 @@ export function FlashcardsView({ item, creds }: { item: ContentItem; creds: Cred
 
 export function PodcastView({ item, creds }: { item: ContentItem; creds: Creds }) {
   const p = item.payload as PodcastPayload | null;
-  const { url } = useMedia(creds, p?.audioKey);
+  const media = useMedia(creds, p?.audioKey);
+  const url = media.url;
   const audio = useRef<HTMLAudioElement>(null);
   const [t, setT] = useState(0);
   const [asking, setAsking] = useState<{ wasPlaying: boolean; at: number } | null>(null);
@@ -166,7 +174,10 @@ export function PodcastView({ item, creds }: { item: ContentItem; creds: Creds }
     <article className="stack">
       <h3>{p.title}</h3>
       <p className="faint">Caddie and {p.speakers.guest} · {p.durationSec ? `${Math.round(p.durationSec)} s` : `${p.words} words`}</p>
-      {url ? <audio ref={audio} controls src={url} onTimeUpdate={e => setT(e.currentTarget.currentTime)} style={{ width: '100%' }} /> : item.status === 'ready' ? null : <div className="notice">Audio isn’t ready. The full transcript is below.</div>}
+      {url ? <audio ref={audio} controls src={url} onTimeUpdate={e => setT(e.currentTarget.currentTime)} style={{ width: '100%' }} />
+        : media.state === 'gone' ? <div className="notice warn row wrap" role="alert"><span className="grow">The audio could not be loaded. The full transcript is below.</span><button className="btn small" onClick={media.reload}>Try again</button></div>
+        : media.state === 'loading' ? <p className="faint" role="status">Loading the audio…</p>
+        : <div className="notice">Audio isn’t ready. The full transcript is below.</div>}
       {asking ? (
         <div className="card stack">
           <div className="eyebrow">Ask about this part</div>
@@ -195,7 +206,8 @@ export function PodcastView({ item, creds }: { item: ContentItem; creds: Creds }
 
 export function ShortView({ item, creds, state }: { item: ContentItem; creds: Creds; state: Snapshot }) {
   const p = item.payload as ShortPayload | null;
-  const { url } = useMedia(creds, p?.videoKey);
+  const media = useMedia(creds, p?.videoKey);
+  const url = media.url;
   const video = useRef<HTMLVideoElement>(null);
   useEffect(() => { video.current?.load(); }, [url]);
   if (!p) return null;
@@ -207,7 +219,8 @@ export function ShortView({ item, creds, state }: { item: ContentItem; creds: Cr
           <video ref={video} src={url} playsInline controls onClick={e => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())} />
         </div>
       ) : (
-        <div className="notice">{item.status === 'generating' ? 'Rendering the video…' : 'The video isn’t available. Here is the storyboard.'}</div>
+        media.state === 'gone' ? <div className="notice warn row wrap" role="alert"><span className="grow">The video could not be loaded. Here is the storyboard.</span><button className="btn small" onClick={media.reload}>Try again</button></div>
+          : <div className="notice">{item.status === 'generating' ? 'Rendering the video…' : media.state === 'loading' ? 'Loading the video…' : 'The video isn’t available. Here is the storyboard.'}</div>
       )}
       <ol className="stack" style={{ paddingLeft: 20, gap: 6 }}>
         {p.scenes.map((s, i) => (
@@ -218,12 +231,31 @@ export function ShortView({ item, creds, state }: { item: ContentItem; creds: Cr
   );
 }
 
-export function ContentBody({ item, state, creds }: { item: ContentItem; state: Snapshot; creds: Creds }) {
+/** Where a piece of content came from: links back to the moments it was made from. */
+function Sources({ item, state, onSource }: { item: ContentItem; state: Snapshot; onSource?: (momentId: string) => void }) {
+  const ms = item.sourceMomentIds.map(id => state.moments.find(m => m.id === id)).filter((m): m is NonNullable<typeof m> => !!m);
+  if (!item.sourceMomentIds.length) return null;
+  if (!ms.length) return <p className="faint">Made from a moment that was since deleted.</p>;
+  return (
+    <p className="faint">
+      <strong>Made from:</strong>{' '}
+      {ms.map(m => {
+        const label = `${clock(m.at)}${m.reading?.userRequest ? ` · “${m.reading.userRequest.slice(0, 60)}${m.reading.userRequest.length > 60 ? '…' : ''}”` : ''}`;
+        return onSource ? <button key={m.id} className="linklike" onClick={() => onSource(m.id)}>{label}</button> : <span key={m.id}>{label}</span>;
+      })}
+    </p>
+  );
+}
+
+export function ContentBody({ item, state, creds, onSource }: { item: ContentItem; state: Snapshot; creds: Creds; onSource?: (momentId: string) => void }) {
   return (
     <div className="stack">
-      <p className="faint"><strong>Why now:</strong> {item.whyNow}</p>
+      {item.requestedByUser
+        ? <p className="faint"><strong>You asked for this one.</strong> The Caddie had skipped it: {item.whyNow}</p>
+        : <p className="faint"><strong>Why now:</strong> {item.whyNow}</p>}
+      <Sources item={item} state={state} onSource={onSource} />
       <StatusLine item={item} creds={creds} />
-      {item.format === 'note' && <NoteView item={item} state={state} />}
+      {item.format === 'note' && <NoteView item={item} state={state} onSource={onSource} />}
       {item.format === 'manual' && <ManualView item={item} state={state} creds={creds} />}
       {item.format === 'flashcards' && <FlashcardsView item={item} creds={creds} />}
       {item.format === 'podcast' && <PodcastView item={item} creds={creds} />}

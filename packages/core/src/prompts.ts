@@ -29,7 +29,7 @@ function clip(s: string, max: number): string {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), max / 2)).trimEnd()}…`;
 }
 
-const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote, at most 15 words at a time (use … to skip words). Prefer what they typed to the AI over voice transcripts: transcripts can contain recognition errors and repeated words, so never quote those parts. Never mention clock times; refer to a moment by what happened in it.`;
+const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote, at most 15 words at a time (use … to skip words). Prefer what they typed to the AI over voice transcripts: transcripts can contain recognition errors and repeated words, so never quote those parts. Never mention clock times; refer to a moment by what happened in it. Keep events in the order they happened, and never say the person disliked, rejected or did not want a result unless they said so.`;
 
 const ingredientsSchema = S.obj({
   audience: S.bool('Says who it is for: a specific customer group, reader, hiring team or audience.'),
@@ -63,6 +63,7 @@ Report only what is visible. Never guess text you cannot read. If the conversati
 - userTyping: true only if there is unsent text in the input box.
 - aiAskedClarifyingQuestion: true only if the AI's most recent turn asks the person questions before producing the result.
 - aiAskedFor: when it asked, which details its questions ask for (audience = who it is for; price = a price or number; mood = a feeling or tone; realPhoto = whether the person has a real photo or own material; productDetail = what exactly it is). Empty when it did not ask.
+- aiResponseSummary: one sentence on what the AI did; name any concrete detail it added that the latest request did not give (e.g. opening hours, a slogan).
 - vagueTerms: style words in the latest request that carry no concrete instruction, lowercased (e.g. "premium", "luxurious", "better", "modern", "cute").
 - ingredients: judge only the latest user request.`,
   schema: S.obj({
@@ -169,7 +170,7 @@ Decide for each of the five formats whether it earns its place now, with a one-l
 - flashcards: idle moments on the phone; worth it when a concept was coached rather than done independently.
 - podcast: prep or commute time; worth it when there is a real objection or trade-off to argue.
 - short: reviewing or sharing; worth it when there is a visible before/after.
-If nothing meaningful changed, set make=false for all and say why. ${STYLE}`,
+If nothing meaningful changed, set make=false for all and say why. When the AI's output shows details the person never supplied (for example opening hours or a slogan), add each to remainingConditions as a fact to check. ${STYLE}`,
   schema: S.obj({
     habit: S.str('The habit that changed or needs to change, one sentence.', 200),
     turningPoint: S.obj({ quote: S.str('The person\'s exact words at the turning point.', 200), momentId: S.nstr('Moment id of that quote.', 40) }),
@@ -277,7 +278,8 @@ export const flashcardsTask: ModelTask<Omit<Flashcard, 'id' | 'dueAt' | 'interva
 export const podcastTask: ModelTask<{ title: string; guest: string; lines: Omit<PodcastLine, 'start' | 'end'>[] }> = {
   name: 'podcast',
   effort: 'medium',
-  maxOutputTokens: 3000,
+  // Medium reasoning shares this budget: a 5,700-token cap was observed to cut a 2–3 minute script short.
+  maxOutputTokens: 5000,
   instructions: `Write a two-person podcast script (8–18 lines, 300–480 words in total, about 2–3 minutes spoken; never under 60 seconds). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). The caddie speaks in the first person about its own questions ("when I asked …"). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
   schema: S.obj({
     title: S.str('Episode title.', 80),

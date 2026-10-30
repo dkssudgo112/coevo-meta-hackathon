@@ -7,7 +7,7 @@ import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
 import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
-import { applyHint, cardObserved } from '../src/cards.ts';
+import { applyHint, asksFromText, cardObserved } from '../src/cards.ts';
 import { decisionTask, readingTask, shortTask, podcastTask, manualTask, turnTask } from '../src/prompts.ts';
 import type { CaddieCard, Moment, Reading } from '../../contracts/index.ts';
 
@@ -236,8 +236,21 @@ test('a card counts as working only when applied, for the same tool and task, an
   assert.equal(cardObserved(card(), asked({ aiAskedFor: ['realPhoto'] })).ok, false, 'unrelated questions');
   assert.equal(cardObserved(card(), asked({ aiAskedClarifyingQuestion: false, aiAskedFor: [] })).ok, false, 'the AI did not ask');
   assert.equal(cardObserved(card({ targetTool: 'your AI' }), asked()).ok, false, 'unknown target tool');
-  assert.equal(cardObserved(card({ asks: undefined }), asked({ aiAskedFor: ['audience', 'price'] })).ok, true, 'older card without asks: two asked details');
   assert.equal(cardObserved(card({ status: 'observed-working' }), asked()).ok, true);
+  // Codex's reproduced false positives:
+  const five = card({ asks: ['audience', 'productDetail', 'price', 'mood', 'realPhoto'] });
+  assert.equal(cardObserved(five, asked({ aiAskedFor: ['audience', 'price'] })).ok, false, 'partial: only 2 of the 5 named details');
+  assert.equal(cardObserved(five, asked({ aiAskedFor: ['audience', 'productDetail', 'price', 'mood', 'realPhoto'] })).ok, true, 'all five asked');
+  assert.equal(cardObserved(card({ asks: undefined, text: 'Verify each quoted claim against the source.' }), asked({ aiAskedFor: ['audience', 'price'] })).ok, false, 'legacy card with unknown requirements');
+  assert.equal(cardObserved(card({ scope: 'This kind of task' }), asked({ task: null })).ok, false, 'unknown task on both sides');
+  assert.equal(cardObserved(card(), asked({ task: null })).ok, false, 'unknown task on the screen');
+});
+
+test('requirements are recognized from an edited rule, or left unknown', () => {
+  assert.deepEqual(asksFromText('Before you make a poster, ask me who it is for, what it is, the price, one feeling, and whether a real photo exists.'), ['audience', 'price', 'mood', 'realPhoto', 'productDetail']);
+  assert.deepEqual(asksFromText('Before drafting, ask me whether I have a real photo.'), ['realPhoto']);
+  assert.deepEqual(asksFromText('Verify each quoted claim against the source.'), []);
+  assert.deepEqual(asksFromText('Make posters warmer.'), []);
 });
 
 test('podcast reader keeps a usable paid script despite cosmetic overruns, but not a wrong speaker', () => {

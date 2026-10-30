@@ -4,10 +4,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { CaptureSource, CropRect, FrameRef, Moment, PodcastPayload, ServerEvent, Session, ShortPayload, Snapshot, WorkspaceSummary } from '../../../packages/contracts/index.ts';
 import { CAPS, charge, dayKey, remaining, type BudgetState } from '../../../packages/core/src/budget.ts';
+import { parseWav } from '../../../packages/core/src/wav.ts';
 import { BudgetExceeded, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
 import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, sessionMoments, type Ctx } from './pipeline.ts';
-import { cardAction, generate, podcastAsk, practiceAttempt, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
+import { cardAction, generate, podcastAsk, practiceAttempt, practiceRetryImage, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
 import { Store } from './store.ts';
 import type { LedgerScope } from './budget-do.ts';
 import type { Env } from './env.ts';
@@ -38,6 +39,8 @@ export function ledgerScope(env: Env, kind: 'meta' | 'modal' = 'meta'): LedgerSc
 }
 
 const IDLE_END_MS = 10 * 60_000;
+/** The Practice Range drill is a 30-second spoken brief (approved plan). */
+const PRACTICE_MAX_SECONDS = 30;
 const STUCK_MS = 6 * 60_000;
 const JOB_TIMEOUT_MS = 12 * 60_000;
 const MIN_FRAME_GAP_MS = 2500;
@@ -60,10 +63,35 @@ export class Workspace extends DurableObject<Env> {
 
   // ------------------------------------------------------------ infra
 
+  /** This instance. Work started by another (pre-restart) instance cannot still be running here. */
+  private runner = crypto.randomUUID();
+  private recovered = false;
+
   private async loadMeta(): Promise<Meta | null> {
     if (!this.meta) this.meta = (await this.ctx.storage.get<Meta>('meta')) ?? null;
     await this.store.load();
+    if (this.meta && !this.recovered) { this.recovered = true; await this.recoverInterrupted(); }
     return this.meta;
+  }
+
+  /**
+   * After a restart (e.g. a code update), items left "generating" by the previous instance
+   * with no tracked media job were cut off mid-step: say so at once so they can be retried.
+   */
+  private async recoverInterrupted(): Promise<void> {
+    const jobs = (await this.ctx.storage.get<Job[]>('jobs')) ?? [];
+    const lost = 'Generation was interrupted when the server restarted. Retry to make it again.';
+    for (const c of this.store.list('content')) {
+      if (jobs.some(j => j.contentId === c.id)) continue; // a tracked media job is still polled
+      // Queued items belong to a wrap chain that no longer exists after a restart.
+      if (c.status === 'queued') { await this.store.put('content', { ...c, status: 'failed', error: lost, updatedAt: now() }); continue; }
+      if (c.status !== 'generating' || c.runner === this.runner) continue;
+      if (!c.runner && Date.now() - Date.parse(c.updatedAt) < STUCK_MS) continue; // older items: leave to the watchdog
+      await this.store.put('content', { ...c, status: 'failed', error: lost, updatedAt: now() });
+    }
+    for (const s of this.store.list('session')) {
+      if (s.wrapStatus === 'planning') await this.store.put('session', { ...s, wrapStatus: 'failed' }); // the wrap-up shows Retry
+    }
   }
 
   private async saveMeta(): Promise<void> {
@@ -174,6 +202,7 @@ export class Workspace extends DurableObject<Env> {
         await this.schedule(5_000);
       },
       watchdog: () => this.schedule(STUCK_MS + 5_000),
+      runner: this.runner,
     };
   }
 
@@ -318,6 +347,12 @@ export class Workspace extends DurableObject<Env> {
         }
         return json({ keys: this.testR2.keys });
       }
+      if (seg[0] === 'test' && seg[1] === 'restart' && method === 'POST' && fakeMeta(this.env)) {
+        // TEST ONLY: behave like a freshly started instance (the old in-memory work is treated as lost).
+        this.runner = crypto.randomUUID();
+        await this.recoverInterrupted();
+        return json({ ok: true });
+      }
 
       if (seg[0] === 'sessions') {
         if (seg.length === 1 && method === 'POST') return json(await this.startSession(req));
@@ -342,6 +377,15 @@ export class Workspace extends DurableObject<Env> {
       if (seg[0] === 'frames' && seg[1] && method === 'DELETE') return this.deleteFrame(seg[1]);
 
       if (seg[0] === 'moments' && seg[2] === 'respond' && method === 'POST') return this.respond(req, seg[1]);
+      if (seg[0] === 'moments' && seg[2] === 'client-timing' && method === 'POST') {
+        // Benchmark frames only: the phone's own change→card and upload→card times.
+        const m = this.store.get('moment', seg[1]);
+        if (!m?.benchmark || !m.timing) return error(404, 'not_found', 'Unknown benchmark moment.');
+        const b = (await req.json().catch(() => ({}))) as { changeToCardMs?: unknown; uploadToCardMs?: unknown };
+        const ok = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 600_000;
+        if (!ok(b.uploadToCardMs) || (b.changeToCardMs !== null && !ok(b.changeToCardMs))) return error(400, 'bad_timing', 'Timing values must be milliseconds.');
+        return json(await this.store.put('moment', { ...m, timing: { ...m.timing, client: { changeToCardMs: b.changeToCardMs as number | null, uploadToCardMs: b.uploadToCardMs as number } } }));
+      }
 
       if (seg[0] === 'cards' && seg[2] === 'action' && method === 'POST') {
         const body = (await req.json()) as { action: CardAction; text?: string };
@@ -363,6 +407,7 @@ export class Workspace extends DurableObject<Env> {
         if (!item) return error(404, 'not_found', 'Unknown content.');
         if (seg[2] === 'retry' && method === 'POST') {
           if (item.status !== 'failed' && item.status !== 'skipped') return error(409, 'not_retryable', 'Only failed or skipped items can be made again.');
+          if (item.status === 'skipped') await this.store.put('content', { ...item, requestedByUser: true, updatedAt: now() });
           this.enqueue(() => generate(ctx, item.id));
           return json({ ok: true });
         }
@@ -384,11 +429,22 @@ export class Workspace extends DurableObject<Env> {
         if (!p) return error(404, 'not_found', 'Unknown practice.');
         if (seg[2] === 'hint' && method === 'POST') return json(await this.store.put('practice', { ...p, hintViewed: true }));
         if (seg[2] === 'attempt' && method === 'POST') {
+          if ((req.headers.get('content-type') ?? '').startsWith('application/json')) {
+            // Typed fallback when speaking is not possible; recorded as typed.
+            const b = (await req.json().catch(() => ({}))) as { text?: unknown };
+            const text = typeof b.text === 'string' ? b.text.trim() : '';
+            if (text.length < 3 || text.length > 600) return error(400, 'bad_text', 'Type a brief of up to 600 characters.');
+            this.enqueue(() => practiceAttempt(ctx, p.id, { text }));
+            return json({ ok: true });
+          }
           const wav = new Uint8Array(await req.arrayBuffer());
-          if (wav.length > MAX_AUDIO_BYTES) return error(413, 'too_large', 'Keep the brief under two minutes.');
-          this.enqueue(() => practiceAttempt(ctx, p.id, wav));
+          if (wav.length > MAX_AUDIO_BYTES) return error(413, 'too_large', 'Keep the brief under 30 seconds.');
+          const info = parseWav(wav);
+          if (info && info.seconds > PRACTICE_MAX_SECONDS + 1) return error(413, 'too_long', 'Keep the brief under 30 seconds.');
+          this.enqueue(() => practiceAttempt(ctx, p.id, { wav }));
           return json({ ok: true });
         }
+        if (seg[2] === 'image' && method === 'POST') { this.enqueue(() => practiceRetryImage(ctx, p.id)); return json({ ok: true }); }
       }
       return error(404, 'not_found', 'Unknown route.');
     } catch (e) {
@@ -488,6 +544,11 @@ export class Workspace extends DurableObject<Env> {
     }
     for (const c of this.store.list('content').filter(c => c.sessionId === s.id)) await this.store.remove('content', c.id);
     for (const c of this.store.list('card').filter(c => c.sessionId === s.id && c.status === 'proposed')) await this.store.remove('card', c.id);
+    for (const pr of this.store.list('practice').filter(x => x.sessionId === s.id)) {
+      if (pr.imageKey) keys.push(pr.imageKey);
+      for (const sk of this.store.list('skill').filter(k => k.practiceId === pr.id)) await this.store.remove('skill', sk.id);
+      await this.store.remove('practice', pr.id);
+    }
     for (const sk of this.store.list('skill')) if (sk.momentId && !this.store.get('moment', sk.momentId)) await this.store.remove('skill', sk.id);
     const listed = await this.bucket().list({ prefix: `w/${this.meta!.id}/` });
     for (const o of listed.objects) if (o.key.includes(`/short/`) || o.key.includes('/media/')) {

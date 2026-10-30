@@ -16,13 +16,14 @@ export interface CameraInfo {
   onPhoto: (file: File) => void;
 }
 
-type Sheet = { kind: 'content'; id: string } | { kind: 'practice'; id: string | null } | { kind: 'session'; id: string } | null;
+/** Content opened from a past session remembers it, so Back returns there (not to the live session). */
+type Sheet = { kind: 'content'; id: string; from?: string } | { kind: 'practice'; id: string | null } | { kind: 'session'; id: string; highlight?: string } | null;
 
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Sheet({ title, onClose, back = 'Back to session', children }: { title: string; onClose: () => void; back?: string; children: ReactNode }) {
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
-        <header><h2 className="grow">{title}</h2><button className="btn small" onClick={onClose}>Back to session</button></header>
+        <header><h2 className="grow">{title}</h2><button className="btn small" onClick={onClose}>{back}</button></header>
         {children}
       </div>
     </div>
@@ -39,14 +40,19 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
   const asking = useMemo(() => [...moments].reverse().find(m => m.decision?.action === 'intervene' && !m.misread) ?? null, [moments]);
   // Acting on the question in the work itself (new ingredients observed) also answers it.
   const resolvedBy = useMemo(() => (asking ? moments.find(m => m.index > asking.index && m.change && !m.misread) ?? null : null), [moments, asking]);
-  const seenAsk = useRef<string | null>(null);
+  // undefined until the first snapshot arrives: whatever is already there is history and never buzzes;
+  // every question that arrives after that buzzes, including the first one of a quiet session.
+  const seenAsk = useRef<string | null | undefined>(undefined);
+  const hydrated = state !== null;
 
   useEffect(() => {
+    if (!hydrated) return;
+    if (seenAsk.current === undefined) { seenAsk.current = asking?.id ?? null; return; }
     if (asking && !asking.response && seenAsk.current !== asking.id) {
-      if (seenAsk.current !== null) { vibrate([60, 40, 60]); setPulse(true); setTimeout(() => setPulse(false), 1900); }
+      vibrate([60, 40, 60]); setPulse(true); setTimeout(() => setPulse(false), 1900);
       seenAsk.current = asking.id;
     }
-  }, [asking?.id]);
+  }, [hydrated, asking?.id]);
 
   if (!state) return <div className="phone"><main><p className="faint" role="status">{conn === 'unauthorized' ? 'This phone is no longer paired.' : 'Connecting to your Desk…'}</p>{conn === 'unauthorized' && onUnpair && <button className="btn" onClick={onUnpair}>Pair again</button>}</main></div>;
 
@@ -113,16 +119,21 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
 
       {sheet?.kind === 'content' && (() => {
         const item = state.content.find(c => c.id === sheet.id);
-        return item ? <Sheet title={FORMAT_NAME[item.format]} onClose={() => setSheet(null)}><ContentBody item={item} state={state} creds={creds} /></Sheet> : null;
+        const back = sheet.from ? () => setSheet({ kind: 'session', id: sheet.from! }) : () => setSheet(null);
+        return item ? (
+          <Sheet title={FORMAT_NAME[item.format]} onClose={back} back={sheet.from ? 'Back to that session' : 'Back to session'}>
+            <ContentBody item={item} state={state} creds={creds} onSource={m => setSheet({ kind: 'session', id: item.sessionId, highlight: m })} />
+          </Sheet>
+        ) : null;
       })()}
       {sheet?.kind === 'practice' && (
         <Sheet title="Practice Range" onClose={() => setSheet(null)}>
-          <PracticeRange creds={creds} state={state} attemptId={sheet.id} onStart={id => setSheet({ kind: 'practice', id })} />
+          <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={session && session.status !== 'ended' ? session.id : null} onStart={id => setSheet({ kind: 'practice', id })} />
         </Sheet>
       )}
       {sheet?.kind === 'session' && (
         <Sheet title="Session" onClose={() => setSheet(null)}>
-          <SessionSummary creds={creds} state={state} sessionId={sheet.id} onOpen={id => setSheet({ kind: 'content', id })} />
+          <SessionSummary creds={creds} state={state} sessionId={sheet.id} highlight={sheet.highlight} onOpen={id => setSheet({ kind: 'content', id, from: sheet.id })} />
         </Sheet>
       )}
     </div>
@@ -244,7 +255,7 @@ function Flow({ state, session, moments, onOpen }: { state: Snapshot; session: S
     const future = Date.parse(c.arriveAt) > Date.now();
     items.push({ at: c.status === 'ready' && !future ? c.updatedAt : c.arriveAt, key: c.id, node: <ContentRow item={c} future={future} onOpen={onOpen} /> });
   }
-  for (const p of state.practice.filter(x => x.status === 'done' && (x.sessionId === session.id || !x.sessionId))) {
+  for (const p of state.practice.filter(x => x.status === 'done' && x.sessionId === session.id)) {
     items.push({ at: p.startedAt, key: p.id, node: <div className="flow-item"><time>{clock(p.startedAt)}</time><span>Practice: {p.checkNote} {p.assistance && <AssistLabel value={p.assistance} extra="practice" />}</span></div> });
   }
   items.sort((a, b) => b.at.localeCompare(a.at));
@@ -261,7 +272,7 @@ function ContentRow({ item, future, onOpen }: { item: ContentItem; future: boole
     <div className="flow-item">
       <time dateTime={item.arriveAt}>{clock(future ? item.arriveAt : item.updatedAt)}</time>
       <div className="row wrap">
-        <span className="grow">{future ? 'Coming up' : FORMAT_NAME[item.format]}{future ? `: ${FORMAT_NAME[item.format]}` : item.status === 'ready' ? ' ready' : item.status === 'failed' ? ' failed' : ' in progress'} <span className="faint">— {item.whyNow}</span></span>
+        <span className="grow">{future ? 'Coming up' : FORMAT_NAME[item.format]}{future ? `: ${FORMAT_NAME[item.format]}` : item.status === 'ready' ? ' ready' : item.status === 'failed' ? ' failed' : ' in progress'} <span className="faint">— {item.requestedByUser ? 'you asked for it' : item.whyNow}</span></span>
         <button className="btn small" onClick={() => onOpen(item.id)}>{future ? 'Open now' : 'Open'}</button>
       </div>
     </div>
@@ -318,14 +329,16 @@ function Privacy({ creds, state, session }: { creds: Creds; state: Snapshot; ses
   );
 }
 
-function SessionSummary({ creds, state, sessionId, onOpen }: { creds: Creds; state: Snapshot; sessionId: string; onOpen: (id: string) => void }) {
+function SessionSummary({ creds, state, sessionId, highlight, onOpen }: { creds: Creds; state: Snapshot; sessionId: string; highlight?: string; onOpen: (id: string) => void }) {
   const s = state.sessions.find(x => x.id === sessionId);
+  const mark = useRef<HTMLDivElement>(null);
+  useEffect(() => { mark.current?.scrollIntoView({ block: 'center' }); }, [highlight]);
   if (!s) return <Empty>This session was deleted.</Empty>;
   const ms = sessionMoments(state, s.id);
   return (
     <div className="stack">
       <p className="faint">{s.tool ?? 'Unknown tool'} · {new Date(s.startedAt).toLocaleString('en-US')}{s.fixture ? ' · sample data' : ''}</p>
-      {ms.map(m => <div key={m.id} className={`flow-item ${m.misread ? 'misread' : ''}`}><time>{clock(m.at)}</time><span>{momentLine(m).text} {m.change && <AssistLabel value={m.change.assistance} />}</span></div>)}
+      {ms.map(m => <div key={m.id} ref={m.id === highlight ? mark : undefined} className={`flow-item ${m.misread ? 'misread' : ''} ${m.id === highlight ? 'source' : ''}`} aria-current={m.id === highlight ? 'true' : undefined}><time>{clock(m.at)}</time><span>{momentLine(m).text} {m.change && <AssistLabel value={m.change.assistance} />}</span></div>)}
       {state.content.filter(c => c.sessionId === s.id).sort(byFormat).map(c => <button key={c.id} className="btn" onClick={() => onOpen(c.id)}>{FORMAT_NAME[c.format]} · {c.status}</button>)}
       {s.status === 'ended' && s.wrapStatus !== 'planned' && <button className="btn" onClick={() => post(creds, `/sessions/${s.id}/wrap`)}>Wrap up this session</button>}
     </div>

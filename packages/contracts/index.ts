@@ -152,6 +152,8 @@ export interface MomentTiming {
   /** Upload accepted → decision stored. */
   totalMs: number;
   calls: number;
+  /** Benchmark only, measured on the phone: screen change first detected → card shown, and upload → card shown. */
+  client?: { changeToCardMs: number | null; uploadToCardMs: number };
 }
 
 export interface ObservedChange {
@@ -288,6 +290,10 @@ export interface ContentItem {
   attempts: number;
   provenance: Provenance;
   updatedAt: string;
+  /** Which server instance is generating it; a restarted instance knows the work was lost. */
+  runner?: string;
+  /** The Caddie skipped this format and the person asked for it anyway; whyNow keeps the Caddie's reason. */
+  requestedByUser?: boolean;
 }
 
 // ---------- Practice Range ----------
@@ -304,6 +310,8 @@ export interface PracticeAttempt {
   /** The user looked at a hint/explanation before answering. */
   hintViewed: boolean;
   transcript: string | null;
+  /** How the brief was given: spoken (the drill) or typed (fallback when speaking is not possible). */
+  briefSource?: 'spoken' | 'typed';
   imageKey: string | null;
   imageStatus: 'none' | 'generating' | 'ready' | 'failed';
   ingredients: Ingredients | null;
