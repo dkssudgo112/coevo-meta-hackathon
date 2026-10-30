@@ -59,21 +59,6 @@ COEVO_ALLOW_MODAL_COMPUTE=true uv run modal run --profile coevo-hackathon --env 
 
 No GPU is configured in this example. Promotional credit claims, a successful token check, and actual available compute are separate states.
 
-## Muse Code
-
-Follow the [official quickstart](https://dev.meta.ai/docs/quickstart) and [authentication guide](https://dev.meta.ai/docs/muse-code/auth). The project launcher expects the standard installation at `~/.local/bin/muse`.
-
-```bash
-npm run muse -- --version
-npm run muse -- --help
-# Only start a live session after checking credits and billing:
-COEVO_ALLOW_LIVE_CALLS=true npm run muse
-```
-
-The launcher maps `.dev.vars`'s `MODEL_API_KEY` to `META_API_KEY` only in the Muse child process. It does not put the key into command arguments or global shell configuration. Live sessions are disabled by default.
-
-A Muse Code subscription is not a prerequisite for using this repository. Validate actual session, hook, and export formats before implementing the input adapter. Authentication alone is not proof of successful inference.
-
 ## Media service (Modal)
 
 `infra/modal/media.py` runs Kokoro-82M text-to-speech (Apache-2.0) and ffmpeg on CPU. It has no warm containers. Deploy only after checking credits:
@@ -101,15 +86,13 @@ node scripts/integration.mjs https://<your-worker>.workers.dev
 
 ## Deployment and other services
 
-Workers currently runs locally. `wrangler deploy --dry-run` builds without deploying. A deployable service still needs a deliberate account setup, persistence design, access controls, and reviewed public artifacts.
+The app is deployed as one Cloudflare Worker with Durable Objects (new workspaces in the US jurisdiction), private R2 and static assets; deploy with `npm run build && npm run check:dist && npx wrangler deploy`.
 
-| Service | Purpose | Next integration step |
-| --- | --- | --- |
-| Meta Model API | Coaching, content, and synthesis | Bounded real-model checks and feature implementation |
-| Modal | Open models and code checks | Validate required endpoints or sandboxes and costs |
-| Muse Code | Session-event input | Implement and test the adapter |
-| Modal (Kokoro TTS + ffmpeg) | Podcast and short-form speech and video | Deploy after credit check |
-| Cloudflare | Worker, Durable Objects, R2, static assets | Enable R2, deploy intentionally |
-| GitHub | Public submission source | Review every commit and dependency license |
+| Service | Purpose |
+| --- | --- |
+| Meta Model API | Reading, decisions, learning design, the five formats, Practice Range (live calls only through the deployed budget) |
+| Modal (Kokoro TTS + ffmpeg) | Podcast and short-form speech and video (separate budget) |
+| Cloudflare | Worker, Durable Objects, R2, static assets |
+| GitHub | Public submission source; every commit and dependency license reviewed |
 
 Use credentials created for this project. Do not reuse employer credentials or unrelated projects' credentials.

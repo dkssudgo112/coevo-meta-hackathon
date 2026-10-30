@@ -185,3 +185,5 @@ button, input, textarea { font: inherit; color: inherit; }
 .data-table table { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 8px; }
 .data-table th, .data-table td { text-align: left; vertical-align: top; padding: 6px 4px; border-top: 1px solid var(--line); }
 .data-table th { color: var(--muted); font-weight: 600; }
+
+.demo-video { width: 100%; max-width: 960px; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius); display: block; }

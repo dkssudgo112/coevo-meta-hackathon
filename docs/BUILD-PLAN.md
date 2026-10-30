@@ -31,7 +31,7 @@ All areas reach each level together. Every evening the full demo runs end to end
 | Meta Model API credit/billing confirmed | Every live reading, decision and content item; S1–S3, S6–S8 |
 | Modal credit for the media service | Podcast audio and short video (S5) |
 | Cloudflare R2 enabled | Evidence frames and media storage in the deployed app |
-| A real phone and monitor | Camera legibility (S1, S2), haptics, real latency |
+| A real phone and monitor | Not required: the maintainer chose an assumed setup (phone beside the monitor) verified in a phone-sized browser; physical camera accuracy (S1, S2), haptics and phone latency are not measured |
 | The maintainer's Meta AI account | S4: image generation (passed) and the card's effect in a dedicated pinned chat (passed; cross-chat Memory failed) |
 
 ## Rule

@@ -4,7 +4,9 @@
 
 Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer / Build for Your World). The product concept continues the author's earlier Coevo work; all code in this repository was written during the event.
 
-> **Status:** deployed at https://coevo-caddie.coevo-meta-hackathon.workers.dev with real Meta model calls behind an application-enforced budget (US$2.50 lifetime ceiling inside an approved US$3 total). Real-screen readings, interventions, Practice Range, Modal speech/video and the Caddie card working inside one pinned Meta AI chat have run live; the real-phone camera benchmark and a real human voice are still open. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). What the Caddie says is never pre-written: its readings, decisions and content are live model output, and when a model call is off, refused or fails, the app says so instead of inventing output. The sample's screens are a scripted, fictional scenario, and the test build labels its fake model.
+> **Status:** deployed at https://coevo-caddie.coevo-meta-hackathon.workers.dev with real Meta model calls behind an application-enforced budget (US$2.50 lifetime ceiling inside an approved US$3 total). Real-screen readings, interventions, Practice Range, Modal speech/video and the Caddie card working inside one pinned Meta AI chat have run live. As in the earlier Coevo project, the phone is *assumed* to stand beside the monitor: the phone screen is verified in a phone-sized browser with a controlled camera and a synthetic voice; accuracy on a physical phone camera and a human voice were not measured. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). What the Caddie says is never pre-written: its readings, decisions and content are live model output, and when a model call is off, refused or fails, the app says so instead of inventing output. The sample's screens are a scripted, fictional scenario, and the test build labels its fake model.
+
+**Demo (three minutes):** https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo · **No phone? Replay a sample session:** https://coevo-caddie.coevo-meta-hackathon.workers.dev/sample
 
 ## The idea in one scene
 
@@ -25,7 +27,7 @@ They answer out loud — office workers near the station, 6,500 won, a calm morn
 **Meta models in the product**
 
 - **Muse Spark 1.3** — reads each camera frame into a structured moment, decides whether to intervene (and why it stays quiet), plans one shared learning design per session, and writes the five formats.
-- **SAM 3.1** — finds the monitor in the one disclosed setup photo so the phone can crop on-device from then on, and points at the poster's title, photo or price on a kept frame ("The price isn't visible."). The pointers were checked live once on a real Meta AI screenshot; finding the monitor on real phone photos (S2) is still to be measured.
+- **SAM 3.1** — finds the monitor in the one disclosed setup photo so the phone can crop on-device from then on, and points at the poster's title, photo or price on a kept frame ("The price isn't visible."). The pointers were checked live on a real Meta AI screenshot; finding the monitor on physical phone photos was not measured.
 - **Muse Voice Transcribe** — your spoken answers and practice briefs.
 - **Muse Image** — Practice Range renders your spoken brief, and scenes for the short.
 

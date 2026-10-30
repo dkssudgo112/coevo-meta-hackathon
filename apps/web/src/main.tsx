@@ -4,6 +4,7 @@ import { Landing } from './Landing.tsx';
 import { CaddieApp } from './phone/Caddie.tsx';
 import { DeskApp } from './desk/Desk.tsx';
 import { SampleApp } from './desk/Sample.tsx';
+import { DemoPage } from './Demo.tsx';
 import './style.css';
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
   if (path === '/caddie' || path === '/c') return <CaddieApp />;
   if (path === '/desk') return <DeskApp />;
   if (path === '/sample') return <SampleApp />;
+  if (path === '/demo') return <DemoPage />;
   return <Landing />;
 }
 

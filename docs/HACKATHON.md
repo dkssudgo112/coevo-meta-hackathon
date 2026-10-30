@@ -8,7 +8,7 @@ Event notes recorded during setup on October 30, 2026. Recheck the [official par
 - Project: Coevo.
 - Track and theme: Indie Developer / Build for Your World.
 - Meaningfully use Meta Model API or Meta open-weight models in the result.
-- Muse Code is a planned input adapter; the choice of development editor is separate from that product integration.
+- The Caddie reads the screen, so it needs no integration with any AI tool. Muse Code is not part of the product.
 
 ## Submission requirements
 

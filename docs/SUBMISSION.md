@@ -13,11 +13,11 @@ Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-develope
 | 5 | Most Viral X post (optional) | Optional |
 | 6 | Project description | Draft below; includes the live app URL (the form has no separate field) |
 | 7 | Public GitHub repository | https://github.com/dkssudgo112/coevo-meta-hackathon (check while signed out) |
-| 8 | 3-minute demo video | Public video URL (check while signed out) |
+| 8 | 3-minute demo video | https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo (the app's own watch page; the official guide allows any public link; check playback while signed out and the exact published bytes) |
 | 9 | Use of Meta products | Draft below |
 | 10 | Why Meta's models matter | Draft below |
 | 11 | Partner technology feedback | Draft below |
-| 12–13 | Likelihood and opinion surveys | The maintainer's own answers |
+| 12–13 | Likelihood and opinion surveys | The maintainer's own answers (recorded privately) |
 | 14 | Consent checkbox | The maintainer decides at final submission |
 | 15 | Submit | The maintainer only |
 
@@ -61,6 +61,10 @@ People stuck with an AI tool often repeat vague requests like "make it more prem
 
 Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
 
+What is real: every Caddie line and every generated note, playbook, flashcard, podcast, short and practice image is live output of Meta's models through the deployed app. The café owner and job applicant are scripted, fictional personas; the AI screens are actual replies to those scripts. As in our earlier Coevo work, the phone is assumed to stand beside the monitor: the phone screen is verified in a phone-sized browser with a controlled camera and a synthetic voice, so physical camera accuracy and a human voice were not measured.
+
+Demo: https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo
+
 Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone, or /sample with no phone. The sample replays a labeled recorded live run on screenshots of actual Meta AI replies to a scripted, fictional café scenario — the Caddie's real output, five formats, podcast and short — with no new model calls; "Run it live" makes fresh calls. Model spend is capped by the app.
 
 **9 · Use of Meta products**
@@ -82,8 +86,8 @@ Seeing the screen is what makes the Caddie work with every AI tool without integ
 Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition for the podcast and the short. Meta's API has no text-to-speech. We used explicit CPU and memory limits, one container, no warm pool, a memory snapshot and async spawn/poll from the Worker; a 61.6-second two-voice episode rendered in 58 seconds end to end. One gotcha worth documenting: `from __future__ import annotations` in the web endpoint module made FastAPI treat the injected request as a query parameter (HTTP 422) until it was removed.
 
 **Verified results so far (never estimate; see docs/VERIFICATION.md):**
-- Reading actual Meta AI screens: latest request word-set match 1.0 and tool 1.0 on screen captures. **S1 on 20 real phone-camera frames: pending (R3).**
-- Latency: combined read-and-decide turn, median 5.9 s at the client / 4.9 s on the server on a screen capture (3 runs); 6–9 s per turn in full sessions. **S3 on the phone (screen change → card): pending.**
+- Reading actual Meta AI screens: latest request word-set match 1.0 and tool 1.0 on screen captures. Physical phone-camera accuracy (S1) not measured: the phone is an assumed setup.
+- Latency: combined read-and-decide turn, median 5.9 s at the client / 4.9 s on the server on a screen capture (3 runs); 6–9 s per turn in full sessions. Phone screen-change-to-card time (S3) not measured (assumed setup); in the browser a camera frame took about 10 s on the server.
 - S5: a 61.6 s two-voice episode rendered in 58 s end to end (one bounded run); product podcasts 93–141 s; shorts 38.9–44.3 s at 1080×1920.
 - S8: one full session (5 screens, a spoken answer, five formats including 3 images) cost $0.163 in Meta usage plus a $0.08 media reservation.
 - The card in Meta AI: sent as the first message of a pinned chat, it made Meta AI ask for audience, product, price and mood first; memory across new chats did not carry the rule.

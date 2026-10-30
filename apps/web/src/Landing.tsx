@@ -27,7 +27,7 @@ export function Landing() {
       <div className="stack">
         <h1>A caddie on the phone beside your screen.</h1>
         <p className="muted" style={{ fontSize: '1.1rem', maxWidth: 640 }}>It watches how you work with any AI — ChatGPT, Gemini, Meta AI, Claude — steps in only when it matters, and helps both you and your AI get better.</p>
-        <p><a href="/sample">No phone? Watch a sample session →</a></p>
+        <p className="row wrap" style={{ gap: 16 }}><a href="/demo">Watch the three-minute demo →</a><a href="/sample">No phone? Replay a sample session →</a></p>
       </div>
       <div className="choices">
         {[desk, caddie]}
