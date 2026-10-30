@@ -3,7 +3,7 @@
 // This script never calls Meta directly and never reads a model key.
 //
 //   node scripts/spike.mjs <baseUrl> s1 <frames-dir> <expect.json>   # S1 reading accuracy + S3 latency
-//   node scripts/spike.mjs <baseUrl> s2 <photos-dir>                 # S2 screen boxes via /calibrate
+//   node scripts/spike.mjs <baseUrl> s2 <s2-prepared.json>           # S2 monitor detection via /calibrate (see docs/S2-PROTOCOL.md)
 //   node scripts/spike.mjs <baseUrl> practice <wav-dir> [n]          # S6 transcription + S7 portrait image + G2–G4
 //
 // Writes sanitized metrics (no generated text, no images) to private/checks/. Inputs stay private.
@@ -70,14 +70,37 @@ if (which === 's1') {
 }
 
 if (which === 's2') {
+  // Input comes from scripts/s2/prepare.html: 20 distinct phone photos, each with a person-drawn
+  // screen box made BEFORE this run. Scored here against that truth; images are never written out.
+  const prep = JSON.parse(readFileSync(dir, 'utf8'));
+  if (prep.kind !== 'coevo-s2-prepared') throw new Error('Not an s2-prepared.json file.');
+  const photos = prep.photos ?? [];
+  const hashes = new Set(photos.map(p => p.sha256Original));
+  if (photos.length !== 20 || hashes.size !== 20 || photos.some(p => !p.truth || !p.image?.startsWith('data:image/jpeg'))) throw new Error('S2 needs 20 distinct photos, each with a truth box (prepare them first).');
+  const iou = (a, b) => { const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); const i = ix * iy; return i / (a.w * a.h + b.w * b.h - i); };
+  const covered = (box, truth) => { const ix = Math.max(0, Math.min(box.x + box.w, truth.x + truth.w) - Math.max(box.x, truth.x)), iy = Math.max(0, Math.min(box.y + box.h, truth.y + truth.h) - Math.max(box.y, truth.y)); return (ix * iy) / (truth.w * truth.h); };
   const rows = [];
-  for (const f of files(dir, /\.(jpe?g|png)$/i)) {
+  for (const p of photos) {
+    const bytes = Buffer.from(p.image.slice(p.image.indexOf(',') + 1), 'base64');
     const t0 = Date.now();
-    const r = await call('/calibrate', { method: 'POST', body: readFileSync(path.join(dir, f)), headers: { 'Content-Type': mime(f) } });
-    rows.push({ file: f, found: r.body?.found ?? 0, crop: r.body?.crop ?? null, confidence: r.body?.confidence ?? null, ms: Date.now() - t0, error: r.body?.error ?? null });
+    const r = await call('/calibrate', { method: 'POST', body: bytes, headers: { 'Content-Type': 'image/jpeg' } });
+    const roundTripMs = Date.now() - t0;
+    const box = r.body?.crop ?? null;
+    const cov = box ? covered(box, p.truth) : 0;
+    const areaRatio = box ? (box.w * box.h) / (p.truth.w * p.truth.h) : null;
+    // Correct = the whole screen is inside the suggested box and the box takes in little else.
+    const correct = !!box && cov >= 0.95 && areaRatio <= 1.5;
+    rows.push({ index: p.index, note: p.note, found: r.body?.found ?? 0, confidence: r.body?.confidence ?? null, iou: box ? Number(iou(box, p.truth).toFixed(3)) : 0, coverage: Number(cov.toFixed(3)), areaRatio: areaRatio === null ? null : Number(areaRatio.toFixed(2)), correct, samMs: r.body?.latencyMs ?? null, roundTripMs, error: r.body?.error ?? null });
+    await sleep(1000);
   }
+  const sam = rows.map(r => r.samMs).filter(x => typeof x === 'number');
   out.rows = rows;
-  out.summary = { photos: rows.length, withBox: rows.filter(r => r.crop).length, p50Ms: pct(rows.map(r => r.ms), 0.5), note: 'Check each crop against the private photo by eye before counting it as correct.' };
+  out.summary = {
+    photos: rows.length, correct: rows.filter(r => r.correct).length, withBox: rows.filter(r => r.found).length,
+    p50SamMs: pct(sam, 0.5), p90SamMs: pct(sam, 0.9), p50RoundTripMs: pct(rows.map(r => r.roundTripMs), 0.5),
+    pass: rows.filter(r => r.correct).length >= 18 && (pct(sam, 0.5) ?? Infinity) <= 2000,
+    criterion: '>= 18/20 correct (box covers >= 95% of the person-drawn screen box, area <= 1.5x) and SAM p50 <= 2 s; round trip measured from this computer, not over the phone network',
+  };
 }
 
 if (which === 'practice') {

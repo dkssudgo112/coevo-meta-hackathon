@@ -161,7 +161,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
       })()}
       {sheet?.kind === 'practice' && (
         <Sheet title="Practice Range" onClose={back} back={backLabel} waiting={unseenAsk} onToQuestion={() => setStack([])}>
-          <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={sheet.sessionId} onStart={id => replaceTop({ kind: 'practice', id, sessionId: sheet.sessionId })} />
+          <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={sheet.sessionId} onStart={id => replaceTop({ kind: 'practice', id, sessionId: sheet.sessionId })} onOpen={id => open({ kind: 'practice', id, sessionId: sheet.sessionId })} />
         </Sheet>
       )}
       {sheet?.kind === 'session' && (

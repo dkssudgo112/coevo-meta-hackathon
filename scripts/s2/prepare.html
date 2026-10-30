@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Local only: nothing is fetched or sent. Photos stay in this page until you export the file yourself. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>S2 photo prep</title>
+<style>
+  :root { --bg: #f6f3ec; --ink: #1d2622; --line: #ddd6c8; --accent: #1f5a44; --warn: #8a5a14; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 12px; }
+  .stage { position: relative; display: inline-block; max-width: 100%; touch-action: none; cursor: crosshair; }
+  .stage img { display: block; max-width: 100%; height: auto; user-select: none; }
+  .box { position: absolute; border: 3px solid var(--accent); background: rgb(31 90 68 / 12%); pointer-events: none; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .warn { color: var(--warn); }
+  .faint { color: #5f6863; }
+  input[type=text] { font: inherit; padding: 4px 8px; min-width: 320px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>S2 photo prep — monitor detection test</h1>
+  <p>Load the 20 photos you took with the phone's camera. For each, drag a box around the <strong>lit display area</strong> (not the bezel, stand or room) <em>before</em> any model sees the photos. The page re-draws each photo upright, at most 1280 px wide (as the app's “Find my screen” does) and without photo metadata, then exports one private file for the test run.</p>
+  <div class="row"><input id="files" type="file" accept="image/*" multiple> <span id="count" class="faint"></span></div>
+  <div id="warn" class="warn"></div>
+  <div id="editor" hidden>
+    <div class="row"><button id="prev">← Previous</button><strong id="pos"></strong><button id="next">Next →</button><button id="remove">Remove this photo</button><span id="status" class="faint"></span></div>
+    <div class="stage" id="stage"><img id="img" alt="Photo being annotated"><div class="box" id="box" hidden></div></div>
+    <div class="row"><label>Conditions <input id="note" type="text" placeholder="e.g. 60 cm, straight, room light on, dark mode"></label></div>
+  </div>
+  <div class="row"><button class="primary" id="export" disabled>Export s2-prepared.json</button><span class="faint">Needs 20 distinct photos, each with a box.</span></div>
+</main>
+<script>
+const MAX_W = 1280, NEED = 20;
+const photos = []; let cur = 0;
+const $ = id => document.getElementById(id);
+
+async function sha256(buf) {
+  const h = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function thumbGray(bmp) {
+  const c = new OffscreenCanvas(32, 24); const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, 32, 24);
+  const d = g.getImageData(0, 0, 32, 24).data; const out = new Float32Array(32 * 24);
+  for (let i = 0; i < out.length; i++) out[i] = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+  return out;
+}
+const meanDiff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+
+$('files').addEventListener('change', async e => {
+  const warn = [];
+  for (const f of e.target.files) {
+    const buf = await f.arrayBuffer();
+    const hash = await sha256(buf);
+    if (photos.some(p => p.sha256Original === hash)) { warn.push(`${f.name}: exact duplicate, skipped.`); continue; }
+    const bmp = await createImageBitmap(new Blob([buf]), { imageOrientation: 'from-image' });
+    const scale = Math.min(1, MAX_W / bmp.width);
+    const c = new OffscreenCanvas(Math.round(bmp.width * scale), Math.round(bmp.height * scale));
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await c.convertToBlob({ type: 'image/jpeg', quality: 0.85 });
+    const image = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+    const gray = thumbGray(bmp);
+    const near = photos.find(p => meanDiff(p.gray, gray) < 4);
+    if (near) warn.push(`${f.name}: looks almost the same as photo ${photos.indexOf(near) + 1}; take a different shot (distance, angle or light).`);
+    photos.push({ name: f.name, sha256Original: hash, width: c.width, height: c.height, image, gray, truth: null, note: '', nearDuplicate: !!near });
+  }
+  $('warn').textContent = warn.join(' ');
+  if (photos.length) { $('editor').hidden = false; show(Math.min(cur, photos.length - 1)); }
+  refresh();
+});
+
+function show(i) {
+  cur = i; const p = photos[i];
+  $('img').src = p.image; $('pos').textContent = `Photo ${i + 1} of ${photos.length}${p.nearDuplicate ? ' — almost the same as another photo; remove or replace it' : ''}`; $('note').value = p.note;
+  drawBox(); refresh();
+}
+function drawBox() {
+  const p = photos[cur], b = $('box');
+  if (!p.truth) { b.hidden = true; return; }
+  b.hidden = false; Object.assign(b.style, { left: `${p.truth.x * 100}%`, top: `${p.truth.y * 100}%`, width: `${p.truth.w * 100}%`, height: `${p.truth.h * 100}%` });
+}
+function refresh() {
+  const done = photos.filter(p => p.truth).length, distinct = photos.filter(p => !p.nearDuplicate).length;
+  $('count').textContent = `${photos.length} loaded · ${done} with a box · ${distinct} distinct`;
+  $('status').textContent = photos[cur]?.truth ? 'box set' : 'drag a box over the lit screen';
+  $('export').disabled = !(photos.length === NEED && done === NEED && distinct === NEED);
+}
+let start = null;
+const rel = e => { const r = $('img').getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; };
+$('stage').addEventListener('pointerdown', e => { e.preventDefault(); $('stage').setPointerCapture(e.pointerId); start = rel(e); });
+$('stage').addEventListener('pointermove', e => {
+  if (!start) return; const q = rel(e);
+  photos[cur].truth = { x: Math.min(start.x, q.x), y: Math.min(start.y, q.y), w: Math.abs(q.x - start.x), h: Math.abs(q.y - start.y) };
+  drawBox();
+});
+$('stage').addEventListener('pointerup', () => { start = null; const t = photos[cur].truth; if (t && (t.w < 0.02 || t.h < 0.02)) photos[cur].truth = null; drawBox(); refresh(); });
+$('note').addEventListener('input', e => { photos[cur].note = e.target.value; });
+$('prev').onclick = () => cur > 0 && show(cur - 1);
+$('next').onclick = () => cur < photos.length - 1 && show(cur + 1);
+$('remove').onclick = () => {
+  photos.splice(cur, 1);
+  if (!photos.length) { $('editor').hidden = true; refresh(); return; }
+  show(Math.min(cur, photos.length - 1));
+};
+$('export').onclick = () => {
+  const out = { kind: 'coevo-s2-prepared', preparedAt: new Date().toISOString(), maxWidth: MAX_W,
+    truthDefinition: 'lit display area, drawn by a person before any model saw the photo; normalized 0..1',
+    photos: photos.map((p, i) => ({ index: i + 1, sha256Original: p.sha256Original, width: p.width, height: p.height, note: p.note, truth: p.truth, image: p.image })) };
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: 'application/json' })); a.download = 's2-prepared.json'; a.click();
+};
+</script>
+</body>
+</html>

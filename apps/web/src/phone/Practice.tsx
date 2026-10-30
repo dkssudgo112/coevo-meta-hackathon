@@ -6,7 +6,7 @@ import { AssistLabel, errorText, INGREDIENT_TEXT, MediaImage } from '../ui/commo
 import { VoiceButton } from './Voice.tsx';
 
 /** The drill's own scope: attempts opened during a session belong to it; others stand alone. */
-export function PracticeRange({ creds, state, attemptId, sessionId, onStart }: { creds: Creds; state: Snapshot; attemptId: string | null; sessionId: string | null; onStart: (id: string) => void }) {
+export function PracticeRange({ creds, state, attemptId, sessionId, onStart, onOpen }: { creds: Creds; state: Snapshot; attemptId: string | null; sessionId: string | null; onStart: (id: string) => void; onOpen?: (id: string) => void }) {
   const p: PracticeAttempt | undefined = attemptId ? state.practice.find(x => x.id === attemptId) : undefined;
   const [err, setErr] = useState('');
   const [confirmHint, setConfirmHint] = useState(false);
@@ -27,7 +27,7 @@ export function PracticeRange({ creds, state, attemptId, sessionId, onStart }: {
         {err && <p className="faint" role="alert">{err}</p>}
         {recent.length > 0 && (
           <ul className="stack" style={{ listStyle: 'none', padding: 0 }} aria-label="Earlier attempts">
-            {recent.map(x => <li key={x.id} className="row wrap"><span className="grow">{x.checkNote}</span>{x.assistance && <AssistLabel value={x.assistance} extra="practice" />}{x.briefSource === 'typed' && <span className="faint">typed</span>}</li>)}
+            {recent.map(x => <li key={x.id}><button className="btn" style={{ width: '100%', justifyContent: 'space-between', textAlign: 'left' }} onClick={() => (onOpen ?? onStart)(x.id)} aria-label={`Open earlier attempt: ${x.checkNote ?? 'practice attempt'}`}><span className="row wrap" style={{ width: '100%' }}><span className="grow">{x.checkNote}</span>{x.assistance && <AssistLabel value={x.assistance} extra="practice" />}{x.briefSource === 'typed' && <span className="faint">typed</span>}</span></button></li>)}
           </ul>
         )}
       </div>
