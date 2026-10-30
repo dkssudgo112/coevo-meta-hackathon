@@ -60,6 +60,66 @@
       "sha256": "e9b78bf40cc508207917225acdca788ce35f4c1f93ba0681180473c8d2ff5633",
       "review": "JPEG (quality 86, no EXIF) of private/demo/shotcraft/assets/coevo-setup-guide.png (sha256 5380675d35d4bdff3350b50d3392e06501c70e4b6dcb596d9a4bb2eba93b7bd8), which Codex reviewed for public use on 2026-10-31: no credentials, accounts or real user data; the QR symbol is decorative and non-functional; English text inspected. Same pixels, re-encoded by Claude for the web.",
       "provenance": "Instructional illustration generated for this project at the maintainer's request (image generation), not an app screenshot. Labeled as an illustration wherever it appears."
+    },
+    {
+      "path": "docs/img/hero.jpg",
+      "sha256": "444810035401844e42f18cfcc0792d716ff8a2d776e8e9ad911568a76842f738",
+      "review": "2× capture of the deployed /sample replay at the question moment (actual Meta AI reply + the Caddie's recorded question), cropped to the screen and the phone frame. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Recorded live run replayed by the deployed app; scripted fictional café; actual Meta AI reply (already public as samples/meta-ai-3.jpg)."
+    },
+    {
+      "path": "docs/img/start-desk.jpg",
+      "sha256": "1e337b7a62f626565bd8235956bb2a9d63d989e9eeb68443773e5c039022c73c",
+      "review": "2× capture of the deployed Desk pairing card; the QR code is pixelated beyond recovery (and that code was used up by pairing a test phone right after the capture). No workspace id or token visible. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Real app screen (Desk), test workspace."
+    },
+    {
+      "path": "docs/img/start-phone.jpg",
+      "sha256": "bc6d678b6c4418a607bde8efbca350a715d0aa7f5fe7427bcbc7c0c127e7c29c",
+      "review": "Two 3× phone captures of the deployed /caddie: the scan screen and the aim screen. The camera view is a controlled canvas showing a public Meta AI sample screenshot (and the Desk with its code blurred). No ids or tokens. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Real app screens; controlled camera input (assumed setup)."
+    },
+    {
+      "path": "docs/img/start-ready.jpg",
+      "sha256": "07543a48d94eb693ec2049a32446d255320695fb24f0d4995c4e277e22685596",
+      "review": "2× capture of the deployed Desk after a test phone paired: 'Your phone is connected'. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Real app screen (Desk), test workspace."
+    },
+    {
+      "path": "docs/img/session-evidence.jpg",
+      "sha256": "3eb6c1eb8d278438934113b90d63f93c789f934360c9f5fdf6e199dab506c7a7",
+      "review": "2× capture of the deployed Desk session record of the final assumed-setup live run: requests, Caddie decisions with model names, the spoken answer as transcribed, labels, SAM price marker. No ids or tokens. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Live model output stored by the deployed app; scripted fictional café; synthetic voice input."
+    },
+    {
+      "path": "docs/img/session-phone.jpg",
+      "sha256": "064d640cbc4a1b68835958deb4942f60f5f3a9c53553dc26b2a151983a826686",
+      "review": "3× element captures of the deployed phone NOW card, fed the same run's own stored snapshot truncated to the question and the next step (replay of stored output; non-GET requests blocked). Text identical to the 390-px live captures. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Live model output of the final assumed-setup run, replayed."
+    },
+    {
+      "path": "docs/img/after-session.jpg",
+      "sha256": "d80828e2ba36be8e739c92cee1e464ac547ca54bbea8a4b0296abd0b70352963",
+      "review": "2× crops of the deployed Desk: What changed and Made from this session (five formats with reasons; podcast skipped). Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Live model output of the final assumed-setup run."
+    },
+    {
+      "path": "docs/img/caddie-card.jpg",
+      "sha256": "cd4c2df3a43441d7c98f7fcfc7d8f2b4b12cb7505e5b5706a364b4581688a226",
+      "review": "2× crop of the deployed Desk: the proposed Caddie card for Meta AI (Approve/Edit/Reject). Never applied in this run. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Live model output of the final assumed-setup run."
+    },
+    {
+      "path": "docs/img/practice.jpg",
+      "sha256": "f46427dc494157a974b0bbb680738f0abb3e129d19ed12ce1c5b84d887525a0b",
+      "review": "3× capture of the deployed phone Practice Range result sheet of the separate sample session (typed scripted brief, Muse Image poster, five checks), cropped above the footer. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Practice sample session: scripted typed brief; real model output."
+    },
+    {
+      "path": "docs/img/pinned-chat.jpg",
+      "sha256": "165485340549d970b08ee3461d0367d495e25d4d688ec53f1c2e2dc634ecc5f1",
+      "review": "2× capture of the deployed /sample replay, session 2: actual Meta AI reply in a separate chat that began with an earlier card, and the Caddie's recorded note. Same content as the already public samples/meta-ai-6.jpg. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
+      "provenance": "Recorded live run replayed by the deployed app; scripted fictional persona."
     }
   ]
 }
