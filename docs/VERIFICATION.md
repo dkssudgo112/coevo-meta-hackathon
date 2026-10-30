@@ -67,7 +67,7 @@ Last updated: 2026-10-30 (night KST).
 | D1 | Moment = frame + reading + decision + response + observed change | ◐ | ☐ | ☐ | contracts | |
 | D2 | Four assistance labels by deterministic rules | ☑ | ◐ | ☐ | unit: labels incl. a question two frames earlier; live: specific brief after the Caddie's question → coached (mislabel found and fixed) | |
 | D3 | 4D observations (no levels or scores); unobserved is not failure | ◐ | ☐ | ☐ | unit: `dimensionFor` | |
-| D4 | Source links from every card and content item to its moment/frame | ☑ | ◐ | ☐ | TEST build in the browser: "Made from" links and note quotes open their session with the moment highlighted; content opened from a past session returns there | Desk evidence rows link pending |
+| D4 | Source links from every card and content item to its moment/frame | ☑ | ◐ | ☐ | TEST build in the browser: "Made from" links on content and cards (phone and Desk), note quotes open the session with the moment highlighted and its kept frame shown; Back retraces content → source → content; Desk links scroll to the evidence row | |
 | D5 | Frame deletion keeps the label and marks "source removed" | ☑ | ◐ | ☐ | fake e2e: deleting a frame keeps its "with the Caddie" label and removes the stored image; Desk row shows "Source removed", the short storyboard "(frame deleted)" | Live check pending |
 | D6 | Desk evidence rows: FRAME, YOU SAID, CADDIE, THEN | ☐ | ☐ | ☐ | | |
 
@@ -78,7 +78,7 @@ Last updated: 2026-10-30 (night KST).
 | E1 | Card proposed from the playbook's `cardRule` | ☑ | ◐ | ☐ | live: "Before you make a poster, ask me who it is for, what it is, the price, one feeling, and whether a real photo exists." | |
 | E2 | Approve / edit / reject / revoke with history | ☑ | ◐ | ☐ | fake e2e: edit/approve/apply/revoke history; approve → edit updates the Desk copy and the card's checked details; live: approve, apply, revoke after the source session was deleted | |
 | E3 | Tool-specific apply text (Meta AI: dedicated pinned chat) | ☑ | ◐ | ☐ | unit: apply hints; S4 fallback observed in real Meta AI | Memory did not persist across new chats |
-| E4 | Next session: "AI asked first" observed → `observed-working` | ☑ | ◐ | ☐ | live: card pinned in a dedicated Meta AI chat → Meta AI asked for audience, product, price, mood → Caddie quiet → observed-working; unit negatives: approved-only, other tool/task, unrelated questions | Scoped to one pinned chat, not cross-chat memory |
+| E4 | Next session: "AI asked first" observed → `observed-working` | ☑ | ☑ | ☐ | live: the app's own card pinned in a dedicated Meta AI chat → Meta AI asked all five named details → the Caddie read aiAskedFor = all five, stayed quiet ("AI asked first as card says") → card observed-working with the details in its history; unit negatives: approved-only, other tool/task, partial details, unknown task, negated or unrecognized rules | Scoped to one pinned chat, not cross-chat memory |
 
 ## F. Content (five formats)
 
@@ -100,7 +100,7 @@ Last updated: 2026-10-30 (night KST).
 | G2 | Spoken brief → transcript | ☑ | ◐ | ☐ | live Voice Transcribe on synthetic speech (macOS voice): 31 and 19 words; word-set similarity 0.86 to the script | Real human voice pending |
 | G3 | Muse Image renders the user's own words | ☑ | ◐ | ☐ | live: 3 portrait images (1024×1536) from spoken briefs, ~16 s per attempt incl. transcription and check | |
 | G4 | Ingredient check + exact label | ☑ | ◐ | ☐ | live: ingredient check + "independent · practice" label; unit/fake: coached after hint | |
-| G5 | Practice recovery and scope: 30 s cap, typed fallback marked typed, image-only redraw, session-scoped attempts deleted with their session | ◐ | ☐ | ☐ | fake e2e: 35 s recording refused (413), typed brief checked and marked typed, session deletion removes attempts/images/skill notes | Live check pending |
+| G5 | Practice recovery and scope: 30 s cap, typed fallback marked typed, image-only redraw, session-scoped attempts deleted with their session | ◐ | ☐ | ☐ | fake e2e: 35 s recording refused (413), typed brief checked and marked typed, session deletion removes attempts/images/skill notes, practice opened from a finished session stays with it (browser), a TEST-simulated restart keeps the scenario and offers a retry | Live check and a real process restart for practice pending |
 
 ## H. Deployment and judging
 
@@ -109,7 +109,7 @@ Last updated: 2026-10-30 (night KST).
 | H1 | Cloudflare Worker + Durable Objects + R2 + static assets | ☑ | ◐ | ☐ | deployed: https://coevo-caddie.coevo-meta-hackathon.workers.dev with live calls under the budget | |
 | H2 | Health/status, security headers, rate limits | ☑ | ☑ | ☐ | deployed integration 17/17: CSP, Permissions-Policy, frame 429, admin routes closed, test mode off | |
 | H3 | Application-enforced budget: approved $3 total, $2.50 lifetime ceiling, single authority; per workspace and per sample caps | ☑ | ☑ | ☐ | unit (36): ledger rules, exact pre-dispatch reservation from counted input tokens, refusal when unverifiable, missing usage kept, ambiguous failures kept, Retry-After honored, no-bypass guards; real Durable Object (`npm run test:budget`): concurrent reservations never exceed $2.50; durable tickets settle once (duplicate, unknown and 20 concurrent settles); tickets reserved before a restart settle once after it; priced model allowlist and WAV-derived audio cost; live: every real call reserved and settled through the deployment; a full session cost Meta $0.163 | |
-| H4 | Three entrances: camera / photo / sample session (live model, fixture frames labeled) | ◐ | ☐ | ☐ | sample: six reviewed screenshots of actual Meta AI replies, labeled scripted/fictional | Budget for public live runs: R10 |
+| H4 | Three entrances: camera / photo / sample session (live model, fixture frames labeled) | ☑ | ◐ | ☐ | live: the full public sample on the deployed app (all five formats, $0.2034 Meta + $0.08 media reservation); a labeled recorded live run of it replays with no model calls as the default preview (TEST build; files in publication review) | Real phone camera path pending (R3) |
 | H5 | English docs, reproducible setup | ◐ | ☐ | ☐ | | |
 | H6 | Three-minute demo video | ☐ | ☐ | ☐ | | R7 |
 | H7 | Submission texts ready (not submitted) | ☐ | ☐ | ☐ | | R8 |
