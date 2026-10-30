@@ -105,7 +105,7 @@ Last updated: 2026-10-30 (late KST).
 | --- | --- | --- | --- | --- | --- | --- |
 | H1 | Cloudflare Worker + Durable Objects + R2 + static assets | ☑ | ◐ | ☐ | deployed: https://coevo-caddie.coevo-meta-hackathon.workers.dev (live calls off) | Live calls pending R1 |
 | H2 | Health/status, security headers, rate limits | ☑ | ☑ | ☐ | deployed integration 17/17: CSP, Permissions-Policy, frame 429, admin routes closed, test mode off | |
-| H3 | Cost caps: one lifetime authority ($3), per workspace, per sample session | ☑ | ◐ | ☐ | unit: budget, reservations kept on ambiguous failures, Retry-After; deployed health shows the lifetime ledger; fake e2e spend under cap | Live run needed |
+| H3 | Application-enforced budget: approved $3 total, $2.50 lifetime ceiling, single authority; per workspace and per sample caps | ☑ | ☑ | ☐ | unit (36): ledger rules, exact pre-dispatch reservation from counted input tokens, refusal when unverifiable, missing usage kept, ambiguous failures kept, Retry-After honored, no-bypass guards; real Durable Object (`npm run test:budget`): 160 concurrent reservations → exactly 125 accepted at $2.50, persists across restart; deployed health shows $0 of $2.50 | Live spend pending Codex review |
 | H4 | Three entrances: camera / photo / sample session (live model, fixture frames labeled) | ☐ | ☐ | ☐ | | |
 | H5 | English docs, reproducible setup | ◐ | ☐ | ☐ | | |
 | H6 | Three-minute demo video | ☐ | ☐ | ☐ | | R7 |
