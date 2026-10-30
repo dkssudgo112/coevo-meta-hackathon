@@ -29,7 +29,8 @@
     "test:integration": "node scripts/integration.mjs",
     "samples": "node scripts/make-samples.mjs",
     "test:e2e-fake": "node scripts/e2e-fake.mjs",
-    "test:budget": "node scripts/budget-test.mjs"
+    "test:budget": "node scripts/budget-test.mjs",
+    "test:media-web": "uv run --quiet --with fastapi==0.115.12 --with httpx python infra/modal/test_web.py"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261023.1",

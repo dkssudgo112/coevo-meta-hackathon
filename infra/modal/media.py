@@ -7,9 +7,12 @@ Needs a Modal Secret named `coevo-media-token` with COEVO_MEDIA_TOKEN set to a r
 API (Bearer auth):
   POST /jobs            {"kind": "podcast" | "short", ...} -> {"job_id": "..."}
   GET  /jobs/{job_id}   -> 202 while running; 200 {"status": "done", mime, duration, timings, data_b64}
-"""
-from __future__ import annotations
 
+Note: no `from __future__ import annotations` here. FastAPI must see the real
+`Request` class on route parameters; with postponed annotations the locally
+imported `Request` becomes an unresolvable string and FastAPI treats `req` as a
+required query parameter (HTTP 422).
+"""
 import hmac
 import os
 from pathlib import Path
