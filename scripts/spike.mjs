@@ -97,9 +97,10 @@ if (which === 's2') {
   out.rows = rows;
   out.summary = {
     photos: rows.length, correct: rows.filter(r => r.correct).length, withBox: rows.filter(r => r.found).length,
-    p50SamMs: pct(sam, 0.5), p90SamMs: pct(sam, 0.9), p50RoundTripMs: pct(rows.map(r => r.roundTripMs), 0.5),
-    pass: rows.filter(r => r.correct).length >= 18 && (pct(sam, 0.5) ?? Infinity) <= 2000,
-    criterion: '>= 18/20 correct (box covers >= 95% of the person-drawn screen box, area <= 1.5x) and SAM p50 <= 2 s; round trip measured from this computer, not over the phone network',
+    p50SamMs: pct(sam, 0.5), p90SamMs: pct(sam, 0.9), maxSamMs: sam.length ? Math.max(...sam) : null, p50RoundTripMs: pct(rows.map(r => r.roundTripMs), 0.5),
+    // The plan says "<= 2 s" without saying median or each; until that is clarified, every photo must be within it.
+    pass: rows.filter(r => r.correct).length >= 18 && sam.length === rows.length && Math.max(...sam) <= 2000,
+    criterion: '>= 18/20 correct (box covers >= 95% of the person-drawn screen box, area <= 1.5x) and every SAM time <= 2 s (conservative reading of the plan\'s "<= 2 s"); round trip measured from this computer, not over the phone network',
   };
 }
 

@@ -1,6 +1,6 @@
 # S2 — monitor detection on real phone photos (test protocol)
 
-S2 checks one thing: on photos taken by a real phone propped beside a real monitor, does SAM 3.1 find the screen? Pass: at least 18 of 20 photos correct, with a median SAM time of 2 seconds or less (approved plan, technical spike S2).
+S2 checks one thing: on photos taken by a real phone propped beside a real monitor, does SAM 3.1 find the screen? The approved plan's bar: at least 18 of 20 photos correct, within 2 seconds. The plan does not say whether "2 seconds" means each photo or a median, so this protocol reports every photo's time (with p50, p90 and max) and passes only if every photo is within 2 seconds.
 
 This is **not** the S1/S3 benchmark. S1/S3 keep 20 *device-cropped* frames to score reading and latency. S2 needs 20 *whole camera views*, because finding the screen is what the crop is for. It is also not the normal setup: in normal use, "Find my screen for me" sends one disclosed photo and keeps nothing. That stays as it is; this test is a separate, explicit run.
 
@@ -36,7 +36,7 @@ Keep that file private (for example `private/spikes/s2/`). The boxes are drawn b
 
 ## Run and score
 
-Run this only after a live SAM 3.1 call through the deployment has returned boxes at least once (the poster-pointer check); otherwise a failure could be a reading problem rather than detection.
+This route calls SAM directly; it does not depend on Muse Spark or its token counting. The first photo also shows whether SAM's live output is read correctly; a failure there is kept and reported as it is, not retried around.
 
 ```bash
 node scripts/spike.mjs https://coevo-caddie.coevo-meta-hackathon.workers.dev s2 private/spikes/s2/s2-prepared.json
@@ -44,7 +44,7 @@ node scripts/spike.mjs https://coevo-caddie.coevo-meta-hackathon.workers.dev s2 
 
 - 20 SAM calls through the deployment's lifetime budget (about $0.05 at $0.0025 per image).
 - A photo is **correct** when the suggested box covers at least 95% of the person's screen box and is no more than 1.5× its area (the whole screen is kept, little of the room). IoU is reported too.
-- Time: SAM time as measured by the server (pass at a median of 2 s or less), plus the round trip from the tester's computer. The phone's own network time is not part of this measure.
+- Time: SAM time as measured by the server for each photo (p50, p90 and max reported; pass only if every photo is within 2 s), plus the round trip from the tester's computer. The phone's own network time is not part of this measure.
 - The script writes scores and timings only (no images, no generated text) to `private/checks/`.
 
 ## Deletion

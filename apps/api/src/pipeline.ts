@@ -14,6 +14,8 @@ import { id, now } from './util.ts';
 export interface Ctx {
   env: Env;
   wsId: string;
+  /** A judge/sample workspace: everything in it comes from a scripted scenario. */
+  sampleWorkspace?: boolean;
   store: Store;
   /** Meta Model API budget (lifetime authority). */
   spender: Spender;

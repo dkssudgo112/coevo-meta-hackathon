@@ -360,7 +360,13 @@ export interface PracticeAttempt {
   assistance: Assistance | null;
   status: 'scenario' | 'open' | 'transcribing' | 'checking' | 'done' | 'failed';
   error: string | null;
+  /** Where the MODEL output came from (live model or the test fake). */
   provenance: Provenance;
+  /**
+   * Where the INPUT came from: true for a scripted/sample context (a fixture session or a sample
+   * workspace), false for an ordinary person's attempt, null when an older record did not say.
+   */
+  fixture?: boolean | null;
 }
 
 // ---------- Sessions, inbox, workspace ----------
@@ -400,7 +406,10 @@ export interface SkillObservation {
   practiceId: string | null;
   note: string;
   at: string;
+  /** Not real-user evidence (scripted input, sample workspace or a test model). */
   fixture: boolean;
+  /** An older practice record did not say where its input came from; never counted as a real person. */
+  originUnknown?: boolean;
 }
 
 export interface WorkspaceSummary {

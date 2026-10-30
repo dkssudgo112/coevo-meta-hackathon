@@ -418,7 +418,7 @@ export function Habits({ state }: { state: Snapshot }) {
           <div key={d.key} className="stack" style={{ gap: 4 }}>
             <div className="row"><strong className="grow">{d.name}</strong>{!obs.length && <AssistLabel value="unobserved" />}</div>
             <span className="faint">{d.about}</span>
-            {obs.map(o => <div key={o.id} className="row wrap"><AssistLabel value={o.assistance} extra={o.strength ?? undefined} /><span className="faint">{o.note} · {clock(o.at)}{o.fixture ? ' · sample' : ''}</span></div>)}
+            {obs.map(o => <div key={o.id} className="row wrap"><AssistLabel value={o.assistance} extra={o.strength ?? undefined} /><span className="faint">{o.note} · {clock(o.at)}{o.originUnknown ? ' · origin not recorded' : o.fixture ? ' · sample' : ''}</span></div>)}
           </div>
         );
       })}
@@ -473,7 +473,7 @@ function SessionSummary({ creds, state, sessionId, highlight, onOpen, onPractice
       ))}
       {state.content.filter(c => c.sessionId === s.id).sort(byFormat).map(c => <button key={c.id} className="btn" onClick={() => onOpen(c.id)}>{FORMAT_NAME[c.format]} · {c.status}</button>)}
       {cards.map(c => <CardControls key={c.id} card={c} creds={creds} compact state={state} onSource={onSource} />)}
-      {s.design && <button className="btn" onClick={() => onPractice(s.id)}>Practice this in the Practice Range</button>}
+      {(s.design || state.practice.some(p => p.sessionId === s.id)) && <button className="btn" onClick={() => onPractice(s.id)}>{s.design ? 'Practice this in the Practice Range' : 'Practice from this session'}</button>}
       {s.status === 'ended' && s.wrapStatus !== 'planned' && <button className="btn" onClick={() => post(creds, `/sessions/${s.id}/wrap`)}>Wrap up this session</button>}
     </div>
   );

@@ -9,6 +9,7 @@ import { asksFromText } from '../../../packages/core/src/cards.ts';
 import { BudgetExceeded, egressProbe, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
 import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, retainOrDiscard, ruleDecision, sessionMoments, type Ctx } from './pipeline.ts';
+import { skillFixture } from '../../../packages/core/src/labels.ts';
 import { cardAction, generate, podcastAsk, practiceAttempt, practiceRetryImage, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
 import { Store } from './store.ts';
 import type { LedgerScope } from './budget-do.ts';
@@ -145,6 +146,17 @@ export class Workspace extends DurableObject<Env> {
       else if (p.status === 'transcribing' || p.status === 'checking') await this.store.put('practice', { ...p, status: 'failed', error: cut, imageStatus: p.imageStatus === 'generating' ? 'failed' : p.imageStatus });
       else if (p.status === 'done' && p.imageStatus === 'generating') await this.store.put('practice', { ...p, imageStatus: 'failed', error: cut });
     }
+    // Practice records made before input origin was stored: take it from their session or a sample
+    // workspace; when neither says, record it as unknown (null), never as a real person.
+    for (const p of this.store.list('practice')) {
+      if (p.fixture !== undefined) continue;
+      const s = p.sessionId ? this.store.get('session', p.sessionId) : null;
+      const fixture = s ? s.fixture : this.meta?.kind === 'sample' ? true : null;
+      await this.store.put('practice', { ...p, fixture });
+      for (const k of this.store.list('skill').filter(k => k.practiceId === p.id)) {
+        await this.store.put('skill', fixture === null ? { ...k, fixture: true, originUnknown: true } : { ...k, fixture: skillFixture(fixture, p.provenance) });
+      }
+    }
     // Cards made before checked details existed: derive them once from the exact rule text,
     // recorded in the card's history; wording that is not recognized stays unverified.
     for (const c of this.store.list('card')) {
@@ -246,6 +258,7 @@ export class Workspace extends DurableObject<Env> {
     return {
       env: this.env,
       wsId: this.meta!.id,
+      sampleWorkspace: this.meta!.kind === 'sample',
       store: this.store,
       spender: this.spender('meta'),
       mediaSpender: this.spender('modal'),

@@ -76,9 +76,10 @@ def card_png(card, path):
         if len(title) <= 2 or size <= 56:
             break
         size -= 8
-    sf = font(40)
-    sub = wrap(d, card.get("sub", ""), sf, W - 360)[:3] if card.get("sub") else []
-    th, sh, gap = int(size * 1.2), 54, 40
+    sf = font(44 if card.get("lines") else 40)
+    # "lines": short lines shown one per row (easier to read than one long wrapped sentence).
+    sub = [ln for x in card["lines"] for ln in wrap(d, x, sf, W - 360)] if card.get("lines") else (wrap(d, card.get("sub", ""), sf, W - 360)[:3] if card.get("sub") else [])
+    th, sh, gap = int(size * 1.2), (62 if card.get("lines") else 54), 40
     total = len(title) * th + (gap + len(sub) * sh if sub else 0)
     y = (H - total) // 2
     for ln in title:

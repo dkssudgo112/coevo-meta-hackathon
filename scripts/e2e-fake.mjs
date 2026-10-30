@@ -146,6 +146,11 @@ check('practice scenario written', practice.body?.status === 'open' && practice.
 await call(`/practice/${practice.body.id}/attempt`, { method: 'POST', body: wav(3), headers: { 'Content-Type': 'audio/wav' } });
 const done = await until(s => s.practice.find(x => x.id === practice.body.id && (x.status === 'done' || x.status === 'failed')), 'practice');
 check('practice: image, ingredients, independent label', done.v.status === 'done' && done.v.imageStatus === 'ready' && done.v.assistance === 'independent', done.v.error ?? done.v.checkNote);
+// Input origin is kept apart from model origin: an ordinary standalone attempt is not sample input;
+// its skill note is still not real-user evidence here only because a TEST model made it.
+const doneSkill = (await state()).skills.find(k => k.practiceId === practice.body.id);
+check('practice origin: an ordinary attempt is not sample input (fixture=false), model origin kept separately', done.v.fixture === false && done.v.provenance === 'fixture' && doneSkill?.fixture === true, `attempt.fixture=${done.v.fixture} provenance=${done.v.provenance} skill.fixture=${doneSkill?.fixture}`);
+
 const hinted = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false }) });
 await call(`/practice/${hinted.body.id}/hint`, { method: 'POST' });
 await call(`/practice/${hinted.body.id}/attempt`, { method: 'POST', body: wav(3), headers: { 'Content-Type': 'audio/wav' } });
@@ -425,6 +430,18 @@ await freshWorkspace();
   const c2 = await moment(c0?.id);
   const answer = await moment(asked.m.id);
   check('restart during a reply: the reply is reported as interrupted, the typed answer is kept', asked.m.decision?.action === 'intervene' && c1?.interrupted === true && c1.decision?.guardrail === 'decision-interrupted' && c2?.decision?.guardrail === 'decision-interrupted' && answer?.response?.kind === 'typed-answer', `${c1?.decision?.guardrail} → later ${c2?.decision?.guardrail}`);
+}
+
+// Practice in a fixture session (fresh workspace, so no other session is ended by it).
+await freshWorkspace();
+{
+const fxs = (await call('/sessions', { method: 'POST', body: JSON.stringify({ fixture: true }) })).body;
+await sleep(2600);
+const fxp = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false, sessionId: fxs.id }) });
+await call(`/practice/${fxp.body.id}/attempt`, { method: 'POST', body: JSON.stringify({ text: 'For office workers, 6,500 won, calm morning, my own photo.' }) });
+const fxd = await until(s => s.practice.find(x => x.id === fxp.body.id && (x.status === 'done' || x.status === 'failed')), 'fixture-session practice');
+const fxSkill = (await state()).skills.find(k => k.practiceId === fxp.body.id);
+check('practice origin: an attempt in a fixture session is stored as sample input and its skill as not real-user evidence', fxp.body.fixture === true && fxd.v.fixture === true && fxSkill?.fixture === true, `attempt.fixture=${fxd.v.fixture} skill.fixture=${fxSkill?.fixture}`);
 }
 
 const fin = await state();

@@ -66,12 +66,18 @@ $('files').addEventListener('change', async e => {
     const gray = thumbGray(bmp);
     const near = photos.find(p => meanDiff(p.gray, gray) < 4);
     if (near) warn.push(`${f.name}: looks almost the same as photo ${photos.indexOf(near) + 1}; take a different shot (distance, angle or light).`);
-    photos.push({ name: f.name, sha256Original: hash, width: c.width, height: c.height, image, gray, truth: null, note: '', nearDuplicate: !!near });
+    photos.push({ name: f.name, sha256Original: hash, width: c.width, height: c.height, image, gray, truth: null, note: '', nearDuplicate: false });
   }
+  flagNear();
   $('warn').textContent = warn.join(' ');
   if (photos.length) { $('editor').hidden = false; show(Math.min(cur, photos.length - 1)); }
   refresh();
 });
+
+/** Flag every photo that looks almost the same as an EARLIER remaining photo (the first one of a pair stays). */
+function flagNear() {
+  photos.forEach((p, i) => { p.nearDuplicate = photos.slice(0, i).some(q => meanDiff(q.gray, p.gray) < 4); });
+}
 
 function show(i) {
   cur = i; const p = photos[i];
@@ -103,6 +109,7 @@ $('prev').onclick = () => cur > 0 && show(cur - 1);
 $('next').onclick = () => cur < photos.length - 1 && show(cur + 1);
 $('remove').onclick = () => {
   photos.splice(cur, 1);
+  flagNear(); // the photo it resembled may be gone now
   if (!photos.length) { $('editor').hidden = true; refresh(); return; }
   show(Math.min(cur, photos.length - 1));
 };

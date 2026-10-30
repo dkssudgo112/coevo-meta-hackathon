@@ -33,7 +33,7 @@ These run in the test build in a browser, with a scripted fake model and recorde
 
 ## Known issues
 
-- **Provider token-count outages.** Several times on October 30 (once for 15+ minutes), Meta's `input_tokens` endpoint answered 404 `model_not_found` for Muse Spark 1.3 while the model list still showed it. The app counts tokens before every call and refuses when it cannot (no spend, a visible "could not verify what this call would cost" note); it now retries this case briefly. The recorded sample is unaffected because it makes no model calls.
+- **Workspaces placed in Hong Kong could not reach Meta's API (found and fixed Oct 31).** What looked like intermittent provider outages was where each workspace's server object was created. Meta calls are made from that object, which stays where it was first created; objects placed in Hong Kong got 404 `model_not_found` for every model, while the same calls from the US or the maintainer's computer worked (a free diagnostic probe showed both in the same minute). New workspaces are now created in western North America. Workspaces made earlier in Hong Kong still cannot make live calls; the app refuses with no spend. The recorded sample is unaffected.
 
 ## Not yet verified
 

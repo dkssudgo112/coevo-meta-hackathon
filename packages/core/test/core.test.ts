@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ChangeDetector, meanAbsDiff } from '../src/change.ts';
 import { allowedStep, applyGuardrails, type Proposal } from '../src/ladder.ts';
-import { dimensionFor, labelPractice, observeChange } from '../src/labels.ts';
+import { dimensionFor, labelPractice, observeChange, practiceInputFixture, skillFixture } from '../src/labels.ts';
 import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
 import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
@@ -347,4 +347,16 @@ test('the first request seen names its details; it is not called an improvement'
   const later = observeChange(reading({ userRequest: 'For office workers, 6,500 won', ingredients: { audience: true, price: true, mood: false, realPhoto: false, productDetail: false } }), [moment({ id: 'a' })]);
   assert.equal(later?.firstSeen, undefined);
   assert.match(later!.summary, /^added who it is for, the price/);
+});
+
+test('practice input origin is separate from model origin', () => {
+  assert.equal(practiceInputFixture({ fixture: true }, false), true, 'fixture session');
+  assert.equal(practiceInputFixture({ fixture: false }, true), false, 'the session decides when there is one');
+  assert.equal(practiceInputFixture(null, true), true, 'standalone in a sample workspace');
+  assert.equal(practiceInputFixture(null, false), false, 'an ordinary person');
+  assert.equal(skillFixture(true, 'live-model'), true, 'real model on scripted input is still not real-user evidence');
+  assert.equal(skillFixture(false, 'live-model'), false, 'real person, real model');
+  assert.equal(skillFixture(false, 'fixture'), true, 'test model');
+  assert.equal(skillFixture(null, 'live-model'), true, 'unknown origin is never counted as a real person');
+  assert.equal(skillFixture(undefined, 'live-model'), true);
 });

@@ -66,6 +66,16 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
   return { addedIngredients: added, assistance, aiAskedFirst, ...(firstSeen ? { firstSeen: true } : {}), correctedDetail, askedNoInvention, summary: parts.join('; ') };
 }
 
+/** Input origin of a practice attempt: its session's flag, else a sample workspace; ordinary use is false. */
+export function practiceInputFixture(session: { fixture: boolean } | null | undefined, sampleWorkspace: boolean): boolean {
+  return session ? session.fixture : sampleWorkspace;
+}
+
+/** A skill observation is not real-user evidence when its input was scripted or a test model made it. */
+export function skillFixture(inputFixture: boolean | null | undefined, modelProvenance: string): boolean {
+  return inputFixture !== false || modelProvenance === 'fixture';
+}
+
 export function strengthFor(assistance: Assistance, opts: { practice?: boolean; transfer?: boolean }): EvidenceStrength | null {
   if (assistance !== 'independent') return null;
   if (opts.practice) return 'practice';

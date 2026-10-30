@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { PracticeAttempt, Snapshot } from '../../../../packages/contracts/index.ts';
 import { INGREDIENT_KEYS } from '../../../../packages/contracts/index.ts';
 import { post, postBinary, type Creds } from '../lib/api.ts';
-import { AssistLabel, errorText, INGREDIENT_TEXT, MediaImage } from '../ui/common.tsx';
+import { AssistLabel, errorText, FixtureTag, INGREDIENT_TEXT, MediaImage } from '../ui/common.tsx';
 import { VoiceButton } from './Voice.tsx';
 
 /** The drill's own scope: attempts opened during a session belong to it; others stand alone. */
@@ -27,7 +27,7 @@ export function PracticeRange({ creds, state, attemptId, sessionId, onStart, onO
         {err && <p className="faint" role="alert">{err}</p>}
         {recent.length > 0 && (
           <ul className="stack" style={{ listStyle: 'none', padding: 0 }} aria-label="Earlier attempts">
-            {recent.map(x => <li key={x.id}><button className="btn" style={{ width: '100%', justifyContent: 'space-between', textAlign: 'left' }} onClick={() => (onOpen ?? onStart)(x.id)} aria-label={`Open earlier attempt: ${x.checkNote ?? 'practice attempt'}`}><span className="row wrap" style={{ width: '100%' }}><span className="grow">{x.checkNote}</span>{x.assistance && <AssistLabel value={x.assistance} extra="practice" />}{x.briefSource === 'typed' && <span className="faint">typed</span>}</span></button></li>)}
+            {recent.map(x => <li key={x.id}><button className="btn" style={{ width: '100%', justifyContent: 'space-between', textAlign: 'left' }} onClick={() => (onOpen ?? onStart)(x.id)} aria-label={`Open earlier attempt: ${x.checkNote ?? 'practice attempt'}`}><span className="row wrap" style={{ width: '100%' }}><span className="grow">{x.checkNote}</span>{x.assistance && <AssistLabel value={x.assistance} extra="practice" />}{x.fixture && <FixtureTag />}{x.briefSource === 'typed' && <span className="faint">typed</span>}</span></button></li>)}
           </ul>
         )}
       </div>
@@ -70,7 +70,8 @@ export function PracticeRange({ creds, state, attemptId, sessionId, onStart, onO
             {INGREDIENT_KEYS.map(k => <li key={k}>{p.ingredients?.[k] ? '✓' : '○'} {INGREDIENT_TEXT[k]}</li>)}
           </ul>
           <p>{p.checkNote}</p>
-          <div className="row">{p.assistance && <AssistLabel value={p.assistance} extra="practice" />}{p.autoOpened && <span className="faint">Opened by the Caddie</span>}</div>
+          <div className="row wrap">{p.assistance && <AssistLabel value={p.assistance} extra="practice" />}{p.fixture ? <FixtureTag /> : p.fixture === null ? <span className="faint">Origin not recorded</span> : null}{p.autoOpened && <span className="faint">Opened by the Caddie</span>}</div>
+          {p.fixture && <p className="faint">Sample: a scripted practice brief, not a real person’s attempt. The scenario, transcript, image and check are {p.provenance === 'fixture' ? 'from the test model' : 'real model output'}.</p>}
           <button className="btn" onClick={start}>Another request</button>
         </div>
       )}
