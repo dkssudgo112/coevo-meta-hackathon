@@ -58,8 +58,8 @@ function decision(input) {
 const words = n => Array.from({ length: n }, (_, i) => ['brief', 'morning', 'price', 'photo', 'guest', 'cafe', 'poster', 'calm'][i % 8]).join(' ');
 
 const OUT = {
-  learning_design: () => ({ habit: '[test] Naming who it is for and the price instead of repeating "premium".', turningPoint: { quote: 'more premium', momentId: null }, remainingConditions: ['[test] Check the price is readable.'], counterpoint: '[test] Sometimes vague words are fine for quick drafts.', ingredientsUsed: ['audience', 'price', 'mood', 'realPhoto'], formats: Object.fromEntries(['note', 'manual', 'flashcards', 'podcast', 'short'].map(f => [f, { make: true, why: `[test] Why ${f} now.` }])) }),
-  note: () => ({ title: '[test] What changed the poster', body: '[test] Four requests for "more premium" kept the same poster. Naming office workers, 6,500 won and a calm morning changed it.', quotes: [{ text: 'more premium', momentId: null }], remaining: ['[test] Is the price visible on a phone screen?'] }),
+  learning_design: ids => ({ habit: '[test] Naming who it is for and the price instead of repeating "premium".', turningPoint: { quote: 'more premium', momentId: ids.at(-1) ?? null }, remainingConditions: ['[test] Check the price is readable.'], counterpoint: '[test] Sometimes vague words are fine for quick drafts.', ingredientsUsed: ['audience', 'price', 'mood', 'realPhoto'], formats: Object.fromEntries(['note', 'manual', 'flashcards', 'podcast', 'short'].map(f => [f, { make: true, why: `[test] Why ${f} now.` }])) }),
+  note: ids => ({ title: '[test] What changed the poster', body: '[test] Four requests for "more premium" kept the same poster. Naming office workers, 6,500 won and a calm morning changed it.', quotes: [{ text: 'more premium', momentId: ids.at(1) ?? null }], remaining: ['[test] Is the price visible on a phone screen?'] }),
   manual: () => ({ title: '[test] Poster brief recipe', whenToUse: '[test] Any new menu poster.', whenNotToUse: '[test] Quick internal drafts.', steps: [{ text: '[test] Say who it is for.', check: 'audience', owner: 'you' }, { text: '[test] Ask me for the price before drafting.', check: 'price', owner: 'ai' }], pitfalls: ['[test] Repeating "premium".'], forYourAI: ['[test] Ask who it is for and the price first.'], youDecide: ['[test] The one feeling.'], cardRule: 'Before making a poster, ask me who it is for, the price, one feeling, and whether I have a real photo', cardAsks: ['audience', 'price', 'mood', 'realPhoto'] }),
   flashcards: () => ({ cards: [{ scenario: '[test] A customer wants a cuter cookie poster for kids, 3,000 won.', prompt: '[test] What do you tell the AI first?', answer: '[test] Who it is for and the price; "cute" alone is vague.' }] }),
   podcast: () => ({ title: '[test] Why "premium" fails', guest: 'Jun, bakery owner', lines: Array.from({ length: 10 }, (_, i) => ({ speaker: i % 2 ? 'guest' : 'caddie', text: `[test] ${words(30)}.` })) }),
@@ -131,7 +131,9 @@ createServer(async (req, res) => {
         const text = body.input[0].content[0].text;
         return send(res, 200, message(decision(JSON.parse(text.slice(text.indexOf('{'))))));
       }
-      if (OUT[name]) return send(res, 200, message(OUT[name]()));
+      // Moment ids from the evidence text ("[m_…]"), so source links point at real moments.
+      const ids = [...JSON.stringify(body.input ?? '').matchAll(/\[(m_[a-z0-9]+)\]/g)].map(m => m[1]);
+      if (OUT[name]) return send(res, 200, message(OUT[name](ids)));
       return send(res, 400, { error: { message: `fake: unknown task ${name}`, type: 'invalid_request_error', code: null } });
     }
     if (req.method === 'POST' && url === '/v1/images/generations') return send(res, 200, { data: [{ b64_json: png(64, 96, [120, 150, 110]).toString('base64') }] });
