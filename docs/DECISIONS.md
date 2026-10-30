@@ -40,8 +40,12 @@ The phone camera watches the monitor so any AI tool works without integration. S
 
 ## October 30, 2026 — Models, speech and costs
 
-Muse Spark 1.3 (reading, decisions, learning design, content), SAM 3.1 (screen location), Muse Voice Transcribe (spoken answers), Muse Image (Practice Range, short scenes). Standard models only — never contributor variants for user data. Meta's API has no text-to-speech, so Kokoro-82M (Apache-2.0) runs on Modal for the podcast and short. Server-side caps: $4/day global, $0.60/day per workspace, $0.15 per sample session. The Open Weight bonus is not pursued.
+Muse Spark 1.3 (reading, decisions, learning design, content), SAM 3.1 (screen location), Muse Voice Transcribe (spoken answers), Muse Image (Practice Range, short scenes). Standard models only — never contributor variants for user data. Meta's API has no text-to-speech, so Kokoro-82M (Apache-2.0) runs on Modal for the podcast and short. Server-side caps: $0.60/day per workspace and $0.15 per sample session, under a global lifetime cap (see below). The Open Weight bonus is not pursued.
 
 ## October 30, 2026 — Meta AI card fallback
 
 In a Korean Meta AI account, image generation worked, but a "Remember that…" rule was not applied in a new chat and no Memory setting was found. Caddie cards for Meta AI are therefore sent as the first message of a chat, and the Caddie verifies the effect by observing whether the AI asks first.
+
+## October 30, 2026 — One lifetime spend authority
+
+All paid calls go through the deployed Worker's single `Budget` Durable Object, which keeps a lifetime ledger capped at $3.00 (`COEVO_LIFETIME_CAP_USD`), never reset by day, deployment, workspace or script. Local and fake-model runs cannot spend (fake runs use a separate ledger). Spike scripts call the deployed app instead of Meta directly; out-of-app runs such as a Modal probe must first reserve their allocation through an admin-only route. Ambiguous provider failures keep their reservation; only documented unbilled rejections are refunded.

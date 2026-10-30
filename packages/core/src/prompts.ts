@@ -25,12 +25,12 @@ export interface ModelTask<T> {
 const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote.`;
 
 const ingredientsSchema = S.obj({
-  audience: S.bool('Says who it is for (a specific customer group).'),
-  price: S.bool('States a price or offer.'),
-  mood: S.bool('Names a concrete feeling, scene, light, color or reference. Vague words like "premium" or "nicer" do NOT count.'),
-  realPhoto: S.bool('Attaches or refers to a real photo of the actual product.'),
-  productDetail: S.bool('Names the specific product and what makes it distinct (flavor, material, size).'),
-}, 'Ingredients present in the latest user request only.');
+  audience: S.bool('Says who it is for: a specific customer group, reader, hiring team or audience.'),
+  price: S.bool('Gives a concrete number: a price, offer, quantity, measurable result or deadline.'),
+  mood: S.bool('Names a concrete feeling, tone, scene or reference. Vague words like "premium", "nicer" or "more professional" do NOT count.'),
+  realPhoto: S.bool('Supplies the person\'s own real material: a real photo, a real experience or story, or real data — not something the AI could invent.'),
+  productDetail: S.bool('Names the specific thing and what makes it distinct (a product\'s flavor or size, a role and company, a project).'),
+}, 'Ingredients present in the latest user request only. These apply to any task: posters, cover letters, emails, reports.');
 
 function readIngredients(v: unknown, path: string): Ingredients {
   const o = R.obj(v, path);
@@ -113,7 +113,7 @@ Intervene only when one of these is true:
 3. The person directly answered or asked you something that needs a reply.
 Ladder (use the lowest step that can work, one step at a time):
 - question: ONE short question that makes the person supply a missing ingredient. Quote their exact words if it helps. Do not write the brief for them.
-- ingredients: a short list of what is missing (who it's for, price, one concrete feeling, a real photo, product detail).
+- ingredients: a short list of what is missing (who it's for, a concrete number, one concrete feeling or tone, the person's own real material, specific details). For a poster that might be the price and a real photo; for a cover letter, one thing only this person did.
 - example: only if the person asked for an example or stayed stuck after ingredients. Give a short sample brief in their context and call it an example.
 Never repeat a question the AI already asked. One improvement at a time. Message at most 2 sentences and 160 characters. ${STYLE}
 Special cases:
@@ -266,10 +266,10 @@ export const podcastTask: ModelTask<{ title: string; guest: string; lines: Omit<
   name: 'podcast',
   effort: 'medium',
   maxOutputTokens: 2200,
-  instructions: `Write a two-person podcast script (8–18 lines, 300–480 words in total, about 2–3 minutes spoken). Speakers: "caddie" (the coach) and "guest", a skeptical friend who also runs a small business and raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
+  instructions: `Write a two-person podcast script (8–18 lines, 300–480 words in total, about 2–3 minutes spoken). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
   schema: S.obj({
     title: S.str('Episode title.', 80),
-    guest: S.str('Guest display name, e.g. "Jun, bakery owner".', 40),
+    guest: S.str('Guest display name with their situation, e.g. "Jun, bakery owner".', 40),
     lines: S.arr(S.obj({ speaker: S.enumOf(['caddie', 'guest'], 'Speaker.'), text: S.str('Spoken line.', 500) }), 'Lines.', 8, 18),
   }),
   read(json) {

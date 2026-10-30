@@ -27,6 +27,11 @@ interface Meta {
 
 interface Job { contentId: string; jobId: string; startedAt: number }
 
+/** Real paid calls and fake test runs never share a ledger. */
+export function ledgerName(env: Env): string {
+  return fakeMeta(env) ? 'fake-test-ledger' : 'global';
+}
+
 const IDLE_END_MS = 10 * 60_000;
 const STUCK_MS = 6 * 60_000;
 const JOB_TIMEOUT_MS = 12 * 60_000;
@@ -83,7 +88,7 @@ export class Workspace extends DurableObject<Env> {
         // Sample workspaces have a lifetime cap, user workspaces a daily cap.
         const left = this.meta?.kind === 'sample' ? Math.max(0, this.cap() - st.spentUsd) : remaining(st, this.cap(), Date.now());
         if (left < usd) throw new BudgetExceeded('workspace');
-        const global = this.env.BUDGET.get(this.env.BUDGET.idFromName('global'));
+        const global = this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env)));
         if (!(await global.reserve(usd))) throw new BudgetExceeded('global');
         await this.ctx.storage.put('budget', this.meta?.kind === 'sample' ? { day: st.day, spentUsd: st.spentUsd + usd } : charge(st, usd, Date.now()));
         const ticket = `${label}:${id('t')}`;
@@ -97,7 +102,7 @@ export class Workspace extends DurableObject<Env> {
         if (Math.abs(delta) < 1e-9) return;
         const st = await this.budgetState();
         await this.ctx.storage.put('budget', { day: st.day, spentUsd: Math.max(0, st.spentUsd + delta) });
-        await this.env.BUDGET.get(this.env.BUDGET.idFromName('global')).adjust(delta);
+        await this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env))).adjust(delta);
         this.broadcast({ type: 'workspace', workspace: await this.summary() });
       },
     };

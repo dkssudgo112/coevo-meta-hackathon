@@ -13,10 +13,17 @@ export const PRICES = {
 } as const;
 
 export const CAPS = {
-  globalPerDayUsd: 4.0,
+  /** Lifetime ceiling for ALL paid calls (Meta + Modal), never reset. Overridable via COEVO_LIFETIME_CAP_USD. */
+  globalLifetimeUsd: 3.0,
   workspacePerDayUsd: 0.6,
   sampleWorkspaceUsd: 0.15,
 } as const;
+
+/** Parse the configured lifetime cap; falls back to the default and never exceeds it unless explicitly set. */
+export function lifetimeCap(configured: string | undefined): number {
+  const n = Number(configured);
+  return Number.isFinite(n) && n > 0 ? n : CAPS.globalLifetimeUsd;
+}
 
 export interface Usage { input_tokens?: number; output_tokens?: number; cached_tokens?: number }
 

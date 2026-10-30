@@ -4,7 +4,7 @@ import { ChangeDetector, meanAbsDiff } from '../src/change.ts';
 import { applyGuardrails, type Proposal } from '../src/ladder.ts';
 import { labelPractice, observeChange } from '../src/labels.ts';
 import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
-import { CAPS, charge, remaining, sparkCost } from '../src/budget.ts';
+import { CAPS, charge, lifetimeCap, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
 import { applyHint } from '../src/cards.ts';
@@ -112,8 +112,12 @@ test('spaced repetition: 10 minutes, then 1, 3, 7, 14 days; unsure resets', () =
 test('budget charges per day and caps', () => {
   const now = Date.parse('2026-11-01T10:00:00Z');
   let st = { day: '2026-10-31', spentUsd: 3.9 };
-  assert.equal(remaining(st, CAPS.globalPerDayUsd, now), CAPS.globalPerDayUsd);
+  assert.equal(remaining(st, CAPS.workspacePerDayUsd, now), CAPS.workspacePerDayUsd);
   st = charge(st, 0.5, now);
+  assert.equal(CAPS.globalLifetimeUsd, 3);
+  assert.equal(lifetimeCap(undefined), 3);
+  assert.equal(lifetimeCap('abc'), 3);
+  assert.equal(lifetimeCap('1.5'), 1.5);
   assert.equal(st.spentUsd, 0.5);
   assert.ok(Math.abs(sparkCost({ input_tokens: 1_000_000, output_tokens: 0 }) - 1.25) < 1e-9);
 });

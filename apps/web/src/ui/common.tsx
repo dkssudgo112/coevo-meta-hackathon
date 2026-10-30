@@ -55,7 +55,7 @@ export function Empty({ children }: { children: ReactNode }) {
 }
 
 export const INGREDIENT_TEXT: Record<string, string> = {
-  audience: 'who it’s for', price: 'price', mood: 'a concrete feeling', realPhoto: 'a real photo', productDetail: 'product details',
+  audience: 'who it’s for', price: 'a concrete number', mood: 'a concrete feeling', realPhoto: 'your own real material', productDetail: 'specific details',
 };
 
 export function latestSession(s: Snapshot | null) {

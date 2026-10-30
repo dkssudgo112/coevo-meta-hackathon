@@ -57,4 +57,4 @@ A one-sentence request with a changed condition (new item, season or audience). 
 
 - Only the device-cropped screen area is uploaded; the setup photo for SAM is disclosed and never stored. Raw frames are discarded after reading unless they are evidence for a moment; kept frames can be deleted.
 - Standard Meta models only; contributor variants are never used for user data.
-- Server-enforced caps: $4.00/day global, $0.60/day per workspace, $0.15 per sample session.
+- One spend authority: the deployed Worker's Budget object keeps a **lifetime** ledger for every paid call (Meta and Modal), capped at $3.00 and never reset by day, deployment or workspace. Also $0.60/day per workspace and $0.15 per sample session. Paid calls are enabled only on the deployment; local and test runs cannot spend.

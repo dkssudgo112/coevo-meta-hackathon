@@ -7,8 +7,10 @@ const mode = process.argv[2] ?? 'models';
 if (!['models', 'smoke'].includes(mode)) throw new Error('Use models or smoke.');
 if (!env.MODEL_API_KEY?.trim()) { console.error('MODEL_API_KEY is not configured. Run npm run secrets:set -- MODEL_API_KEY.'); process.exit(2); }
 if (env.META_API_BASE_URL !== 'https://api.meta.ai/v1') throw new Error('Only the verified Meta endpoint is allowed.');
-if (mode === 'smoke' && env.COEVO_ALLOW_LIVE_CALLS !== 'true') {
-  console.error('Live inference is disabled. Confirm free credits and enable COEVO_ALLOW_LIVE_CALLS intentionally.'); process.exit(2);
+if (mode === 'smoke') {
+  // Paid calls must go through the deployment's single lifetime budget authority.
+  console.error('Direct paid smoke calls are disabled. Use the deployed app (node scripts/spike.mjs <url> ...) so every paid call is charged to the one lifetime budget.');
+  process.exit(2);
 }
 const url = `${env.META_API_BASE_URL}/${mode === 'models' ? 'models' : 'responses'}`;
 let result;

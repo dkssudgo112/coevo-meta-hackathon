@@ -95,11 +95,20 @@ check('skill observation recorded for description', m4.s.skills.some(k => k.dime
 check('evidence frame kept for the changed moment', Boolean(m4.m.frame?.storedKey));
 
 const sessionId = m4.m.work.sessionId;
+// Inject one failure each: the short's plan (model 500) and the podcast's render.
+await fetch(`${fake}/fail`, { method: 'POST', body: JSON.stringify({ name: 'short' }) });
+await fetch(`${fake}/fail`, { method: 'POST', body: JSON.stringify({ name: 'media-podcast' }) });
 await call(`/sessions/${sessionId}/end`, { method: 'POST' });
 const planned = await until(s => s.sessions.find(x => x.id === sessionId)?.wrapStatus === 'planned', 'wrap planned', 30);
 check('wrap planned with a reason per format', Object.values(planned.s.sessions.find(x => x.id === sessionId).design.formats).every(f => f.why));
-const all = await until(s => { const c = s.content.filter(x => x.sessionId === sessionId); return c.length === 5 && c.every(x => x.status === 'ready' || x.status === 'failed') ? c : null; }, 'five formats', 180);
-for (const c of all.v) check(`${c.format}: ${c.status}`, c.status === 'ready', c.error ?? c.whyNow);
+const first = await until(s => { const c = s.content.filter(x => x.sessionId === sessionId); return c.length === 5 && c.every(x => x.status === 'ready' || x.status === 'failed') ? c : null; }, 'five formats (with injected failures)', 180);
+const f1 = Object.fromEntries(first.v.map(c => [c.format, c]));
+check('partial success: note, manual and flashcards ready despite two failures', ['note', 'manual', 'flashcards'].every(f => f1[f].status === 'ready'));
+check('failed short shows an error and stays retryable', f1.short.status === 'failed' && Boolean(f1.short.error), f1.short.error);
+check('failed podcast render keeps its script (transcript fallback)', f1.podcast.status === 'failed' && f1.podcast.payload?.lines?.length >= 8, f1.podcast.error);
+for (const f of ['short', 'podcast']) await call(`/content/${f1[f].id}/retry`, { method: 'POST' });
+const all = await until(s => { const c = s.content.filter(x => x.sessionId === sessionId); return c.every(x => x.status === 'ready') ? c : null; }, 'retry recovers', 180);
+for (const c of all.v) check(`${c.format}: ${c.status} after retry`, c.status === 'ready', c.error ?? `attempts ${c.attempts}`);
 const podcast = all.v.find(c => c.format === 'podcast');
 check('podcast ≥ 60 s with per-line timings', podcast?.payload?.durationSec >= 60 && podcast.payload.lines.every(l => l.end > l.start), `${podcast?.payload?.durationSec} s`);
 const short = all.v.find(c => c.format === 'short');

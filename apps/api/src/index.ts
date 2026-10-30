@@ -4,6 +4,7 @@ import { mediaConfigured } from './media.ts';
 import type { Env } from './env.ts';
 import { error, id, json, sha256 } from './util.ts';
 
+import { ledgerName } from './workspace.ts';
 export { Workspace } from './workspace.ts';
 export { Budget } from './budget-do.ts';
 
@@ -37,19 +38,36 @@ async function createWorkspace(req: Request, env: Env, kind: 'user' | 'sample'):
   return stub.fetch(new Request(`https://do/api/w/${wsId}/init`, { method: 'POST', body: JSON.stringify({ kind }) }));
 }
 
+async function admin(req: Request, env: Env, path: string): Promise<Response> {
+  const expected = env.COEVO_ADMIN_TOKEN?.trim();
+  if (!expected || expected.length < 24) return error(404, 'not_found', 'Unknown route.');
+  const got = req.headers.get('authorization') ?? '';
+  const [a, b] = [await sha256(got), await sha256(`Bearer ${expected}`)];
+  if (a !== b) return error(401, 'unauthorized', 'Admin token required.');
+  const ledger = env.BUDGET.get(env.BUDGET.idFromName(ledgerName(env)));
+  if (path === '/api/admin/ledger' && req.method === 'GET') return json({ ...(await ledger.status()), external: await ledger.externalLog() });
+  if (path === '/api/admin/reserve' && req.method === 'POST') {
+    const b2 = (await req.json().catch(() => ({}))) as { usd?: number; label?: string };
+    const ok = await ledger.reserveExternal(Number(b2.usd), String(b2.label ?? 'external'));
+    return ok ? json({ ok: true, ...(await ledger.status()) }) : error(402, 'budget', 'The lifetime budget cannot cover this reservation.');
+  }
+  return error(404, 'not_found', 'Unknown route.');
+}
+
 async function route(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
   if (!path.startsWith('/api/')) return env.ASSETS.fetch(req);
 
   if (path === '/api/health' && req.method === 'GET') {
-    const global = await env.BUDGET.get(env.BUDGET.idFromName('global')).status();
+    const global = await env.BUDGET.get(env.BUDGET.idFromName(ledgerName(env))).status();
     const payload: Readiness & { budget: typeof global } = {
       service: 'coevo', mode: liveEnabled(env) ? 'live' : 'mock', metaKeyConfigured: Boolean(env.MODEL_API_KEY?.trim()),
       liveCallsEnabled: liveEnabled(env), mediaServiceConfigured: mediaConfigured(env), testFakeModels: fakeMeta(env), model: models(env).text, implementation: 'caddie', budget: global,
     };
     return json(payload);
   }
+  if (path.startsWith('/api/admin/')) return admin(req, env, path);
   if (path === '/api/workspaces' && req.method === 'POST') return createWorkspace(req, env, 'user');
   if (path === '/api/sample' && req.method === 'POST') return createWorkspace(req, env, 'sample');
 

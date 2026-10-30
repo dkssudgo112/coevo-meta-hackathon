@@ -49,6 +49,10 @@ check('health responds', health.res.ok && health.body.implementation === 'caddie
 if (!/^http:\/\/(127\.0\.0\.1|localhost)/.test(base)) check('deployed server is NOT in test fake-model mode', health.body.testFakeModels === false);
 check('security headers', Boolean(health.res.headers.get('content-security-policy')?.includes("frame-ancestors 'none'")) && health.res.headers.get('permissions-policy')?.includes('camera=(self)'));
 
+const adm = await call('/api/admin/ledger');
+check('admin ledger is closed to the public', adm.res.status === 404 || adm.res.status === 401, `status ${adm.res.status}`);
+check('health reports a lifetime budget', health.body.budget?.scope === 'lifetime' && health.body.budget.capUsd > 0, `$${health.body.budget?.spentUsd} of $${health.body.budget?.capUsd}`);
+
 const page = await fetch(`${base}/caddie`);
 check('SPA route served with CSP', page.ok && (await page.text()).includes('<div id="root">') && Boolean(page.headers.get('content-security-policy')));
 

@@ -1,7 +1,9 @@
 // One bounded probe of the deployed Modal media service (S5): one podcast, one short.
-// Needs MODAL_MEDIA_URL and MODAL_MEDIA_TOKEN in the environment or .dev.vars.
+// Needs MODAL_MEDIA_URL, MODAL_MEDIA_TOKEN and COEVO_ADMIN_TOKEN in the environment or .dev.vars.
+// Before anything runs, it reserves its allocation in the deployment's single lifetime
+// budget (POST /api/admin/reserve); if the reservation is refused, nothing is sent.
 // Prints duration, size and timings only; saves the files under private/checks/media/.
-// Usage: node scripts/media-probe.mjs
+// Usage: node scripts/media-probe.mjs https://<deployment>
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -9,7 +11,14 @@ import { deflateSync } from 'node:zlib';
 import { readConfig, root } from './config.mjs';
 
 const env = readConfig();
+const deployment = process.argv[2];
+if (!deployment?.startsWith('https://')) { console.error('Usage: node scripts/media-probe.mjs https://<deployment>'); process.exit(2); }
 if (!env.MODAL_MEDIA_URL?.startsWith('https://') || !env.MODAL_MEDIA_TOKEN) { console.error('Set MODAL_MEDIA_URL (https) and MODAL_MEDIA_TOKEN first.'); process.exit(2); }
+if (!env.COEVO_ADMIN_TOKEN) { console.error('Set COEVO_ADMIN_TOKEN so the probe can reserve its allocation first.'); process.exit(2); }
+const PROBE_USD = 0.05;
+const reserve = await fetch(`${deployment}/api/admin/reserve`, { method: 'POST', headers: { Authorization: `Bearer ${env.COEVO_ADMIN_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ usd: PROBE_USD, label: 'modal media probe (1 podcast + 1 short)' }) });
+if (!reserve.ok) { console.error(`Lifetime budget refused the $${PROBE_USD} reservation (${reserve.status}). Nothing was sent.`); process.exit(2); }
+console.log(`Reserved $${PROBE_USD} in the lifetime ledger.`);
 
 function png(rgb) {
   const w = 512, h = 768;
