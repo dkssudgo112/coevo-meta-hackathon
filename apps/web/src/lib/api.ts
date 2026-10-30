@@ -79,7 +79,7 @@ export function pairLink(workspaceId: string, pairSecret: string): string {
 
 /** Parse a scanned QR / link into pairing parts. */
 export function parsePair(text: string): { workspaceId: string; pairSecret: string } | null {
-  const m = text.match(/#pair=(w_[a-z0-9]+)\.([A-Za-z0-9_-]+)/);
+  const m = text.match(/#pair=(wu?_[a-z0-9]+)\.([A-Za-z0-9_-]+)/);
   return m ? { workspaceId: m[1], pairSecret: m[2] } : null;
 }
 

@@ -121,7 +121,7 @@ async function route(req: Request, env: Env): Promise<Response> {
 
 /** Path without workspace ids or tokens, safe to log. */
 function safePath(path: string): string {
-  return path.replace(/w_[a-z0-9]+/g, 'w_*').replace(/\/(m|f|c|card|pr|in|s)_[a-z0-9]+/g, '/$1_*');
+  return path.replace(/wu?_[a-z0-9]+/g, 'w_*').replace(/\/(m|f|c|card|pr|in|s)_[a-z0-9]+/g, '/$1_*');
 }
 
 export default {
