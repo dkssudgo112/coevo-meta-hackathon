@@ -9,7 +9,9 @@ edl.json:
     {"src": "clips/desk.mov", "in": 2.0, "out": 10.0, "caption": "A café owner makes a poster with Meta AI. The phone beside the monitor is the Caddie."}
   ]
 }
-Clips are letterboxed into 1920x1080. Audio from clips is kept; cards are silent.
+Split segments put a PC recording (left) beside a phone recording (right):
+    {"split": {"left": "clips/pc.mov", "left_in": 12.0, "right": "clips/phone.mov", "right_in": 3.5}, "duration": 20, "caption": "..."}
+Clips are letterboxed into 1920x1080. Audio from clips is kept (split: left audio); cards are silent.
 Needs ffmpeg and Pillow. No model calls.
 """
 import json
@@ -90,7 +92,20 @@ def main(edl_path):
             cap = os.path.join(d, f"cap{i}.png")
             caption_png(seg.get("caption"), cap)
             part = os.path.join(d, f"p{i}.mp4")
-            if "card" in seg:
+            if "split" in seg:
+                sp = seg["split"]
+                dur = seg["duration"]
+                left, right = os.path.join(base, sp["left"]), os.path.join(base, sp["right"])
+                vf = (f"color=c=0x141917:s={W}x{H}:r={FPS}:d={dur}[bg];"
+                      f"[0:v]scale=1240:840:force_original_aspect_ratio=decrease,fps={FPS}[l];"
+                      f"[1:v]scale=-2:840,fps={FPS}[r];"
+                      f"[bg][l]overlay=x=60:y=40+(840-h)/2[t1];[t1][r]overlay=x=W-w-80:y=40[t2];"
+                      f"[t2][2:v]overlay=0:0,format=yuv420p[v]")
+                audio = ["-map", "0:a"] if has_audio(left) else ["-map", "3:a"]
+                extra = [] if has_audio(left) else ["-f", "lavfi", "-t", str(dur), "-i", "anullsrc=r=48000:cl=stereo"]
+                run(["-ss", str(sp.get("left_in", 0)), "-t", str(dur), "-i", left, "-ss", str(sp.get("right_in", 0)), "-t", str(dur), "-i", right, "-i", cap, *extra,
+                     "-filter_complex", vf, "-map", "[v]", *audio, "-t", str(dur), "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", part])
+            elif "card" in seg:
                 bg = os.path.join(d, f"card{i}.png")
                 card_png(seg["card"], bg)
                 dur = seg.get("duration", 4)
