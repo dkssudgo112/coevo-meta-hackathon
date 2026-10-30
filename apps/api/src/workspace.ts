@@ -12,6 +12,7 @@ import { followUp, failureStatus, processMoment, retainOrDiscard, ruleDecision, 
 import { skillFixture } from '../../../packages/core/src/labels.ts';
 import { cardAction, generate, podcastAsk, practiceAttempt, practiceRetryImage, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
 import { Store } from './store.ts';
+import { usWorkspaces } from './jurisdiction.ts';
 import type { LedgerScope } from './budget-do.ts';
 import type { Env } from './env.ts';
 import { bearer, bytesToDataUrl, error, id, imageSize, json, MAX_AUDIO_BYTES, MAX_FRAME_BYTES, now, secret, sha256 } from './util.ts';
@@ -28,7 +29,14 @@ interface Meta {
   paired: boolean;
   /** TEST ONLY (fake models on 127.0.0.1): this workspace spends on its own fake ledger. */
   testLedger?: string;
+  /** This (older) workspace was copied to a US-jurisdiction workspace; clients are told to move there. */
+  movedTo?: string;
+  /** This workspace is a copy of an older one; its media keys keep the original id. */
+  movedFrom?: string;
 }
+
+/** Cloudflare colos in regions where Meta's API is not offered; an object found there relocates. */
+const RESTRICTED_COLOS = new Set(['HKG', 'MFM']);
 
 interface Job { contentId: string; jobId: string; startedAt: number }
 
@@ -275,8 +283,11 @@ export class Workspace extends DurableObject<Env> {
     };
   }
 
+  private inflight = 0;
+
   private enqueue(task: () => Promise<void>): void {
-    this.queue = this.queue.then(task).catch(e => {
+    this.inflight++;
+    this.queue = this.queue.then(task).finally(() => { this.inflight--; }).catch(e => {
       console.error(JSON.stringify({ event: 'task_error', name: (e as Error)?.name, message: String((e as Error)?.message ?? e).slice(0, 300) }));
       this.notice('warn', 'task-failed', 'A background step failed. You can retry it.');
     });
@@ -317,7 +328,8 @@ export class Workspace extends DurableObject<Env> {
   // ------------------------------------------------------------ alarm
 
   async alarm(): Promise<void> {
-    if (!(await this.loadMeta())) return;
+    const meta = await this.loadMeta();
+    if (!meta || meta.movedTo) return; // a moved workspace's copy polls its own jobs
     const ctx = this.context();
     let next: number | null = null;
     // New jobs can be added while this alarm awaits the media service, so the list is
@@ -396,10 +408,14 @@ export class Workspace extends DurableObject<Env> {
 
     if (path === '/init' && method === 'POST') return this.init(req, url);
     if (!meta) return error(404, 'not_found', 'Unknown workspace.');
+    if (meta.movedTo) return this.moved(meta.movedTo);
     if (path === '/pair' && method === 'POST') return this.pair(req);
 
     const role = await this.auth(req);
     if (!role) return error(401, 'unauthorized', 'Pair this device first.');
+    // An older workspace whose object sits where Meta's API is not offered moves itself to the US
+    // jurisdiction (data and token hashes copied, nothing here rewritten) once no work is running.
+    if (meta.id.startsWith('w_') && this.inflight === 0 && (await this.restricted())) return this.relocate();
     const ctx = this.context();
     const seg = path.split('/').filter(Boolean);
 
@@ -415,6 +431,15 @@ export class Workspace extends DurableObject<Env> {
           return json({ ok: true });
         }
         return json({ keys: this.testR2.keys });
+      }
+      if (seg[0] === 'test' && seg[1] === 'jobs' && method === 'GET' && fakeMeta(this.env)) {
+        // TEST ONLY: the media jobs this workspace is tracking (content id + job id).
+        return json((await this.ctx.storage.get<Job[]>('jobs')) ?? []);
+      }
+      if (seg[0] === 'test' && seg[1] === 'restricted' && method === 'POST' && fakeMeta(this.env)) {
+        // TEST ONLY: behave as if this object sat in a region Meta's API does not serve.
+        this.forceRestricted = true;
+        return json({ ok: true });
       }
       if (seg[0] === 'test' && seg[1] === 'restart' && method === 'POST' && fakeMeta(this.env)) {
         // TEST ONLY: behave like a freshly started instance (the old in-memory work is treated as lost).
@@ -550,6 +575,54 @@ export class Workspace extends DurableObject<Env> {
 
   // ------------------------------------------------------------ handlers
 
+  private colo: string | null | undefined = undefined;
+  private forceRestricted = false;
+
+  /** Where this object's outbound requests leave from (one Cloudflare trace per instance). */
+  private async restricted(): Promise<boolean> {
+    if (this.forceRestricted) return true;
+    if (this.colo === undefined) {
+      try {
+        const t = await (await fetch('https://www.cloudflare.com/cdn-cgi/trace', { signal: AbortSignal.timeout(3_000) })).text();
+        this.colo = /^colo=(.+)$/m.exec(t)?.[1] ?? null;
+      } catch { this.colo = null; }
+    }
+    return !!this.colo && RESTRICTED_COLOS.has(this.colo);
+  }
+
+  private moved(to: string): Response {
+    return json({ error: { code: 'workspace_moved', message: 'This workspace moved to a region the model service supports. Reconnecting…', movedTo: to } }, 409);
+  }
+
+  /**
+   * Copy every stored record (sessions, moments, content, cards, token hashes, budget day) to a new
+   * workspace in the US jurisdiction, then point clients there. The copy keeps all ids and evidence as
+   * they are; this object keeps its data and only records where it moved. Nothing is proxied.
+   */
+  private async relocate(): Promise<Response> {
+    const from = this.meta!.id;
+    const to = id('wu');
+    const entries = [...(await this.ctx.storage.list()).entries()];
+    const us = usWorkspaces(this.env);
+    await us.get(us.idFromName(to)).importFrom(entries, from, to);
+    this.meta = { ...this.meta!, movedTo: to };
+    await this.saveMeta();
+    console.log(JSON.stringify({ event: 'workspace_relocated', from, to, colo: this.colo ?? (this.forceRestricted ? 'test' : null), records: entries.length }));
+    for (const w of this.clients) w.close().catch(() => undefined);
+    this.clients.clear();
+    return this.moved(to);
+  }
+
+  /** RPC from an older workspace that is moving here (never reachable over HTTP). */
+  async importFrom(entries: [string, unknown][], from: string, to: string): Promise<void> {
+    if (await this.ctx.storage.get('meta')) throw new Error('This workspace already exists.');
+    for (let i = 0; i < entries.length; i += 100) await this.ctx.storage.put(Object.fromEntries(entries.slice(i, i + 100)));
+    const meta = (await this.ctx.storage.get<Meta>('meta'))!;
+    await this.ctx.storage.put('meta', { ...meta, id: to, movedFrom: from, movedTo: undefined });
+    this.meta = null;
+    if (((await this.ctx.storage.get<Job[]>('jobs')) ?? []).length) await this.schedule(5_000);
+  }
+
   private async init(req: Request, url: URL): Promise<Response> {
     if (this.meta) return error(409, 'exists', 'Workspace already exists.');
     const b = (await req.json().catch(() => ({}))) as { kind?: 'user' | 'sample'; testLedger?: string | null };
@@ -605,7 +678,8 @@ export class Workspace extends DurableObject<Env> {
   }
 
   private async media(key: string): Promise<Response> {
-    if (!key.startsWith(`w/${this.meta!.id}/`)) return error(404, 'not_found', 'Unknown media.');
+    const own = [this.meta!.id, this.meta!.movedFrom].filter(Boolean).map(x => `w/${x}/`);
+    if (!own.some(p => key.startsWith(p))) return error(404, 'not_found', 'Unknown media.');
     const obj = await this.env.MEDIA.get(key);
     if (!obj) return error(404, 'not_found', 'This file was deleted.');
     return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'Cache-Control': 'private, max-age=300' } });

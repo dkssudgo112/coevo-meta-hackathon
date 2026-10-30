@@ -32,6 +32,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * An older workspace that sat where the model service is not offered moves itself to a supported
+ * region. Its answer says where; this device keeps its token, updates the workspace id and reloads.
+ */
+export function followMove(creds: Creds | null, status: number, data: unknown): boolean {
+  const e = (data as { error?: { code?: string; movedTo?: string } } | null)?.error;
+  if (!creds || status !== 409 || e?.code !== 'workspace_moved' || !e.movedTo || !/^wu_[a-z0-9]{8,24}$/.test(e.movedTo) || e.movedTo === creds.workspaceId) return false;
+  saveCreds({ ...creds, workspaceId: e.movedTo }, creds.role);
+  if (typeof location !== 'undefined') location.reload();
+  return true;
+}
+
 export async function api<T>(creds: Creds | null, path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (creds) headers.set('Authorization', `Bearer ${creds.token}`);
@@ -39,7 +51,10 @@ export async function api<T>(creds: Creds | null, path: string, init: RequestIni
   const url = creds && !path.startsWith('/api/') ? `/api/w/${creds.workspaceId}${path}` : path;
   const res = await fetch(url, { ...init, headers });
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data?.error?.code ?? 'error', data?.error?.message ?? `Request failed (${res.status}).`);
+  if (!res.ok) {
+    followMove(creds, res.status, data);
+    throw new ApiError(res.status, data?.error?.code ?? 'error', data?.error?.message ?? `Request failed (${res.status}).`);
+  }
   return data as T;
 }
 

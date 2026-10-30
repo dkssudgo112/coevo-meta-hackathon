@@ -33,14 +33,18 @@ These run in the test build in a browser, with a scripted fake model and recorde
 
 ## Known issues
 
-- **Workspaces placed in Hong Kong could not reach Meta's API (found and fixed Oct 31).** What looked like intermittent provider outages was where each workspace's server object was created. Meta calls are made from that object, which stays where it was first created; objects placed in Hong Kong got 404 `model_not_found` for every model, while the same calls from the US or the maintainer's computer worked (a free diagnostic probe showed both in the same minute). New workspaces are now created in western North America. Workspaces made earlier in Hong Kong still cannot make live calls; the app refuses with no spend. The recorded sample is unaffected.
+- **Workspaces placed in Hong Kong could not reach Meta's API (found and fixed Oct 31).** What looked like intermittent provider outages was where each workspace's server object was created. Meta calls are made from that object, which stays where it was first created; objects placed in Hong Kong got 404 `model_not_found` for every model, while the same calls from the US or the maintainer's computer worked (a free diagnostic probe showed both in the same minute). New workspaces are now created in Cloudflare's US jurisdiction, which fixes where they run. An older workspace that finds itself in a restricted region copies its data and token hashes to a new US workspace, and the paired phone and Desk switch to it on their next request with no re-pairing; the original is kept as it was. The recorded sample is unaffected.
 
-## Not yet verified
+## Assumed setup, not measured (accepted by the maintainer on Oct 31)
 
-- **Real phone camera:** the 20-frame benchmark (reading accuracy on camera frames, latency, SAM screen detection), haptics, and the camera-off indicator on pause.
-- **A real human voice** (only synthetic speech so far).
-- **SAM 3.1 pointing on posters with the real model**, and the earphone voice on a phone.
-- The three-minute demo video, simulated persona tests (to be labeled as simulations), and the submission texts.
+The maintainer decided that, as in the earlier Coevo project, the phone is assumed to stand beside the monitor: the flow is checked in a phone-sized browser with controlled camera and microphone input and screenshots of actual AI replies, not on a physical phone. These physical characteristics are therefore **not measured**, and are not claimed:
+
+- Reading accuracy and latency on real phone-camera frames (S1, S3) and SAM screen finding on real phone photos (S2; the protocol is ready).
+- Haptics, the camera-in-use indicator on pause, and a real human voice (speech so far is synthetic).
+
+## Still to do
+
+- The three-minute demo video (concept setup labeled as such, real browser footage), and the submission texts.
 
 ## Publication
 

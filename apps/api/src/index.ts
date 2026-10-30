@@ -1,5 +1,6 @@
 import type { Readiness } from '../../../packages/contracts/index.ts';
 import { fakeMeta, liveEnabled, models } from './meta.ts';
+import { usWorkspaces } from './jurisdiction.ts';
 import { mediaConfigured } from './media.ts';
 import type { Env } from './env.ts';
 import { error, id, json, sha256 } from './util.ts';
@@ -29,12 +30,17 @@ function withHeaders(res: Response): Response {
 
 /**
  * Every Meta call is made from the workspace's Durable Object, which stays where it was first created.
- * Objects placed in Hong Kong (where Meta's API answers 404 model_not_found for every model) could never
- * work, so new workspaces are created in western North America. The hint only affects creation.
+ * Meta's API is not offered in some regions (Hong Kong among them), so new workspaces ("wu_…") are
+ * created in Cloudflare's US jurisdiction, which guarantees where the object runs and stores data.
+ * Older workspaces ("w_…") keep their original global-namespace id; one found in a restricted region
+ * moves itself (see Workspace.relocate), it is never proxied.
  */
-function workspaceStub(env: Env, wsId: string) {
-  const hint = (env.COEVO_DO_LOCATION_HINT ?? 'wnam') as DurableObjectLocationHint;
-  return env.WORKSPACE.get(env.WORKSPACE.idFromName(wsId), { locationHint: hint });
+export function workspaceStub(env: Env, wsId: string) {
+  if (wsId.startsWith('wu_')) {
+    const us = usWorkspaces(env);
+    return us.get(us.idFromName(wsId));
+  }
+  return env.WORKSPACE.get(env.WORKSPACE.idFromName(wsId));
 }
 
 async function createWorkspace(req: Request, env: Env, kind: 'user' | 'sample'): Promise<Response> {
@@ -43,7 +49,7 @@ async function createWorkspace(req: Request, env: Env, kind: 'user' | 'sample'):
   if (!(await budget.allowCreate(await sha256(`coevo:${ip}`), kind === 'sample' ? 10 : 20))) {
     return error(429, 'rate_limited', 'Too many new workspaces from this network. Try again later.');
   }
-  const wsId = id('w');
+  const wsId = id('wu');
   const stub = workspaceStub(env, wsId);
   // TEST ONLY: with fake models on 127.0.0.1, a test run may keep its spend on its own fake ledger.
   const testLedger = fakeMeta(env) ? req.headers.get('x-coevo-test-ledger') : null;
@@ -100,7 +106,12 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (path === '/api/workspaces' && req.method === 'POST') return createWorkspace(req, env, 'user');
   if (path === '/api/sample' && req.method === 'POST') return createWorkspace(req, env, 'sample');
 
-  const m = path.match(/^\/api\/w\/(w_[a-z0-9]{8,24})(\/.*)?$/);
+  // TEST ONLY (fake models on 127.0.0.1): create an old-style global-namespace workspace to check relocation.
+  if (path === '/api/test/legacy-workspace' && req.method === 'POST' && fakeMeta(env)) {
+    const wsId = id('w');
+    return env.WORKSPACE.get(env.WORKSPACE.idFromName(wsId)).fetch(new Request(`https://do/api/w/${wsId}/init`, { method: 'POST', body: JSON.stringify({ kind: 'user', testLedger: req.headers.get('x-coevo-test-ledger') }) }));
+  }
+  const m = path.match(/^\/api\/w\/(wu?_[a-z0-9]{8,24})(\/.*)?$/);
   if (m) {
     if (m[2] === '/init') return error(404, 'not_found', 'Unknown route.');
     return workspaceStub(env, m[1]).fetch(req);

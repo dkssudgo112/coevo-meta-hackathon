@@ -1,3 +1,4 @@
+import { followMove } from './api.ts';
 import { useEffect, useRef, useState } from 'react';
 import type { EntityName, ServerEvent, Snapshot } from '../../../../packages/contracts/index.ts';
 import type { Creds } from './api.ts';
@@ -45,6 +46,7 @@ export function useWorkspace(creds: Creds | null, onNotice?: (e: Extract<ServerE
           setConn(attempt ? 'retrying' : 'connecting');
           const res = await fetch(`/api/w/${creds.workspaceId}/events`, { headers: { Authorization: `Bearer ${creds.token}` }, signal: ctrl.signal });
           if (res.status === 401 || res.status === 404) { setConn('unauthorized'); return; }
+          if (res.status === 409 && followMove(creds, res.status, await res.json().catch(() => null))) return;
           if (!res.ok || !res.body) throw new Error('stream');
           const reader = res.body.getReader();
           const dec = new TextDecoder();

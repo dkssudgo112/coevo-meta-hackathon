@@ -265,14 +265,18 @@ await freshWorkspace();
     console.log('DEBUG', JSON.stringify({ session: s.sessions.find(x => x.id === sess.id)?.wrapStatus, content: s.content.filter(c => c.sessionId === sess.id).map(c => `${c.format}:${c.status}`) }));
     throw e;
   }
-  const before = await (await fetch(`${fake}/stats`)).json();
+  // Measured for THIS session only: the fake server's counters are global, and other test sessions
+  // that reach the 10-minute idle end start their own wraps meanwhile.
+  const contentIds = (await state()).content.filter(c => c.sessionId === sess.id).map(c => c.id);
   await call(`/sessions/${sess.id}`, { method: 'DELETE' });
+  await fetch(`${fake}/sent/clear`, { method: 'POST' });
   await sleep(12000);
   const st = await state();
-  const after = await (await fetch(`${fake}/stats`)).json();
+  const jobs = (await call('/test/jobs')).body ?? [];
+  const sentAfter = await (await fetch(`${fake}/sent/contains`, { method: 'POST', body: JSON.stringify({ marker: sess.id }) })).json();
   check('deleting during content generation leaves no content or cards behind', !st.content.some(c => c.sessionId === sess.id) && !st.cards.some(c => c.sessionId === sess.id) && !st.sessions.some(x => x.id === sess.id));
-  check('no new media jobs are dispatched for deleted content', after.jobsStarted === before.jobsStarted, `jobs ${before.jobsStarted} → ${after.jobsStarted}`);
-  check('no further generations ran after deletion (manual, flashcards, short)', ['manual', 'flashcards', 'short'].every(n => (after.calls[n] ?? 0) === (before.calls[n] ?? 0)));
+  check('no new media jobs are dispatched for deleted content', !jobs.some(j => contentIds.includes(j.contentId)), `${jobs.length} tracked jobs, none for the deleted session's ${contentIds.length} items`);
+  check('no further generations ran for the deleted session (no model request mentions it after deletion)', sentAfter.requests >= 0 && !sentAfter.contains, `${sentAfter.requests} requests from all test sessions checked`);
 }
 
 // Restart during a wrap (TEST hook): cut-off and queued items fail at once and can be retried.
@@ -442,6 +446,33 @@ await call(`/practice/${fxp.body.id}/attempt`, { method: 'POST', body: JSON.stri
 const fxd = await until(s => s.practice.find(x => x.id === fxp.body.id && (x.status === 'done' || x.status === 'failed')), 'fixture-session practice');
 const fxSkill = (await state()).skills.find(k => k.practiceId === fxp.body.id);
 check('practice origin: an attempt in a fixture session is stored as sample input and its skill as not real-user evidence', fxp.body.fixture === true && fxd.v.fixture === true && fxSkill?.fixture === true, `attempt.fixture=${fxd.v.fixture} skill.fixture=${fxSkill?.fixture}`);
+}
+
+// New workspaces live in the US jurisdiction ("wu_…"). An older global-namespace workspace ("w_…")
+// whose object sits where the model service is not offered (TEST hook) copies itself there; the same
+// tokens keep working, the old id answers "moved", and nothing is proxied.
+{
+  check('new workspaces get a US-jurisdiction id', /^wu_/.test(creds.ws), creds.ws.slice(0, 3));
+  const legacy = await (await fetch(`${base}/api/test/legacy-workspace`, { method: 'POST', headers: { 'X-Coevo-Test-Ledger': RUN_LEDGER } })).json();
+  const lp = await (await fetch(`${base}/api/w/${legacy.workspaceId}/pair`, { method: 'POST', body: JSON.stringify({ pairSecret: legacy.pairSecret }), headers: { 'Content-Type': 'application/json' } })).json();
+  creds = { ws: legacy.workspaceId, token: lp.phoneToken };
+  await fetch(`${fake}/reset`);
+  await call('/sessions', { method: 'POST', body: '{}' });
+  await sleep(2600);
+  const kept = await frame(0);
+  const before = await state();
+  await call('/test/restricted', { method: 'POST' });
+  const moved = await call('/state');
+  const to = moved.body?.error?.movedTo;
+  const desk = { Authorization: `Bearer ${legacy.deskToken}` };
+  const old = await fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: desk });
+  creds = { ws: to, token: lp.phoneToken };
+  const after = await state();
+  const deskAfter = await (await fetch(`${base}/api/w/${to}/state`, { headers: desk })).json();
+  const media = kept.m.frame?.storedKey ? await fetch(`${base}/api/w/${to}/media/${kept.m.frame.storedKey}`, { headers: { Authorization: `Bearer ${lp.phoneToken}` } }) : null;
+  check('a restricted-region workspace moves: 409 with a wu_ id, data and both tokens work there, old media still served', legacy.workspaceId.startsWith('w_') && moved.res.status === 409 && /^wu_/.test(to ?? '') && old.status === 409 && after?.workspace?.id === to && after.moments.length === before.moments.length && after.sessions.length === before.sessions.length && deskAfter?.workspace?.id === to && (media ? media.status === 200 : true), `${legacy.workspaceId.slice(0, 4)}… → ${to?.slice(0, 5)}… moments ${before.moments.length}/${after?.moments?.length} media ${media?.status}`);
+  const next = await frame(1);
+  check('the moved workspace keeps working (a new frame is read there)', next.m.readingStatus === 'ok');
 }
 
 const fin = await state();

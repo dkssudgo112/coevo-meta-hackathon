@@ -22,15 +22,17 @@ This matrix tracks every approved requirement through three depth levels and rec
 
 **Live end-to-end session** (deployed app, real models, scripted fictional café on five screenshots of actual Meta AI replies, synthetic voice): quiet notes → intervention at the question step quoting the person → spoken answer transcribed → Caddie reply → specific brief labeled coached → all five formats (note, My playbook, flashcards, 93 s podcast, 38.9 s 1080×1920 short) → card approved. Meta $0.163 + $0.08 media reservation. Not real-user or learning evidence.
 
-Last updated: 2026-10-30 (late night KST).
+Last updated: 2026-10-31 (KST).
+
+**Scope decision (maintainer, Oct 31):** the phone is assumed to stand beside the monitor, as in the earlier Coevo project. The flow is verified in a phone-sized browser with controlled camera and microphone input and screenshots of actual AI replies. Physical-device measurements (camera-frame reading accuracy and latency, SAM on phone photos, haptics, camera indicator, a human voice) are marked **assumed setup, not measured** — they are not claimed and no longer block completion.
 
 ## A. Observation
 
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| A1 | Phone rear camera capture over HTTPS | ☐ | ☐ | ☐ | | Needs `device` evidence (R3) |
+| A1 | Phone rear camera capture over HTTPS | ☐ | ☐ | ☐ | | Assumed setup, not measured |
 | A2 | Device-side crop to the screen before upload; setup frame disclosed | ◐ | ☐ | ☐ | code: `FrameSampler` crops on device; aim screen discloses the one setup photo | Needs `device` |
-| A3 | On-device change detection (send only after a settled change) | ◐ | ☐ | ☐ | unit: `packages/core/test` | Thresholds need `device` tuning |
+| A3 | On-device change detection (send only after a settled change) | ◐ | ☐ | ☐ | unit: `packages/core/test` | Thresholds not tuned on a physical phone (assumed setup) |
 | A4 | SAM 3.1 finds the screen on the disclosed setup frame → crop suggestion | ☐ | ☐ | ☐ | | S2 |
 | A5 | Spark reads a frame → validated `Reading` | ☑ | ◐ | ☐ | live: actual Meta AI screens read correctly (request word-set 1.0, tool 1.0); live session read 5 screens in order, 6–9 s per turn | Phone-camera frames pending (S1) |
 | A6 | Photo fallback (single photo) | ◐ | ☐ | ☐ | code: phone photo + crop, Desk screenshot upload | |
@@ -46,14 +48,14 @@ Last updated: 2026-10-30 (late night KST).
 | --- | --- | --- | --- | --- | --- | --- |
 | B1 | Every decision has a reason, quiet included (live model) | ☑ | ◐ | ☐ | live session: quiet notes ("Second premium request, still converging, staying quiet."), cooldown note, intervention reason | |
 | B2 | Ladder question → ingredients → example; no skipping | ◐ | ◐ | ☐ | unit: a skipped-ahead proposal is refused whole (never relabelled with its example text), a requested example without a brief is refused; fake e2e: the Worker asks the model once more for the allowed step (regenerated), a second skip stays quiet; the allowed step is now sent to the model; live: intervention at the question step quoting "more premium" | Ingredients/example steps pending live |
-| B3 | NOW card + session flow, one primary action; an answer in progress is never replaced | ◐ | ◐ | ☐ | TEST build in the browser: while a typed draft or a recording is open, a newer question waits (no swap, no buzz, "newer note" line), the answer is stored on the question it was started for, then the newer question appears and buzzes once; with a content sheet open a new question waits with a quiet line and buzzes once on return (plan 3.4) | Device check pending |
+| B3 | NOW card + session flow, one primary action; an answer in progress is never replaced | ◐ | ◐ | ☐ | TEST build in the browser: while a typed draft or a recording is open, a newer question waits (no swap, no buzz, "newer note" line), the answer is stored on the question it was started for, then the newer question appears and buzzes once; with a content sheet open a new question waits with a quiet line and buzzes once on return (plan 3.4) | Physical phone not measured (assumed setup) |
 | B4 | Voice answer: record → 16 kHz WAV → Voice Transcribe | ☑ | ◐ | ☐ | live: 10 s synthetic answer transcribed (one place name misheard) → Caddie reply; keyword-hint 400 found and fixed (single words, retry without hints); unit + browser (delayed test microphone): a repeated tap while the microphone opens is ignored, cancelling before permission stops the late stream and starts no audio context | Real microphone + human voice pending |
-| B5 | Haptic nudge (`navigator.vibrate`), visual pulse fallback | ◐ | ☐ | ☐ | code: buzz + pulse on every new question, including the first of a quiet session; history on reopen does not buzz (bug found in review, fixed) | Device check pending; iOS Safari has no vibrate API |
+| B5 | Haptic nudge (`navigator.vibrate`), visual pulse fallback | ◐ | ☐ | ☐ | code: buzz + pulse on every new question, including the first of a quiet session; history on reopen does not buzz (bug found in review, fixed) | Physical haptics not measured (assumed setup); iOS Safari has no vibrate API |
 | B6 | Later defers with a longer cooldown; card stays in flow | ◐ | ☐ | ☐ | unit: later-cooldown | |
 | B7 | "That's not what I asked" marks a misread and drops its evidence | ◐ | ☐ | ☐ | fake e2e: the moment is marked misread; code: misread moments are skipped by change labels, memory, unreadable-run counting and the NOW card | Exclusion not yet asserted end to end |
 | B8 | No interrupt while typing; praise removed; quotes must be grounded | ◐ | ☐ | ☐ | unit | |
 | B9 | First-sighting acknowledgement written by the model | ☑ | ☐ | ☐ | live: "See Meta AI making cafe poster; will speak only when helpful." | |
-| B10 | Live Caddie voice only with earphones (browser speech synthesis, opt-in) | ◐ | ◐ | ☐ | TEST build in the browser: off by default; turning it on needs "My earphones are in"; a new question is read once; it turns itself off when audio devices change; silent while an answer is in progress | Uses only an English voice that runs on the device (never an online browser voice); browsers cannot detect earphones reliably, so the person confirms; device check pending |
+| B10 | Live Caddie voice only with earphones (browser speech synthesis, opt-in) | ◐ | ◐ | ☐ | TEST build in the browser: off by default; turning it on needs "My earphones are in"; a new question is read once; it turns itself off when audio devices change; silent while an answer is in progress | Uses only an English voice that runs on the device (never an online browser voice); browsers cannot detect earphones reliably, so the person confirms; physical phone not measured (assumed setup) |
 
 ## C. Connection
 
@@ -110,7 +112,7 @@ Last updated: 2026-10-30 (late night KST).
 
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| H1 | Cloudflare Worker + Durable Objects + R2 + static assets | ☑ | ◐ | ☐ | deployed: https://coevo-caddie.coevo-meta-hackathon.workers.dev with live calls under the budget | |
+| H1 | Cloudflare Worker + Durable Objects + R2 + static assets | ☑ | ◐ | ☐ | deployed: https://coevo-caddie.coevo-meta-hackathon.workers.dev with live calls under the budget; new workspaces are created in Cloudflare's US jurisdiction (Meta's API is not offered in Hong Kong, where earlier workspace objects were placed); an older workspace found in a restricted region copies itself there with its data and token hashes and tells its phone and Desk to follow (fake e2e: data, both tokens and old media keep working; nothing is proxied) | The global budget object is unchanged |
 | H2 | Health/status, security headers, rate limits | ☑ | ☑ | ☐ | deployed integration 17/17: CSP, Permissions-Policy, frame 429, admin routes closed, test mode off | |
 | H3 | Application-enforced budget: approved $3 total, $2.50 lifetime ceiling, single authority; per workspace and per sample caps | ☑ | ☑ | ☐ | unit (36): ledger rules, exact pre-dispatch reservation from counted input tokens, refusal when unverifiable, missing usage kept, ambiguous failures kept, Retry-After honored, no-bypass guards; real Durable Object (`npm run test:budget`): concurrent reservations never exceed $2.50; durable tickets settle once (duplicate, unknown and 20 concurrent settles); tickets reserved before a restart settle once after it; priced model allowlist and WAV-derived audio cost; live: every real call reserved and settled through the deployment; a full session cost Meta $0.163 | |
 | H4 | Three entrances: camera / photo / sample session (live model, fixture frames labeled) | ☑ | ◐ | ☐ | live: the full public sample on the deployed app (all five formats, $0.2034 Meta + $0.08 media reservation); a labeled recorded live run of it replays with no model calls as the default preview (deployed; exact reviewed bytes; reviewer fact-check notes beside the output) | Real phone camera path pending (R3) |
@@ -123,8 +125,8 @@ Last updated: 2026-10-30 (late night KST).
 
 | ID | Check | Pass criterion | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| S1 | Spark reading of 20 real phone-camera frames | ≥ 90% request text, 100% tool | ☐ | Scoring ready: each frame against its own human-verified request (word/character accuracy, critical words, "nothing readable" expectations), tool on every frame. Needs the phone run (R3) |
-| S2 | SAM 3.1 monitor detection | ≥ 18/20, ≤ 2 s | ☐ | Protocol and tools ready ([S2-PROTOCOL.md](S2-PROTOCOL.md)): 20 distinct real phone photos with consent, a person-drawn screen box made before any model sees them, scoring by coverage/area and each photo's server SAM time (the plan's "≤ 2 s" read conservatively as every photo), deletion afterwards. Needs the phone photos (R3) |
+| S1 | Spark reading of 20 real phone-camera frames | ≥ 90% request text, 100% tool | assumed setup, not measured | Scoring ready: each frame against its own human-verified request (word/character accuracy, critical words, "nothing readable" expectations), tool on every frame. Not run: assumed setup |
+| S2 | SAM 3.1 monitor detection | ≥ 18/20, ≤ 2 s | assumed setup, not measured | Protocol and tools ready ([S2-PROTOCOL.md](S2-PROTOCOL.md)): 20 distinct real phone photos with consent, a person-drawn screen box made before any model sees them, scoring by coverage/area and each photo's server SAM time (the plan's "≤ 2 s" read conservatively as every photo), deletion afterwards. Not run: assumed setup |
 | S3 | Frame → card latency | p50 ≤ 6 s | ◐ | Not yet measured on phone frames. Live, one real screen capture × 3 through the deployed app: separate read+decide p50 11.5 s (4 round trips) → combined turn p50 5.9 s client / 4.9 s server (2 round trips). Benchmark frames now record the phone's own screen change → card time, which is the S3 measure; server time is context only |
 | S4 | Meta AI (KR): image generation + rule changes behavior | both reproducible | ☑ (fallback) | Image: PASS (real 1152×2048 poster, private record). Memory across new chats: FAIL. Approved fallback PASS: rule as first message of a dedicated, pinned chat → Meta AI asked audience, price, mood and photo before generating (manual check by the maintainer's account; private record) |
 | S5 | Modal open TTS, two English voices, 60 s | acceptable quality, ≤ 60 s render, commercial-use license | ☑ | Kokoro-82M (Apache-2.0); maintainer judged the two voices distinguishable and listenable; 61.6 s two-voice benchmark rendered in 58 s end to end (one bounded run) |

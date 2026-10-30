@@ -1,3 +1,4 @@
+import { followMove } from './api.ts';
 import { useEffect, useState } from 'react';
 import type { Creds } from './api.ts';
 
@@ -17,6 +18,7 @@ export function useMedia(creds: Creds | null, key: string | null | undefined): {
     setState('loading');
     fetch(`/api/w/${creds.workspaceId}/media/${key}`, { headers: { Authorization: `Bearer ${creds.token}` } })
       .then(async r => {
+        if (r.status === 409) followMove(creds, 409, await r.json().catch(() => null));
         if (!r.ok) throw new Error(String(r.status));
         const u = URL.createObjectURL(await r.blob());
         cache.set(key, u);
