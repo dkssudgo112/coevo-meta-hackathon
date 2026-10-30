@@ -183,6 +183,7 @@ export function PodcastView({ item, creds }: { item: ContentItem; creds: Creds }
     <article className="stack">
       <h3>{p.title}</h3>
       <p className="faint">Caddie and {p.speakers.guest} · {p.durationSec ? `${Math.round(p.durationSec)} s` : `${p.words} words`}</p>
+      <p className="faint">{p.speakers.guest.split(',')[0]} is a character the model wrote to argue the other side; not a real person.</p>
       {url ? <audio ref={audio} controls src={url} onTimeUpdate={e => setT(e.currentTarget.currentTime)} style={{ width: '100%' }} />
         : media.state === 'gone' ? <div className="notice warn row wrap" role="alert"><span className="grow">The audio could not be loaded. The full transcript is below.</span><button className="btn small" onClick={media.reload}>Try again</button></div>
         : media.state === 'loading' ? <p className="faint" role="status">Loading the audio…</p>
@@ -198,7 +199,7 @@ export function PodcastView({ item, creds }: { item: ContentItem; creds: Creds }
           <button className="btn" onClick={resume}>Return to listening</button>
         </div>
       ) : replay ? (
-        <p className="faint">In a live session you can pause here, ask about this part out loud, and resume at the same line.</p>
+        <p className="faint">Asking about a part of the podcast works in a live session, not in this replay.</p>
       ) : (
         <button className="btn" onClick={startAsk}>Ask about this part</button>
       )}

@@ -77,6 +77,9 @@ function NowPanel({ m }: { m: RecordedMoment }) {
         <p className="message">{m.change.addedIngredients.length ? `You added ${m.change.addedIngredients.map(k => INGREDIENT_TEXT[k] ?? k).join(', ')}.` : 'Your AI asked the clarifying questions first.'}</p>
         <div className="row"><AssistLabel value={m.change.assistance} /></div>
         {d?.note && <p className="faint">{d.note}</p>}
+        <p className="faint">{m.change.addedIngredients.length
+          ? 'How labels work: a change that follows a Caddie question is labeled “with the Caddie”. This owner’s brief was scripted in advance, so here it shows the rule, not a measured effect.'
+          : 'An AI that asks first is labeled “with the Caddie” because a Caddie card caused it. This chat began with a card from an earlier run; this run’s own card was never applied.'}</p>
       </section>
     );
   }
@@ -135,6 +138,7 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
         <div className="stack" style={{ gap: 4 }}>
           <p className="faint">Recorded {new Date(`${run.recordedOn}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} through the deployed app · {[...new Set(Object.values(run.models))].join(' · ')}. Replayed without new model calls.</p>
           <p className="faint">{run.scenario}</p>
+          <p className="faint">Not in this replay: SAM 3.1 finds your screen during phone setup, and Muse Voice Transcribe turns spoken answers into text — this owner did not speak.</p>
         </div>
         <div className="split">
           <section className="stack">
@@ -145,10 +149,9 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
             {step.kind === 'wrap' && <p className="muted">The session ended. The Caddie planned what was worth making, with a reason for each format. Open any of them on the right.</p>}
             <div className="row wrap">
               <button className="btn" disabled={i === 0} onClick={() => { setPlaying(false); setI(x => x - 1); }}>Back</button>
-              {playing ? <button className="btn" onClick={() => setPlaying(false)}>Pause</button> : <button className="btn primary" disabled={i >= steps.length - 1} onClick={() => { if (steps[i].kind === 'wrap') setI(x => x + 1); setPlaying(true); }}>{i === 0 ? 'Play' : 'Continue'}</button>}
+              {playing ? <button className="btn" onClick={() => setPlaying(false)}>Pause</button> : <button className="btn primary" disabled={i >= steps.length - 1} onClick={() => { if (steps[i].kind === 'wrap') setI(x => x + 1); setPlaying(true); }}>Play</button>}
               <button className="btn" disabled={i >= steps.length - 1} onClick={() => { setPlaying(false); setI(x => x + 1); }}>Next</button>
             </div>
-            <p className="faint">This run cost ${run.cost.metaUsd.toFixed(4)} in Meta usage plus a ${run.cost.mediaReservationUsd.toFixed(2)} media reservation. {run.cost.note}</p>
           </section>
           <section aria-label="The Caddie on the phone">
             <div className="phone-frame">
@@ -183,6 +186,7 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
           </section>
         </div>
         {step.kind === 'wrap' && open && (() => { const c = items.find(x => x.id === open); return c ? <section className="card stack"><h3>{FORMAT_NAME[c.format]}</h3><ContentBody item={c} state={EMPTY} creds={null as never} /></section> : null; })()}
+        <p className="faint">This run cost ${run.cost.metaUsd.toFixed(4)} in Meta usage plus a ${run.cost.mediaReservationUsd.toFixed(2)} media reservation. {run.cost.note}</p>
         {i === steps.length - 1 && (
           <div className="notice">{run.notes[2]} <button className="btn small" onClick={onLive}>Run it live yourself</button> <a className="btn small" href="/desk">Use it with your phone</a></div>
         )}
