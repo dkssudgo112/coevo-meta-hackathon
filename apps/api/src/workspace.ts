@@ -65,6 +65,24 @@ export class Workspace extends DurableObject<Env> {
 
   // ------------------------------------------------------------ infra
 
+  /**
+   * What the Caddie remembers across sessions, derived from records that still exist: answers on
+   * moments that were not deleted or marked misread, and the CURRENT text of rules still in use.
+   * Nothing is stored separately, so deleting a session, revoking or editing a card takes effect at once.
+   */
+  private derivedMemory(): string[] {
+    const answers = this.store.list('moment')
+      .filter(m => (m.response?.kind === 'voice-answer' || m.response?.kind === 'typed-answer') && m.response.transcript && !m.misread
+        && this.store.alive('moment', m.id) && this.store.alive('session', m.work.sessionId))
+      .sort((a, b) => a.response!.at.localeCompare(b.response!.at))
+      .slice(-6)
+      .map(m => `${m.response!.kind === 'typed-answer' ? 'They wrote' : 'They said'}: ${m.response!.transcript!.slice(0, 300)}`);
+    const rules = this.store.list('card')
+      .filter(c => c.status === 'approved' || c.status === 'applied' || c.status === 'observed-working')
+      .map(c => `Approved rule for ${c.targetTool}: ${c.text.slice(0, 300)}`);
+    return [...answers, ...rules];
+  }
+
   /** This instance. Work started by another (pre-restart) instance cannot still be running here. */
   private runner = crypto.randomUUID();
   private recovered = false;
@@ -81,6 +99,8 @@ export class Workspace extends DurableObject<Env> {
    * with no tracked media job were cut off mid-step: say so at once so they can be retried.
    */
   private async recoverInterrupted(): Promise<void> {
+    // Older builds kept an unscoped "memory" list that outlived deleted sessions and revoked rules.
+    await this.ctx.storage.delete('memory');
     const jobs = (await this.ctx.storage.get<Job[]>('jobs')) ?? [];
     const lost = 'Generation was interrupted when the server restarted. Retry to make it again.';
     for (const c of this.store.list('content')) {
@@ -192,11 +212,7 @@ export class Workspace extends DurableObject<Env> {
       spender: this.spender('meta'),
       mediaSpender: this.spender('modal'),
       get r2() { return self.bucket(); },
-      memory: async () => (await this.ctx.storage.get<string[]>('memory')) ?? [],
-      remember: async fact => {
-        const mem = (await this.ctx.storage.get<string[]>('memory')) ?? [];
-        await this.ctx.storage.put('memory', [...mem, fact.slice(0, 300)].slice(-30));
-      },
+      memory: async () => this.derivedMemory(),
       notice: (l, c, m) => this.notice(l, c, m),
       trackJob: async (contentId, jobId) => {
         const jobs = (await this.ctx.storage.get<Job[]>('jobs')) ?? [];
@@ -687,7 +703,6 @@ export class Workspace extends DurableObject<Env> {
         const { transcript } = await transcribe(this.env, ctx.spender, wav, keywords);
         if (!transcript) return error(422, 'no_speech', 'No speech was detected. Try again closer to the microphone.');
         const updated = await this.store.put('moment', { ...m, response: { kind: 'voice-answer', transcript, at: now() } });
-        await ctx.remember(`They said: ${transcript}`);
         this.enqueue(() => followUp(ctx, updated, 'The person just answered your last card by voice. Reply to their answer. '));
         return json(updated);
       } catch (e) {
@@ -701,7 +716,6 @@ export class Workspace extends DurableObject<Env> {
       const text = typeof b.text === 'string' ? b.text.trim() : '';
       if (text.length < 2 || text.length > 600) return error(400, 'bad_text', 'Type an answer of up to 600 characters.');
       const updated = await this.store.put('moment', { ...m, response: { kind: 'typed-answer', transcript: text, at: now() } });
-      await ctx.remember(`They wrote: ${text}`);
       this.enqueue(() => followUp(ctx, updated, 'The person just answered your last card in writing. Reply to their answer. '));
       return json(updated);
     }

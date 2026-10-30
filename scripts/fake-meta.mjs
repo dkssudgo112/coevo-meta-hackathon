@@ -14,6 +14,7 @@ import { deflateSync } from 'node:zlib';
 const PORT = Number(process.env.FAKE_META_PORT ?? 8799);
 let readingIndex = 0;
 const jobs = new Map();
+const sent = [];
 /** One-shot failure injection: task names (e.g. "short") or "media-podcast" / "media-short". */
 const failNext = new Set();
 /** One-shot response delays per task name (ms), and simple stats for race tests. */
@@ -103,6 +104,8 @@ createServer(async (req, res) => {
   for await (const c of req) chunks.push(c);
   const raw = Buffer.concat(chunks);
   const url = req.url ?? '';
+  // TEST ONLY: remember recent provider request bodies so a test can ask whether a marker was sent.
+  if (url.startsWith('/v1/')) { sent.push(raw.toString()); if (sent.length > 300) sent.shift(); }
   try {
     if (req.method === 'POST' && url === '/v1/responses/input_tokens') {
       const body = JSON.parse(raw.toString());
@@ -157,6 +160,8 @@ createServer(async (req, res) => {
     if (url === '/reset') { readingIndex = 0; failNext.clear(); delayNext.clear(); return send(res, 200, { ok: true }); }
     if (req.method === 'POST' && url === '/delay') { const b = JSON.parse(raw.toString()); delayNext.set(b.name, b.ms); return send(res, 200, { ok: true }); }
     if (req.method === 'GET' && url === '/stats') return send(res, 200, stats);
+    if (req.method === 'POST' && url === '/sent/clear') { sent.length = 0; return send(res, 200, { ok: true }); }
+    if (req.method === 'POST' && url === '/sent/contains') { const m = JSON.parse(raw.toString()).marker; return send(res, 200, { requests: sent.length, contains: sent.some(b => b.includes(m)) }); }
     if (req.method === 'POST' && url === '/fail') { failNext.add(JSON.parse(raw.toString()).name); return send(res, 200, { ok: true, failNext: [...failNext] }); }
     send(res, 404, { error: { message: 'not found' } });
   } catch (e) {

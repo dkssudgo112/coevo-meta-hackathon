@@ -40,7 +40,7 @@ export function Landing() {
       <section className="stack">
         <h2>How it works</h2>
         <ol className="stack" style={{ paddingLeft: 20 }}>
-          <li><strong>It watches quietly.</strong> Your phone’s camera reads your screen only when it changes. Only the boxed screen area is sent, to Meta’s Muse Spark model.</li>
+          <li><strong>It watches quietly.</strong> Your phone’s camera reads your screen only when it changes. Only the boxed screen area is sent, to Meta’s Muse Spark model (plus one setup photo, only if you ask it to find your screen).</li>
           <li><strong>It steps in when you’re stuck.</strong> If you keep asking for “more premium”, it asks one question — who it’s for, the price — and you answer out loud or type it. It doesn’t write the brief for you.</li>
           <li><strong>You and your AI both improve.</strong> After the session you get a note, a playbook, flashcards, a two-voice podcast and a short video, chosen for when you’ll use them. Approve a Caddie card and your AI starts asking first.</li>
         </ol>

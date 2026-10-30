@@ -20,7 +20,6 @@ export interface Ctx {
   mediaSpender: Spender;
   r2: R2Bucket;
   memory: () => Promise<string[]>;
-  remember: (fact: string) => Promise<void>;
   notice: (level: 'info' | 'warn', code: string, message: string) => void;
   /** Register a Modal media job for alarm-driven polling. */
   trackJob: (contentId: string, jobId: string) => Promise<void>;

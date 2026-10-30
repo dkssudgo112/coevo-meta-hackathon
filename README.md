@@ -18,7 +18,7 @@ They answer out loud — office workers near the station, 6,500 won, a calm morn
 
 | Part | What it does |
 | --- | --- |
-| **Phone · Caddie** (`/caddie`) | Points its camera at your monitor. On-device change detection sends a frame only when the screen changed and settled. Only the boxed screen area is uploaded. A NOW card and haptic nudge when the Caddie steps in; you answer by voice. |
+| **Phone · Caddie** (`/caddie`) | Points its camera at your monitor. On-device change detection sends a frame only when the screen changed and settled. Only the boxed screen area is uploaded (plus one disclosed setup photo if you ask it to find the screen). A NOW card and haptic nudge when the Caddie steps in; you answer by voice or type. |
 | **PC · Desk** (`/desk`) | A thin tab: QR pairing, a copy inbox for what the Caddie sends, and evidence rows per moment (frame · what you said · what the Caddie did · what changed). |
 | **Sample** (`/sample`) | No phone needed: replays a scripted, fictional café scenario on screenshots of actual Meta AI replies (the follow-up is a separate recorded chat that began with a Coevo card), while the Caddie's readings and replies are live model output. |
 

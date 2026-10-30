@@ -116,11 +116,13 @@ export function modelSourceLine(h: HealthInfo | null): string {
 /** What leaves the phone, who receives it, how long Coevo keeps it, and how to delete it. */
 export function DataTable() {
   const rows: [string, string, string, string][] = [
-    ['Screen frames — only the boxed area, after the screen changed', 'This app’s server, then Meta Muse Spark to read it', 'Discarded after reading unless it is evidence for a moment (a question, a change, the AI’s result); evidence stays in this workspace’s private storage', '“Delete frame” on the Desk, or delete the session'],
-    ['One setup photo, only if you tap “Find my screen”', 'Meta SAM 3.1, to find the monitor', 'Not stored', '—'],
-    ['Spoken answers and practice briefs', 'Meta Muse Voice Transcribe', 'Audio is not stored; the text is kept with the moment', 'Delete the session'],
-    ['Typed answers and briefs', 'This app', 'Kept with the moment', 'Delete the session'],
-    ['Note, playbook, flashcards, podcast, short', 'Written by Muse Spark; podcast and short voices made on Modal; the short shows your before and after screens', 'Kept in this workspace until you delete them', 'Delete the session'],
+    ['Screen frames — only the boxed area, after the screen changed', 'This app’s server, then Meta Muse Spark to read it. For a short, the selected before and after frames also go to Modal to make the video', 'Discarded after reading unless it is evidence for a moment (a question, a change, the AI’s result); evidence stays in this workspace’s private storage', '“Delete frame” removes the stored image; a short already made from it keeps it until you delete the session'],
+    ['One setup photo (the whole camera view), only if you tap “Find my screen”', 'Meta SAM 3.1, to find the monitor', 'Not stored', '—'],
+    ['Spoken answers', 'Meta Muse Voice Transcribe; the text then goes to Muse Spark for the Caddie’s reply and your session content', 'Audio is not stored; the text is kept with the moment', 'Delete the session'],
+    ['Typed answers', 'Meta Muse Spark, for the Caddie’s reply and your session content', 'Kept with the moment', 'Delete the session'],
+    ['Practice briefs (spoken or typed)', 'Voice Transcribe if spoken, then Muse Spark to check it and Muse Image to draw it', 'The text, check and image are kept with the attempt', 'Delete the session (attempts opened in it)'],
+    ['Note, playbook, flashcards, podcast, short', 'Written by Muse Spark from your session; the podcast script and the short’s narration and images go to Modal to make audio and video', 'Kept in this workspace until you delete them', 'Delete the session'],
+    ['Approved Caddie cards', 'Shown to the model as your current rules while approved', 'Kept even after their session is deleted, because they are your rules now', 'Revoke the card'],
   ];
   return (
     <details className="data-table">

@@ -267,7 +267,6 @@ export async function cardAction(ctx: Ctx, cardId: string, action: CardAction, t
   if (action === 'approve') {
     const hint = applyHint(next.targetTool, next.text);
     await ctx.store.put('inbox', { id: id('in'), kind: 'caddie-card', text: hint.text, applyHint: hint.how, refId: next.id, at, copiedAt: null });
-    await ctx.remember(`Approved rule for ${next.targetTool}: ${next.text}`);
   }
   return next;
 }

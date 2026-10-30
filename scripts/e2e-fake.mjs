@@ -183,13 +183,14 @@ check('benchmark export has readings, timing and images', exp.res.ok && exp.body
 const del2 = await call('/benchmark', { method: 'DELETE' });
 check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 && !(await state()).moments.some(m => m.benchmark));
 
-// The race and recovery checks below run in a fresh workspace, so the main journey's
-// spend does not push them into the per-workspace daily cap.
-{
+// The race and recovery checks below run in fresh workspaces, so earlier spend never pushes
+// them into the per-workspace daily cap.
+async function freshWorkspace() {
   const fresh = await (await fetch(`${base}/api/workspaces`, { method: 'POST', headers: { 'X-Coevo-Test-Ledger': RUN_LEDGER } })).json();
   const paired = await (await fetch(`${base}/api/w/${fresh.workspaceId}/pair`, { method: 'POST', body: JSON.stringify({ pairSecret: fresh.pairSecret }), headers: { 'Content-Type': 'application/json' } })).json();
   creds = { ws: fresh.workspaceId, token: paired.phoneToken };
 }
+await freshWorkspace();
 
 // Typed answer (instead of speaking): the Caddie replies and the answer is marked typed.
 {
@@ -201,7 +202,28 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   const ans = asked ? await call(`/moments/${asked.id}/respond`, { method: 'POST', body: JSON.stringify({ kind: 'typed-answer', text: 'Office workers near the station, 6,500 won.' }) }) : null;
   const reply = asked ? await until(s => s.moments.find(m => m.frame === null && m.work.sessionId === asked.work.sessionId && m.decision), 'reply to typed answer', 30) : null;
   check('a typed answer is stored as typed and the Caddie replies', ans?.res.ok && ans.body.response?.kind === 'typed-answer' && Boolean(reply?.v), asked ? reply?.v?.decision?.message ?? reply?.v?.decision?.note ?? '' : 'no intervention');
+  // Deleted answers never reach a later model request (memory is derived from surviving records).
+  const marker = `zq-marker-${Date.now().toString(36)}`;
+  const sess2 = (await call('/sessions', { method: 'POST', body: '{}' })).body;
+  await sleep(2600);
+  await fetch(`${fake}/reset`);
+  let asked2 = null;
+  for (const seed of [0, 1, 2, 3]) { const r = await frame(seed); if (r.m.decision?.action === 'intervene') asked2 = r.m; }
+  if (asked2) await call(`/moments/${asked2.id}/respond`, { method: 'POST', body: JSON.stringify({ kind: 'typed-answer', text: `For ${marker} only.` }) });
+  await sleep(4000);
+  const before = await (await fetch(`${fake}/sent/contains`, { method: 'POST', body: JSON.stringify({ marker }) })).json();
+  await call(`/sessions/${sess2.id}`, { method: 'DELETE' });
+  await fetch(`${fake}/sent/clear`, { method: 'POST' });
+  await call('/sessions', { method: 'POST', body: '{}' });
+  await sleep(2600);
+  await frame(4);
+  const after = await (await fetch(`${fake}/sent/contains`, { method: 'POST', body: JSON.stringify({ marker }) })).json();
+  check('a deleted session’s answer is never sent in later model requests', Boolean(asked2) && before.contains && after.requests > 0 && !after.contains, `before: ${before.contains} · after: ${after.contains} in ${after.requests} requests`);
+  // Clean up: deleting stops any background wrap, so later checks see only their own provider calls.
+  for (const x of (await state()).sessions) await call(`/sessions/${x.id}`, { method: 'DELETE' });
+  await sleep(3000);
 }
+await freshWorkspace();
 
 // Deletion races: a late model response must never recreate deleted content.
 {
@@ -268,6 +290,7 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   const img = prDone.v.imageKey ? await call(`/media/${prDone.v.imageKey}`) : null;
   check('deleting a session removes its practice attempts, images and skill notes', !gone.practice.some(x => x.id === pr.body.id) && !gone.skills.some(k => k.practiceId === pr.body.id) && (!img || img.res.status === 404));
 }
+await freshWorkspace();
 // Deletion during a slow object write (TEST hook): nothing stays behind in storage.
 {
   await fetch(`${fake}/reset`);
@@ -297,7 +320,7 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   try {
     settled = (await until(s => { const c = s.content.filter(x => x.sessionId === sess.id && (x.format === 'podcast' || x.format === 'short')); return c.length === 2 && c.every(x => x.status === 'ready' || x.status === 'failed') ? c : null; }, 'podcast and short settled', 60)).v;
   } catch { /* reported below */ }
-  check('a short dispatched during a slow podcast poll still completes', Boolean(settled) && settled.every(x => x.status === 'ready'), settled ? settled.map(x => `${x.format} ${x.status}`).join(', ') : 'short never settled (job lost)');
+  check('a short dispatched during a slow podcast poll still completes', Boolean(settled) && settled.every(x => x.status === 'ready'), settled ? settled.map(x => `${x.format} ${x.status}${x.error ? ` (${x.error})` : ''}`).join(', ') : 'short never settled (job lost)');
   // An approved card outlives its session and can still be revoked afterwards.
   const { v: card } = await until(s => s.cards.find(c => c.sessionId === sess.id && c.status === 'proposed'), 'card proposed', 30);
   await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'approve' }) });
@@ -311,6 +334,14 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'revoke' }) });
   const revoked = (await state()).cards.find(c => c.id === card.id);
   check('an approved card is kept after its session is deleted and can still be revoked', kept?.status === 'approved' && revoked?.status === 'revoked', `${kept?.status} → ${revoked?.status}`);
+  // A revoked rule is no longer presented to the model as an approved rule.
+  await fetch(`${fake}/sent/clear`, { method: 'POST' });
+  await fetch(`${fake}/reset`);
+  await call('/sessions', { method: 'POST', body: '{}' });
+  await sleep(2600);
+  await frame(0);
+  const ruleSent = await (await fetch(`${fake}/sent/contains`, { method: 'POST', body: JSON.stringify({ marker: 'Before drafting, ask me whether I have a real photo' }) })).json();
+  check('a revoked rule is not sent to the model as approved', ruleSent.requests > 0 && !ruleSent.contains, `${ruleSent.requests} requests checked`);
 }
 
 const fin = await state();
