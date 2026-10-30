@@ -109,3 +109,34 @@ export function charge(state: BudgetState, usd: number, nowMs: number): BudgetSt
   const day = dayKey(nowMs);
   return { day, spentUsd: (state.day === day ? state.spentUsd : 0) + usd };
 }
+
+const isCount = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && Number.isInteger(x) && x >= 0;
+
+/**
+ * Usage is trusted only when every count is a finite, nonnegative integer and
+ * cached tokens lie within [0, input]. Anything else returns null, and the
+ * caller keeps the full reservation instead of a partial or negative cost.
+ */
+export function verifiedSparkUsage(u: unknown): { input_tokens: number; output_tokens: number; cached_tokens: number } | null {
+  if (!u || typeof u !== 'object') return null;
+  const o = u as { input_tokens?: unknown; output_tokens?: unknown; input_tokens_details?: { cached_tokens?: unknown } | null };
+  if (!isCount(o.input_tokens) || !isCount(o.output_tokens)) return null;
+  const c = o.input_tokens_details?.cached_tokens;
+  if (c !== undefined && c !== null && (!isCount(c) || c > o.input_tokens)) return null;
+  return { input_tokens: o.input_tokens, output_tokens: o.output_tokens, cached_tokens: (c as number | undefined) ?? 0 };
+}
+
+/**
+ * A provider-reported audio duration is used only when it is finite, nonnegative
+ * and consistent with the validated WAV (within max(1 s, 10 %)). Otherwise null:
+ * the reservation from the WAV length stays charged.
+ */
+export function verifiedAudioSeconds(reportedMs: unknown, wavSeconds: number): number | null {
+  if (typeof reportedMs !== 'number' || !Number.isFinite(reportedMs) || reportedMs < 0) return null;
+  const s = reportedMs / 1000;
+  return Math.abs(s - wavSeconds) <= Math.max(1, wavSeconds * 0.1) ? s : null;
+}
+
+export function verifiedImageCount(n: unknown): number | null {
+  return isCount(n) && n >= 1 ? n : null;
+}

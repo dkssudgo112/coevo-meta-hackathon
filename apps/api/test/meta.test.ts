@@ -222,3 +222,50 @@ test('models outside the priced allowlist fail closed before anything is reserve
   assert.equal(sent, false);
   assert.equal(l.total(), 0);
 });
+
+test('malformed usage numbers keep the full reservation', async () => {
+  const max = sparkMaxCost(Math.ceil(2000 * INPUT_COUNT_MARGIN) + INPUT_COUNT_PAD, readingTask.maxOutputTokens + 1500);
+  const bad = [
+    { input_tokens: -5, output_tokens: 10 },
+    { input_tokens: 10.5, output_tokens: 10 },
+    { input_tokens: Number.NaN, output_tokens: 10 },
+    { input_tokens: '100', output_tokens: 10 },
+    { input_tokens: 100, output_tokens: -1 },
+    { input_tokens: 100, output_tokens: 10, input_tokens_details: { cached_tokens: 200 } },
+    { input_tokens: 100, output_tokens: 10, input_tokens_details: { cached_tokens: -1 } },
+  ];
+  for (const usage of bad) {
+    const l = ledger();
+    // JSON cannot carry NaN; send it through a hand-built object instead.
+    const body = { status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(reading) }] }], usage };
+    const { f } = withCount(async () => ({ ok: true, status: 200, headers: new Headers(), json: async () => body } as unknown as Response));
+    await runTask(env, l.spender, readingTask, { text: 'x' }, f);
+    assert.ok(Math.abs(l.total() - max) < 1e-12, `usage ${JSON.stringify(usage)}`);
+  }
+  const good = ledger();
+  const { f } = withCount(async () => response({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(reading) }] }], usage: { input_tokens: 2000, output_tokens: 100, input_tokens_details: { cached_tokens: 500 } } }));
+  await runTask(env, good.spender, readingTask, { text: 'x' }, f);
+  assert.ok(good.total() < max, 'valid usage settles to the real, smaller cost');
+});
+
+test('reported audio duration must be valid and consistent with the WAV', async () => {
+  const reserved = (5 / 3600) * 0.18; // 4.2 s rounds up to 5 s
+  for (const audioDurationMs of [0, -100, 'x', null, 60_000, 1000]) {
+    const l = ledger();
+    const body = { transcript: 'hi', audioDurationMs };
+    await transcribe(env, l.spender, wavBytes(4.2), [], (async () => ({ ok: true, status: 200, headers: new Headers(), json: async () => body } as unknown as Response)) as unknown as typeof fetch);
+    assert.ok(Math.abs(l.total() - reserved) < 1e-12, `reported ${String(audioDurationMs)}`);
+  }
+  const ok4 = ledger();
+  await transcribe(env, ok4.spender, wavBytes(4.2), [], (async () => response({ transcript: 'hi', audioDurationMs: 4200 })) as unknown as typeof fetch);
+  assert.ok(Math.abs(ok4.total() - (4 / 3600) * 0.18) < 1e-12, 'a consistent duration settles to whole seconds');
+});
+
+test('SAM image count must be a positive integer, otherwise one image stays charged', async () => {
+  for (const images_processed of [0, -1, 1.5, 'x', undefined]) {
+    const l = ledger();
+    const body = { status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: '' }] }], usage: { images_processed } };
+    await segmentBoxes(env, l.spender, 'data:image/jpeg;base64,AA', 'monitor', (async () => ({ ok: true, status: 200, headers: new Headers(), json: async () => body } as unknown as Response)) as unknown as typeof fetch);
+    assert.ok(Math.abs(l.total() - 0.0025) < 1e-12, `images_processed ${String(images_processed)}`);
+  }
+});

@@ -3,7 +3,7 @@
 
 import type { ModelTask } from '../../../packages/core/src/prompts.ts';
 import { parseJsonText, ShapeError } from '../../../packages/core/src/schema.ts';
-import { isPriced, PRICED_MODELS, sparkCost, sparkMaxCost, transcribeCost, type Operation } from '../../../packages/core/src/budget.ts';
+import { isPriced, PRICED_MODELS, sparkCost, sparkMaxCost, transcribeCost, verifiedAudioSeconds, verifiedImageCount, verifiedSparkUsage, type Operation } from '../../../packages/core/src/budget.ts';
 import { parseWav } from '../../../packages/core/src/wav.ts';
 
 export interface MetaEnv {
@@ -253,10 +253,9 @@ export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T
       if (unbilled(e)) await spend.settle(ticket, 0);
       throw e;
     }
-    const usage = raw.usage;
-    const complete = typeof usage?.input_tokens === 'number' && typeof usage?.output_tokens === 'number';
-    // Missing or partial usage never turns an accepted call into a smaller charge.
-    const cost = complete ? sparkCost({ input_tokens: usage!.input_tokens, output_tokens: usage!.output_tokens, cached_tokens: usage!.input_tokens_details?.cached_tokens }) : maxCost;
+    // Missing, partial or malformed usage never turns an accepted call into a smaller charge.
+    const usage = verifiedSparkUsage(raw.usage);
+    const cost = usage ? sparkCost(usage) : maxCost;
     await spend.settle(ticket, cost);
     try {
       if (raw.status === 'incomplete') throw new InvalidOutput(`Incomplete output (${raw.incomplete_details?.reason ?? 'unknown'})`);
@@ -304,13 +303,12 @@ export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, 
   fd.append('request', new Blob([JSON.stringify({ model: transcribeModel, audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English'], keywords: keywords.slice(0, 20) })], { type: 'application/json' }));
   fd.append('audio', new Blob([wav], { type: 'audio/wav' }), 'answer.wav');
   try {
-    const data = (await post(env, '/asr/transcribe', fd, {}, f, 60_000)) as { transcript?: string; audioDurationMs?: number };
-    const reported = typeof data.audioDurationMs === 'number' && Number.isFinite(data.audioDurationMs);
-    const durationMs = reported ? data.audioDurationMs! : durationSec * 1000;
-    // Without a reported duration the reservation (rounded-up WAV length) stays charged.
-    const cost = reported ? Math.min(estimate, transcribeCost(Math.floor(durationMs / 1000))) : estimate;
+    const data = (await post(env, '/asr/transcribe', fd, {}, f, 60_000)) as { transcript?: string; audioDurationMs?: unknown };
+    // A missing, malformed or contradictory reported duration keeps the WAV-based reservation.
+    const reportedSec = verifiedAudioSeconds(data.audioDurationMs, durationSec);
+    const cost = reportedSec === null ? estimate : Math.min(estimate, transcribeCost(Math.floor(reportedSec)));
     await spend.settle(ticket, cost);
-    return { transcript: (data.transcript ?? '').trim(), durationMs, costUsd: cost };
+    return { transcript: (typeof data.transcript === 'string' ? data.transcript : '').trim(), durationMs: Math.round((reportedSec ?? durationSec) * 1000), costUsd: cost };
   } catch (e) {
     if (unbilled(e)) await spend.settle(ticket, 0);
     throw e;
@@ -345,8 +343,8 @@ export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: s
       metadata: { mask_encoding: 'one_bit', include_confidence: 'true' },
       store: false,
     }), { 'Content-Type': 'application/json' }, f, 30_000)) as ResponsesOutput;
-    const processed = raw.usage?.images_processed;
-    await spend.settle(ticket, typeof processed === 'number' && processed >= 1 ? SAM_USD * processed : SAM_USD);
+    const processed = verifiedImageCount(raw.usage?.images_processed);
+    await spend.settle(ticket, processed === null ? SAM_USD : SAM_USD * processed);
     return { boxes: parseSamBoxes(outputText(raw)), costUsd: SAM_USD, latencyMs: Date.now() - started };
   } catch (e) {
     if (unbilled(e)) await spend.settle(ticket, 0);
