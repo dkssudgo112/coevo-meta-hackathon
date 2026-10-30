@@ -54,7 +54,7 @@ The maintainer decided that, as in the earlier Coevo project, the phone is assum
 
 ## Still to do
 
-- Publish the three-minute demo at /demo after its exact-byte review (cut from still captures of the live run and recorded clips, each scene tagged with its run); final submission is the maintainer's.
+- Nothing left to build. The three-minute demo is published at /demo with its exact reviewed bytes (still captures of the live run and recorded clips, each scene tagged with its run). The final submission is the maintainer's.
 
 ## Publication
 
