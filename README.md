@@ -30,7 +30,7 @@ When an AI result is not right, many people just ask again with a vaguer word: *
 
 ## What happens while you work
 
-A scripted, fictional café owner asks Meta AI for a dessert poster, then types *make it more premium* again and again. These are real screens from one live run of the deployed app. The phone setup is assumed: a controlled camera showed actual Meta AI replies, and the spoken answer used a synthetic voice.
+A scripted, fictional café owner asks Meta AI for a dessert poster, then types *make it more premium* again and again. The screens in this section come from one later live run of the deployed app, not the recorded sample above (in that recording the owner never answered the question). The phone setup is assumed: a controlled camera showed actual Meta AI replies, and the spoken answer used a synthetic voice.
 
 - **It stays quiet while you are on track, and says why.** Twice: "Second premium poster visible, still iterating."
 - **After the third *more premium*, it asks one question:** "What exactly is your new dessert — flavor and what makes it special?"
