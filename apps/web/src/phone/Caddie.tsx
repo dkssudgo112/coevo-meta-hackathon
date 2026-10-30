@@ -30,7 +30,7 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
   const { state, conn } = useWorkspace(creds);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const sampler = useRef<FrameSampler | null>(null);
-  const [message, setMessage] = useState(crop ? 'Starting the camera…' : 'Photo mode — send a photo from the menu');
+  const [message, setMessage] = useState(crop ? 'Starting the camera…' : 'Photo mode: send a photo whenever you want the Caddie to look.');
   const [photo, setPhoto] = useState<{ file: File; url: string; crop: CropRect; aspect: number | null } | null>(null);
   const session = latestSession(state);
   const paused = session?.status === 'paused';
@@ -62,7 +62,7 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
 
   return (
     <>
-      <LiveScreen creds={creds} state={state} conn={conn} camera={{ videoRef, message, onReaim, onPhoto }} onUnpair={onUnpair} />
+      <LiveScreen creds={creds} state={state} conn={conn} camera={{ mode: crop ? 'camera' : 'photo', videoRef, message, onReaim, onPhoto }} onUnpair={onUnpair} />
       {photo && (
         <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Crop photo">
           <div className="sheet">

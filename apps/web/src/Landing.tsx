@@ -1,6 +1,25 @@
 import { Flag } from './ui/common.tsx';
 
+function onPhone(): boolean {
+  try { return matchMedia('(pointer: coarse)').matches && innerWidth < 760; } catch { return false; }
+}
+
 export function Landing() {
+  const phone = onPhone();
+  const desk = (
+    <div className="card choice" key="desk">
+      <h3>On your computer</h3>
+      <p className="muted">Open the Desk. It shows a code for your phone and keeps the evidence of each session.</p>
+      <a className={`btn ${phone ? '' : 'primary'}`} href="/desk">Open the Desk</a>
+    </div>
+  );
+  const caddie = (
+    <div className="card choice" key="caddie">
+      <h3>On your phone</h3>
+      <p className="muted">Open the Caddie, point it at the Desk code, then prop it next to your monitor.</p>
+      <a className={`btn ${phone ? 'primary' : ''}`} href="/caddie">Open the Caddie</a>
+    </div>
+  );
   return (
     <div className="landing">
       <div className="row"><Flag state="watching" /><span className="eyebrow">Coevo Caddie</span></div>
@@ -9,16 +28,7 @@ export function Landing() {
         <p className="muted" style={{ fontSize: '1.1rem', maxWidth: 640 }}>It watches how you work with any AI — ChatGPT, Gemini, Meta AI, Claude — steps in only when it matters, and helps both you and your AI get better.</p>
       </div>
       <div className="choices">
-        <div className="card choice">
-          <h3>On your computer</h3>
-          <p className="muted">Open the Desk. It shows a code for your phone and keeps the evidence of each session.</p>
-          <a className="btn primary" href="/desk">Open the Desk</a>
-        </div>
-        <div className="card choice">
-          <h3>On your phone</h3>
-          <p className="muted">Open the Caddie, point it at the Desk code, then prop it next to your monitor.</p>
-          <a className="btn" href="/caddie">Open the Caddie</a>
-        </div>
+        {phone ? [caddie, desk] : [desk, caddie]}
         <div className="card choice">
           <h3>No phone handy?</h3>
           <p className="muted">Replay a sample session. Screens are sample data; the Caddie’s responses are live Meta model output.</p>

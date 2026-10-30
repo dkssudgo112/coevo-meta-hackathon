@@ -9,6 +9,7 @@ import { VoiceButton } from './Voice.tsx';
 import { PracticeRange } from './Practice.tsx';
 
 export interface CameraInfo {
+  mode: 'camera' | 'photo';
   videoRef: RefObject<HTMLVideoElement | null>;
   message: string;
   onReaim: () => void;
@@ -62,7 +63,13 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
         {session && session.status !== 'ended' && <button className="btn small" onClick={() => act(() => post(creds, `/sessions/${session.id}/${session.status === 'paused' ? 'resume' : 'pause'}`))}>{session.status === 'paused' ? 'Resume' : 'Pause'}</button>}
         <button className="btn small" aria-label="Open menu" onClick={() => setDrawer(true)}>≡</button>
       </div>
-      {camera && (
+      {camera?.mode === 'photo' && (
+        <div className="card soft row" style={{ margin: '12px 16px 0' }}>
+          <span className="grow faint">{camera.message}</span>
+          <label className="btn primary small">📷 Send a photo<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; if (f) camera.onPhoto(f); e.target.value = ''; }} /></label>
+        </div>
+      )}
+      {camera?.mode === 'camera' && (
         <div className="camstrip" aria-label="Live camera view of your screen">
           <video ref={camera.videoRef as RefObject<HTMLVideoElement>} playsInline muted />
           <span className="cam-msg" role="status">{session?.status === 'paused' ? 'Paused — nothing is sent' : camera.message}</span>
