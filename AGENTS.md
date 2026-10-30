@@ -2,7 +2,9 @@
 
 This is a **public GitHub repository** for the 2026 Meta Global AI Developer Hackathon. Treat every tracked file, commit message, author field, screenshot, and generated artifact as potentially public.
 
-Read `README.md`, `docs/STATUS.md`, and `docs/PRODUCT.md` before making changes. Clearly distinguish implemented behavior from plans.
+Read `README.md`, `docs/STATUS.md`, `docs/PRODUCT.md`, and `docs/VERIFICATION.md` before making changes. Clearly distinguish implemented behavior from plans.
+
+The product is **Coevo Caddie**: a phone beside the screen watches how a person works with any AI tool, steps in only when it matters, and helps both the person and their AI improve. The PC side is a thin **Desk** tab.
 
 ## Language
 
@@ -11,10 +13,11 @@ Read `README.md`, `docs/STATUS.md`, and `docs/PRODUCT.md` before making changes.
 
 ## Scope and provenance
 
-- Build new event-period code in this repository. Do not import pre-existing application code, employer code or history, private work records, or material without redistribution rights.
+- All code in this repository is written during the event. The author's earlier Coevo product is used as a **design reference only**: do not copy its code, text, Git history, private records, or material without redistribution rights.
 - Keep all five content formats: notes, manuals, flashcards, two-person podcasts, and vertical shorts. Change implementation order without silently removing product scope.
-- Preserve project/session/work scope, exact source references, speaker attribution, and the distinction between AI claims and observed tool results.
+- Preserve workspace/session/work scope, exact source references (moment and frame), speaker attribution, and the distinction between the Caddie's reading (model interpretation) and what was observed on screen.
 - Distinguish independent, coached, AI-produced, and unobserved performance. Lack of evidence is not evidence of inability.
+- Label provenance: `observed`, `live-model`, `user`, `rule`, `fixture`, `simulated-persona`. Never present fixture data, planned lines, or persona-simulation results as real model output or real-user evidence.
 - Mark synthetic examples with `fixture=true`. Do not claim validated learning outcomes or professional certification.
 
 ## Publication and secrets
@@ -29,13 +32,16 @@ Read `README.md`, `docs/STATUS.md`, and `docs/PRODUCT.md` before making changes.
 
 ## External actions
 
-- Start in mock mode with `COEVO_ALLOW_LIVE_CALLS=false`. Check credit and billing status before intentionally enabling live model calls. Spend-alert emails are not a hard usage cap.
+- Start with `COEVO_ALLOW_LIVE_CALLS=false`. Check credit and billing status before intentionally enabling live model calls. Spend-alert emails are not a hard usage cap; the server enforces its own daily caps.
+- Use Standard Meta models only. Never send user frames, audio, or text to `-contributor` model variants.
+- Camera frames are cropped to the screen region on the device before upload. The one-time setup frame used to find the screen is disclosed to the user.
 - Credential setup alone does not authorize cloud deployments, paid compute, additional subscriptions, or a final competition submission.
 - Preserve other projects' browser tabs, settings, credentials, and development servers.
 
 ## Verification and handoff
 
-- `npm run verify`: type checks, build, Worker dry-run, and local configuration checks.
+- `npm run verify`: type checks, unit tests, build, Worker dry-run, and local configuration checks.
+- Unit tests may use mocks; mocks never count as evidence that a real model, camera, or deployment path works.
 - `npm run check:release`: public-file checks; `--staged` checks the exact index.
 - Update `docs/STATUS.md` and `docs/DECISIONS.md` when implementation or decisions change.
-- Start with the retry/idempotency journey in `docs/BUILD-PLAN.md`. A health endpoint or a configured key is not a completed product integration.
+- Follow `docs/BUILD-PLAN.md`: raise every area A–H through L1 → L2 → L3 together. Track each requirement in `docs/VERIFICATION.md` with the evidence type. A health endpoint or a configured key is not a completed product integration.

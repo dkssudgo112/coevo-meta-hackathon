@@ -5,10 +5,11 @@ Credentials are local to each developer and are not part of this public reposito
 ## Meta Model API
 
 - Base URL: `https://api.meta.ai/v1`
-- Text and synthesis: `muse-spark-1.3`
+- Screen reading, decisions, content: `muse-spark-1.3` (Standard; contributor variants are refused in code)
 - Images: `muse-image-1.0`
 - Speech-to-text: `muse-voice-transcribe-1.0`
-- Server-side credential: `MODEL_API_KEY`
+- Screen location on the setup photo: `sam-3.1`
+- Server-side credential: `MODEL_API_KEY`; live calls also require `COEVO_ALLOW_LIVE_CALLS="true"`
 
 Verify model availability for your own account and region. A model appearing in the catalog does not prove a successful inference request. Transcription is not text-to-speech; podcasts and shorts still need a separate speech-synthesis provider.
 
@@ -73,6 +74,31 @@ The launcher maps `.dev.vars`'s `MODEL_API_KEY` to `META_API_KEY` only in the Mu
 
 A Muse Code subscription is not a prerequisite for using this repository. Validate actual session, hook, and export formats before implementing the input adapter. Authentication alone is not proof of successful inference.
 
+## Media service (Modal)
+
+`infra/modal/media.py` runs Kokoro-82M text-to-speech (Apache-2.0) and ffmpeg on CPU. It has no warm containers. Deploy only after checking credits:
+
+```bash
+uv run modal secret create coevo-media-token COEVO_MEDIA_TOKEN=<random value> --profile coevo-hackathon
+uv run modal deploy --profile coevo-hackathon --env main infra/modal/media.py
+```
+
+Then give the Worker the endpoint URL and the same token as secrets `MODAL_MEDIA_URL` and `MODAL_MEDIA_TOKEN`. `npm run test:media` checks the composition locally with a synthetic tone instead of TTS.
+
+## Cloudflare
+
+`wrangler.jsonc` declares the Worker `coevo-caddie`, the `Workspace` and `Budget` Durable Objects (SQLite backend), the R2 bucket `coevo-caddie-media`, and static assets from `apps/web/dist`.
+
+```bash
+npx wrangler r2 bucket create coevo-caddie-media
+npx wrangler secret put MODEL_API_KEY
+npx wrangler secret put COEVO_ALLOW_LIVE_CALLS      # "true" only after billing is confirmed
+npx wrangler secret put MODAL_MEDIA_URL
+npx wrangler secret put MODAL_MEDIA_TOKEN
+npm run build && npx wrangler deploy
+node scripts/integration.mjs https://<your-worker>.workers.dev
+```
+
 ## Deployment and other services
 
 Workers currently runs locally. `wrangler deploy --dry-run` builds without deploying. A deployable service still needs a deliberate account setup, persistence design, access controls, and reviewed public artifacts.
@@ -82,8 +108,8 @@ Workers currently runs locally. `wrangler deploy --dry-run` builds without deplo
 | Meta Model API | Coaching, content, and synthesis | Bounded real-model checks and feature implementation |
 | Modal | Open models and code checks | Validate required endpoints or sandboxes and costs |
 | Muse Code | Session-event input | Implement and test the adapter |
-| TTS | Podcast and short-form speech | Select a provider and verify usage rights |
-| Cloudflare | Shared deployment and storage | Configure persistence and deploy intentionally |
+| Modal (Kokoro TTS + ffmpeg) | Podcast and short-form speech and video | Deploy after credit check |
+| Cloudflare | Worker, Durable Objects, R2, static assets | Enable R2, deploy intentionally |
 | GitHub | Public submission source | Review every commit and dependency license |
 
 Use credentials created for this project. Do not reuse employer credentials or unrelated projects' credentials.

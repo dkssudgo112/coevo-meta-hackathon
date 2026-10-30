@@ -1,0 +1,239 @@
+// Meta Model API adapter (server-only). Standard models only.
+// Every call: live-call switch → budget reservation → bounded retry → strict parsing → settle cost.
+
+import type { ModelTask } from '../../../packages/core/src/prompts.ts';
+import { parseJsonText, ShapeError } from '../../../packages/core/src/schema.ts';
+import { PRICES, sparkCost, sparkReserve, transcribeCost } from '../../../packages/core/src/budget.ts';
+
+export interface MetaEnv {
+  MODEL_API_KEY?: string;
+  META_API_BASE_URL?: string;
+  META_TEXT_MODEL?: string;
+  META_IMAGE_MODEL?: string;
+  META_TRANSCRIBE_MODEL?: string;
+  META_SEGMENT_MODEL?: string;
+  COEVO_ALLOW_LIVE_CALLS?: string;
+}
+
+export interface Spender {
+  /** Reserve an estimated cost; throws BudgetExceeded when over a cap. */
+  reserve(estimateUsd: number, label: string): Promise<string>;
+  /** Replace the reservation with the actual cost (0 when the call failed unbilled). */
+  settle(ticket: string, actualUsd: number): Promise<void>;
+}
+
+export class LiveCallsDisabled extends Error {
+  constructor() { super('Live model calls are disabled on this server.'); this.name = 'LiveCallsDisabled'; }
+}
+
+export class BudgetExceeded extends Error {
+  readonly scope: string;
+  constructor(scope: string) { super(`Budget cap reached (${scope}).`); this.name = 'BudgetExceeded'; this.scope = scope; }
+}
+
+export class MetaError extends Error {
+  readonly status: number;
+  readonly type: string | null;
+  readonly code: string | null;
+  constructor(status: number, message: string, type: string | null, code: string | null) {
+    super(message);
+    this.name = 'MetaError';
+    this.status = status;
+    this.type = type;
+    this.code = code;
+  }
+}
+
+export class InvalidOutput extends Error {
+  constructor(message: string) { super(message); this.name = 'InvalidOutput'; }
+}
+
+const FORBIDDEN = /-contributor$/;
+
+export function liveEnabled(env: MetaEnv): boolean {
+  return env.COEVO_ALLOW_LIVE_CALLS === 'true' && Boolean(env.MODEL_API_KEY?.trim());
+}
+
+function model(name: string | undefined, fallback: string): string {
+  const m = (name ?? fallback).trim();
+  if (FORBIDDEN.test(m)) throw new Error('Contributor model variants are not allowed for user data.');
+  return m;
+}
+
+export const models = (env: MetaEnv) => ({
+  text: model(env.META_TEXT_MODEL, 'muse-spark-1.3'),
+  image: model(env.META_IMAGE_MODEL, 'muse-image-1.0'),
+  transcribe: model(env.META_TRANSCRIBE_MODEL, 'muse-voice-transcribe-1.0'),
+  segment: model(env.META_SEGMENT_MODEL, 'sam-3.1'),
+});
+
+function base(env: MetaEnv): string {
+  const b = env.META_API_BASE_URL ?? 'https://api.meta.ai/v1';
+  if (b !== 'https://api.meta.ai/v1') throw new Error('Only the verified Meta endpoint is allowed.');
+  return b;
+}
+
+type Fetch = typeof fetch;
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/** POST with bounded retries: 429/503 honor Retry-After (≤ 2 retries), 500 once. Never 504. */
+async function post(env: MetaEnv, path: string, body: BodyInit, headers: Record<string, string>, f: Fetch, timeoutMs: number): Promise<unknown> {
+  if (!liveEnabled(env)) throw new LiveCallsDisabled();
+  let attempt = 0;
+  for (;;) {
+    const res = await f(`${base(env)}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.MODEL_API_KEY}`, Accept: 'application/json', ...headers },
+      body,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (res.ok) return res.json();
+    const data = (await res.json().catch(() => ({}))) as { error?: { message?: string; type?: string; code?: string } };
+    const err = new MetaError(res.status, data.error?.message ?? `Meta API error ${res.status}`, data.error?.type ?? null, data.error?.code ?? null);
+    const retryAfter = Number(res.headers.get('retry-after'));
+    const retryable = res.status === 429 || res.status === 503 ? attempt < 2 : res.status === 500 ? attempt < 1 : false;
+    if (!retryable) throw err;
+    attempt++;
+    await sleep(Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 800 * 2 ** attempt, 8000));
+  }
+}
+
+interface ResponsesOutput {
+  status?: string;
+  output?: { type: string; phase?: string; content?: { type: string; text?: string; refusal?: string }[] }[];
+  usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number }; images_processed?: number };
+  incomplete_details?: { reason?: string } | null;
+}
+
+export function outputText(r: ResponsesOutput): string {
+  let text = '';
+  for (const item of r.output ?? []) {
+    if (item.type !== 'message' || item.phase === 'commentary') continue;
+    for (const part of item.content ?? []) {
+      if (part.type === 'refusal') throw new InvalidOutput(`Model refused: ${part.refusal ?? ''}`.trim());
+      if (part.type === 'output_text' && part.text) text += part.text;
+    }
+  }
+  return text;
+}
+
+const HEADROOM = { minimal: 400, low: 1500, medium: 3500, high: 6000 } as const;
+
+export interface TaskInput { text: string; images?: string[] }
+
+export interface TaskResult<T> { value: T; costUsd: number; model: string; latencyMs: number }
+
+/** Run a structured Spark task. One extra attempt only when the output fails validation. */
+export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T>, input: TaskInput, f: Fetch = fetch): Promise<TaskResult<T>> {
+  if (!liveEnabled(env)) throw new LiveCallsDisabled();
+  const m = models(env).text;
+  const maxOut = task.maxOutputTokens + HEADROOM[task.effort];
+  const content: unknown[] = [{ type: 'input_text', text: input.text }];
+  for (const url of input.images ?? []) content.push({ type: 'input_image', image_url: url, detail: 'high' });
+  const body = JSON.stringify({
+    model: m,
+    instructions: task.instructions,
+    input: [{ type: 'message', role: 'user', content }],
+    text: { format: { type: 'json_schema', name: task.name, schema: task.schema, strict: true } },
+    reasoning: { effort: task.effort },
+    max_output_tokens: maxOut,
+    store: false,
+  });
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ticket = await spend.reserve(sparkReserve(input.images?.length ?? 0, maxOut, Math.ceil(input.text.length / 3) + 1500), task.name);
+    const started = Date.now();
+    let raw: ResponsesOutput;
+    try {
+      raw = (await post(env, '/responses', body, { 'Content-Type': 'application/json' }, f, 60_000)) as ResponsesOutput;
+    } catch (e) {
+      await spend.settle(ticket, 0);
+      throw e;
+    }
+    const usage = raw.usage ?? {};
+    const cost = sparkCost({ input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cached_tokens: usage.input_tokens_details?.cached_tokens });
+    await spend.settle(ticket, cost);
+    try {
+      if (raw.status === 'incomplete') throw new InvalidOutput(`Incomplete output (${raw.incomplete_details?.reason ?? 'unknown'})`);
+      const value = task.read(parseJsonText(outputText(raw)));
+      return { value, costUsd: cost, model: m, latencyMs: Date.now() - started };
+    } catch (e) {
+      lastError = e instanceof ShapeError || e instanceof SyntaxError ? new InvalidOutput(`Invalid ${task.name} output: ${(e as Error).message}`) : (e as Error);
+      if (!(lastError instanceof InvalidOutput) || attempt === 1) throw lastError;
+    }
+  }
+  throw lastError ?? new InvalidOutput('Unknown');
+}
+
+/** Generate one image. Returns raw bytes (PNG). */
+export async function generateImage(env: MetaEnv, spend: Spender, prompt: string, size: '1024x1536' | '1024x1024' | '1536x1024', f: Fetch = fetch): Promise<{ bytes: Uint8Array; mime: string; costUsd: number }> {
+  const ticket = await spend.reserve(PRICES.imageEach, 'image');
+  try {
+    const data = (await post(env, '/images/generations', JSON.stringify({
+      model: models(env).image, prompt, n: 1, size, response_format: 'b64_json', output_format: 'png', reasoning_strength: 'low',
+      tool_enablement: { enable_image_search: false, enable_web_search: false, enable_shell: false },
+    }), { 'Content-Type': 'application/json' }, f, 120_000)) as { data?: { b64_json?: string }[] };
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) throw new InvalidOutput('Image response had no data.');
+    await spend.settle(ticket, PRICES.imageEach);
+    return { bytes: Uint8Array.from(atob(b64), c => c.charCodeAt(0)), mime: 'image/png', costUsd: PRICES.imageEach };
+  } catch (e) {
+    await spend.settle(ticket, e instanceof MetaError && e.status >= 400 && e.status < 500 ? 0 : PRICES.imageEach);
+    throw e;
+  }
+}
+
+/** Transcribe 16/24 kHz mono 16-bit WAV. */
+export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, durationSec: number, keywords: string[] = [], f: Fetch = fetch): Promise<{ transcript: string; durationMs: number; costUsd: number }> {
+  if (durationSec > 120) throw new InvalidOutput('Voice answers are limited to 2 minutes.');
+  const estimate = transcribeCost(Math.ceil(durationSec));
+  const ticket = await spend.reserve(estimate, 'transcribe');
+  const fd = new FormData();
+  fd.append('request', new Blob([JSON.stringify({ model: models(env).transcribe, audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English'], keywords: keywords.slice(0, 20) })], { type: 'application/json' }));
+  fd.append('audio', new Blob([wav], { type: 'audio/wav' }), 'answer.wav');
+  try {
+    const data = (await post(env, '/asr/transcribe', fd, {}, f, 60_000)) as { transcript?: string; audioDurationMs?: number };
+    const durationMs = data.audioDurationMs ?? durationSec * 1000;
+    const cost = transcribeCost(Math.floor(durationMs / 1000));
+    await spend.settle(ticket, cost);
+    return { transcript: (data.transcript ?? '').trim(), durationMs, costUsd: cost };
+  } catch (e) {
+    await spend.settle(ticket, 0);
+    throw e;
+  }
+}
+
+export interface Box { x1: number; y1: number; x2: number; y2: number; w: number; h: number; c: number | null }
+
+/** Parse SAM 3.1 special-token output into boxes. Masks are ignored on purpose. */
+export function parseSamBoxes(text: string): Box[] {
+  const boxes: Box[] = [];
+  const re = /<\|box;([^|]*)\|>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const kv = Object.fromEntries(m[1].split(';').map(p => p.split('=') as [string, string]));
+    const n = (k: string) => Number(kv[k]);
+    if ([n('x1'), n('y1'), n('x2'), n('y2'), n('w'), n('h')].some(v => !Number.isFinite(v))) continue;
+    boxes.push({ x1: n('x1'), y1: n('y1'), x2: n('x2'), y2: n('y2'), w: n('w'), h: n('h'), c: kv.c !== undefined ? Number(kv.c) : null });
+  }
+  return boxes;
+}
+
+/** Find objects matching a noun phrase. Returns pixel boxes in source-image coordinates. */
+export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: string, phrase: string, f: Fetch = fetch): Promise<{ boxes: Box[]; costUsd: number; latencyMs: number }> {
+  const ticket = await spend.reserve(PRICES.samPerImage, 'segment');
+  const started = Date.now();
+  try {
+    const raw = (await post(env, '/responses', JSON.stringify({
+      model: models(env).segment,
+      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: phrase }, { type: 'input_image', image_url: imageDataUrl }] }],
+      metadata: { mask_encoding: 'one_bit', include_confidence: 'true' },
+      store: false,
+    }), { 'Content-Type': 'application/json' }, f, 30_000)) as ResponsesOutput;
+    await spend.settle(ticket, PRICES.samPerImage * (raw.usage?.images_processed ?? 1));
+    return { boxes: parseSamBoxes(outputText(raw)), costUsd: PRICES.samPerImage, latencyMs: Date.now() - started };
+  } catch (e) {
+    await spend.settle(ticket, 0);
+    throw e;
+  }
+}

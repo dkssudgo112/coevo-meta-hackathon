@@ -1,0 +1,137 @@
+import type { CaptureSource, CropRect } from '../../../../packages/contracts/index.ts';
+import { ChangeDetector, toGray, type ChangeVerdict } from '../../../../packages/core/src/change.ts';
+import type { Creds } from './api.ts';
+
+export const FULL: CropRect = { x: 0, y: 0, w: 1, h: 1 };
+
+/** Draw the crop region of a video into a canvas, scaled to fit maxW. Only this region ever leaves the device. */
+export function drawCrop(video: HTMLVideoElement, crop: CropRect, canvas: HTMLCanvasElement, maxW: number): boolean {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return false;
+  const sx = crop.x * vw, sy = crop.y * vh, sw = crop.w * vw, sh = crop.h * vh;
+  const scale = Math.min(1, maxW / sw);
+  canvas.width = Math.max(1, Math.round(sw * scale));
+  canvas.height = Math.max(1, Math.round(sh * scale));
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  if (!g) return false;
+  g.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return true;
+}
+
+export function canvasJpeg(canvas: HTMLCanvasElement, quality = 0.85): Promise<Blob> {
+  return new Promise((res, rej) => canvas.toBlob(b => (b ? res(b) : rej(new Error('encode'))), 'image/jpeg', quality));
+}
+
+export interface SamplerEvents {
+  onVerdict?: (v: ChangeVerdict) => void;
+  onSent?: (momentId: string) => void;
+  onError?: (message: string, status?: number) => void;
+}
+
+/**
+ * Samples the cropped screen every 700 ms, runs on-device change detection and
+ * uploads a frame only after the screen changed and settled.
+ */
+export class FrameSampler {
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private detector = new ChangeDetector();
+  private thumb = document.createElement('canvas');
+  private full = document.createElement('canvas');
+  private busy = false;
+  crop: CropRect;
+  private readonly video: HTMLVideoElement;
+  private readonly creds: Creds;
+  private readonly source: CaptureSource;
+  private readonly events: SamplerEvents;
+
+  constructor(video: HTMLVideoElement, creds: Creds, crop: CropRect, source: CaptureSource, events: SamplerEvents) {
+    this.video = video;
+    this.creds = creds;
+    this.crop = crop;
+    this.source = source;
+    this.events = events;
+  }
+
+  start(): void {
+    if (this.timer) return;
+    this.timer = setInterval(() => this.tick(), 700);
+  }
+
+  stop(): void {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  reset(crop?: CropRect): void {
+    if (crop) this.crop = crop;
+    this.detector.reset();
+  }
+
+  private async tick(): Promise<void> {
+    if (this.busy || document.hidden) return;
+    if (!drawCrop(this.video, this.crop, this.thumb, 64)) return;
+    const g = this.thumb.getContext('2d', { willReadFrequently: true })!;
+    const px = g.getImageData(0, 0, this.thumb.width, this.thumb.height).data;
+    const verdict = this.detector.sample(toGray(px), performance.now());
+    this.events.onVerdict?.(verdict);
+    if (verdict.kind !== 'send') return;
+    this.busy = true;
+    try {
+      drawCrop(this.video, this.crop, this.full, 1280);
+      const blob = await canvasJpeg(this.full);
+      const id = await uploadFrame(this.creds, blob, this.source, true);
+      this.events.onSent?.(id);
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      this.events.onError?.(err.message, err.status);
+    } finally {
+      this.busy = false;
+    }
+  }
+}
+
+export async function uploadFrame(creds: Creds, blob: Blob, source: CaptureSource, deviceCropped: boolean): Promise<string> {
+  const fd = new FormData();
+  fd.append('frame', new File([blob], 'frame.jpg', { type: blob.type || 'image/jpeg' }));
+  fd.append('source', source);
+  fd.append('deviceCropped', String(deviceCropped));
+  fd.append('capturedAt', new Date().toISOString());
+  const res = await fetch(`/api/w/${creds.workspaceId}/frames`, { method: 'POST', body: fd, headers: { Authorization: `Bearer ${creds.token}` } });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw Object.assign(new Error(data?.error?.message ?? 'Upload failed.'), { status: res.status });
+  return data.momentId as string;
+}
+
+/** Downscale an image file and crop it to a region before upload. */
+export async function cropImageFile(file: File, crop: CropRect, maxW = 1280): Promise<Blob> {
+  const bmp = await createImageBitmap(file);
+  const c = document.createElement('canvas');
+  const sw = crop.w * bmp.width, sh = crop.h * bmp.height;
+  const scale = Math.min(1, maxW / sw);
+  c.width = Math.round(sw * scale);
+  c.height = Math.round(sh * scale);
+  c.getContext('2d')!.drawImage(bmp, crop.x * bmp.width, crop.y * bmp.height, sw, sh, 0, 0, c.width, c.height);
+  return canvasJpeg(c);
+}
+
+export async function startRearCamera(video: HTMLVideoElement): Promise<MediaStream> {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+  video.srcObject = stream;
+  video.setAttribute('playsinline', 'true');
+  video.muted = true;
+  await video.play();
+  return stream;
+}
+
+export function stopStream(stream: MediaStream | null): void {
+  stream?.getTracks().forEach(t => t.stop());
+}
+
+export function vibrate(pattern: number | number[]): boolean {
+  try {
+    return typeof navigator.vibrate === 'function' ? navigator.vibrate(pattern) : false;
+  } catch {
+    return false;
+  }
+}

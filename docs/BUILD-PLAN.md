@@ -1,56 +1,39 @@
 # Build plan
 
-Plan date: October 30, 2026. Submission deadline: **November 5, 2026, 11:00 KST**. Dates below are targets, not completion claims.
+Plan date: October 30, 2026. Deadline: **November 5, 2026, 11:00 KST**. Dates are targets, not completion claims. Progress and evidence live in [VERIFICATION.md](VERIFICATION.md).
 
-## October 30 — Establish the work flow
+## Method: every area at the same depth
 
-- [x] Independent repository, documentation, and local development environment.
-- [x] Development account authentication checks; account-specific details remain private.
-- [ ] Verify credits and perform intentional, bounded model/compute checks.
-- [ ] Create one synthetic retry/idempotency JSONL fixture.
-- [ ] Define an import contract that preserves WorkReference, provenance, and assistance.
-- [ ] Verify the first real Meta response with cost and error handling.
+Areas: **A** observation · **B** Caddie · **C** connection · **D** evidence · **E** AI growth · **F** five formats · **G** Practice Range · **H** deployment and judging.
 
-## October 31 — Review work and evidence
+- **L1 through:** the real path runs end to end with minimum behavior.
+- **L2 real use:** waiting, empty, failure, partial-success and recovery states; correct labels.
+- **L3 finished:** copy, visuals, performance at demo quality.
 
-- [ ] Validate source anchors and scope.
-- [ ] Connect coaching, a revision, the user's decision, and verification to one task.
-- [ ] Separate AI completion claims from actual execution results.
-- [ ] Preserve partial content and recover within the same work context after a failure.
+All areas reach each level together. Every evening the full demo runs end to end; whatever breaks is the next morning's first task.
 
-## November 1 — Shared learning design and all five formats
+## Schedule (KST)
 
-- [ ] Render notes, manuals, and flashcards.
-- [ ] Implement two-person podcast scripts and speech synthesis.
-- [ ] Implement vertical-short scenes, verified captions/diagrams, and composition.
-- [ ] Handle image/audio failures and costs in the shared pipeline.
+| Date | Target |
+| --- | --- |
+| Oct 30 | Contracts, core rules, Worker + Durable Objects, Meta and media adapters, phone/Desk/sample UI, local integration checks. Credit checks (external). |
+| Oct 31 | All areas L1 with live calls once credits are confirmed: camera → card → voice → card approval → five formats → Practice Range. Deploy to Cloudflare (live calls off until approved). |
+| Nov 1 | Toward L2: states, labels, misreads, partial success, real podcast and short lengths. |
+| Nov 2 | All areas L2. Calm Caddie polish. Deployed build with caps. Simulated persona tests (labeled). |
+| Nov 3 | All areas L3: copy, latency (p50 ≤ 6 s), sample session, recorded demo sessions. |
+| Nov 4 | Demo video edit (desk shot → split screen, English captions), docs, release checks, submission form review. |
+| Nov 5 | Submit before 11:00 KST (by the maintainer) and verify receipt. |
 
-## November 2 — Practice and performance evidence
+## Gates that need external access
 
-- [ ] Present changed-condition tasks and distinguish first attempts from assisted work.
-- [ ] Connect spoken explanations and visual rehearsal to evidence.
-- [ ] Add an evidence ledger with source references and rubric versions.
-- [ ] Represent unobserved actions and insufficient evidence explicitly.
+| Gate | Needed for |
+| --- | --- |
+| Meta Model API credit/billing confirmed | Every live reading, decision and content item; S1–S3, S6–S8 |
+| Modal credit for the media service | Podcast audio and short video (S5) |
+| Cloudflare R2 enabled | Evidence frames and media storage in the deployed app |
+| A real phone and monitor | Camera legibility (S1, S2), haptics, real latency |
+| The maintainer's Meta AI account | S4: image generation (passed) and the card's effect in a new chat |
 
-## November 3 — Approved rules and weekly synthesis
+## Rule
 
-- [ ] Suggest scoped rules, collect user approval, and check later replay/application.
-- [ ] Synthesize weekly patterns, automation opportunities, and learning recommendations.
-- [ ] Integrate real Muse Code input with the complete scenario.
-- [ ] Audit public data for employer material, personal information, and credentials.
-
-## November 4 — Demonstration and submission preparation
-
-- [ ] Run the complete first-user journey from start to finish.
-- [ ] Distinguish real model output, synthetic data, and observed results.
-- [ ] Review the public repository, project/dependency licenses, deployment, and video access.
-- [ ] Produce a three-minute demo with English narration or captions.
-- [ ] Review the submission form early and leave time to resolve problems.
-
-## November 5 — Deadline
-
-- [ ] Submit before 11:00 KST and verify receipt.
-
-## Prioritization rule
-
-Complete one coherent work journey first, then connect every content format to the same learning design. Do not reduce the agreed scope by deleting features. Explain actual constraints and proposed substitutions before changing scope.
+Do not delete agreed scope to save time. If a dependency fails, apply the approved fallback (photo or screen share instead of camera; first-message card instead of Meta AI Memory) and record the evidence and the limit.

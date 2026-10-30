@@ -17,15 +17,20 @@
     "dev:web": "npm run dev --workspace @coevo/web",
     "typecheck": "tsc --noEmit -p tsconfig.api.json && npm run typecheck --workspace @coevo/web",
     "build": "npm run build --workspace @coevo/web && wrangler deploy --dry-run --outdir dist/worker",
-    "verify": "npm run typecheck && npm run build && npm run test:release && npm run doctor",
+    "verify": "npm run typecheck && npm test && npm run build && npm run test:release && npm run doctor",
     "meta:models": "node scripts/meta-check.mjs models",
     "meta:smoke": "node scripts/meta-check.mjs smoke",
     "muse": "node scripts/muse.mjs",
     "check:release": "node scripts/release-check.mjs",
     "secrets:set": "python3 scripts/set-secret.py",
-    "test:release": "node --test scripts/tests/release-check.test.mjs"
+    "test:release": "node --test scripts/tests/release-check.test.mjs",
+    "test": "node --test 'packages/core/test/*.test.ts' 'apps/api/test/*.test.ts'",
+    "test:media": "python3 infra/modal/test_compose.py",
+    "test:integration": "node scripts/integration.mjs",
+    "samples": "node scripts/make-samples.mjs"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261023.1",
     "@types/node": "26.6.6",
     "concurrently": "10.0.6",
     "typescript": "7.0.2",

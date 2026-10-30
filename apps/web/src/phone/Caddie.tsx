@@ -1,0 +1,84 @@
+import { useEffect, useRef, useState } from 'react';
+import type { CropRect } from '../../../../packages/contracts/index.ts';
+import { loadCreds, saveCreds, type Creds } from '../lib/api.ts';
+import { useWorkspace } from '../lib/store.ts';
+import { cropImageFile, FrameSampler, startRearCamera, stopStream, uploadFrame } from '../lib/capture.ts';
+import { errorText, latestSession } from '../ui/common.tsx';
+import { AimScreen, CropEditor, PairScreen } from './Setup.tsx';
+import { LiveScreen } from './Live.tsx';
+
+const CROP_KEY = 'coevo.crop';
+
+function loadCrop(): CropRect | null {
+  try { const r = localStorage.getItem(CROP_KEY); return r ? (JSON.parse(r) as CropRect) : null; } catch { return null; }
+}
+function saveCrop(c: CropRect): void {
+  try { localStorage.setItem(CROP_KEY, JSON.stringify(c)); } catch { /* per-tab only */ }
+}
+
+export function CaddieApp() {
+  const [creds, setCreds] = useState<Creds | null>(() => (location.hash.includes('pair=') ? null : loadCreds('phone')));
+  const [mode, setMode] = useState<'aim' | 'camera' | 'photos'>(() => (loadCrop() ? 'camera' : 'aim'));
+  const [crop, setCrop] = useState<CropRect | null>(loadCrop);
+
+  if (!creds) return <PairScreen onPaired={c => { saveCreds(c, 'phone'); setCreds(c); setMode(loadCrop() ? 'camera' : 'aim'); }} />;
+  if (mode === 'aim') return <AimScreen creds={creds} initial={crop} onDone={c => { saveCrop(c); setCrop(c); setMode('camera'); }} onPhotos={() => setMode('photos')} />;
+  return <Watching creds={creds} crop={mode === 'camera' ? crop : null} onReaim={() => setMode('aim')} onUnpair={() => { saveCreds(null, 'phone'); setCreds(null); }} />;
+}
+
+function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: CropRect | null; onReaim: () => void; onUnpair: () => void }) {
+  const { state, conn } = useWorkspace(creds);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const sampler = useRef<FrameSampler | null>(null);
+  const [message, setMessage] = useState(crop ? 'Starting the camera…' : 'Photo mode — send a photo from the menu');
+  const [photo, setPhoto] = useState<{ file: File; url: string; crop: CropRect; aspect: number | null } | null>(null);
+  const session = latestSession(state);
+  const paused = session?.status === 'paused';
+
+  useEffect(() => {
+    if (!crop || !videoRef.current) return;
+    let stream: MediaStream | null = null;
+    let cancelled = false;
+    startRearCamera(videoRef.current).then(s => {
+      stream = s;
+      if (cancelled) { stopStream(s); return; }
+      sampler.current = new FrameSampler(videoRef.current!, creds, crop, 'camera', {
+        onVerdict: v => setMessage(v.kind === 'camera-moved' ? 'Camera moved — hold still or re-aim' : v.kind === 'settling' ? 'Screen is changing…' : 'Watching your screen'),
+        onSent: () => setMessage('Sent the boxed screen area'),
+        onError: (m, status) => { if (status === 409) sampler.current?.stop(); if (status !== 429) setMessage(m); },
+      });
+      sampler.current.start();
+    }).catch(() => setMessage('Camera unavailable — use photos from the menu'));
+    return () => { cancelled = true; sampler.current?.stop(); sampler.current = null; stopStream(stream); };
+  }, [crop?.x, crop?.y, crop?.w, crop?.h, creds.token]);
+
+  useEffect(() => {
+    if (!sampler.current) return;
+    if (paused) sampler.current.stop();
+    else { sampler.current.reset(); sampler.current.start(); }
+  }, [paused]);
+
+  const onPhoto = (file: File) => setPhoto({ file, url: URL.createObjectURL(file), crop: crop ?? { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }, aspect: null });
+
+  return (
+    <>
+      <LiveScreen creds={creds} state={state} conn={conn} camera={{ videoRef, message, onReaim, onPhoto }} onUnpair={onUnpair} />
+      {photo && (
+        <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Crop photo">
+          <div className="sheet">
+            <h2>Send this screen area</h2>
+            <p className="muted">Drag the corners to cover only your screen. Only the boxed area is sent.</p>
+            <CropEditor aspect={photo.aspect} media={<img src={photo.url} alt="Photo of your screen" style={{ width: '100%', height: '100%', objectFit: 'fill' }} onLoad={e => { const a = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight; setPhoto(p => (p ? { ...p, aspect: a } : p)); }} />} crop={photo.crop} onChange={c => setPhoto({ ...photo, crop: c })} />
+            <div className="row">
+              <button className="btn primary grow" onClick={async () => {
+                try { await uploadFrame(creds, await cropImageFile(photo.file, photo.crop), 'photo', true); setMessage('Photo sent'); } catch (e) { setMessage(errorText(e)); }
+                URL.revokeObjectURL(photo.url); setPhoto(null);
+              }}>Send</button>
+              <button className="btn" onClick={() => { URL.revokeObjectURL(photo.url); setPhoto(null); }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

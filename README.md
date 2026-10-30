@@ -1,86 +1,82 @@
-# Coevo
+# Coevo Caddie
 
-**Turn AI-assisted development work into better decisions and evidence of what you can do yourself.**
+**A caddie on the phone beside your screen.** It watches how you work with any AI tool, steps in only when it matters, and helps both you and your AI get better.
 
-Coevo is being built for the 2026 Meta Global AI Developer Hackathon, in the Indie Developer / Build for Your World track. It connects a real development task to coaching, learning content, practice, and scoped improvements that can be applied to later work.
+Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer / Build for Your World). The product concept continues the author's earlier Coevo work; all code in this repository was written during the event.
 
-> **Status: workspace bootstrap.** The repository currently contains a React/TypeScript starting screen, a local Workers health endpoint, shared contracts, and development tooling. Coaching, content generation, practice, and the evidence ledger are planned, not implemented.
+> **Status:** core product implemented and tested locally with live model calls **off**. Real Meta model calls, the Modal media service, and the public deployment are pending credit and account checks. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). Nothing in the app is simulated: when live calls are off, the app says so instead of inventing output.
 
-This is a fresh implementation created during the event. The product concept predates the event; no pre-existing application code, employer code, private work records, or previous repository history is included.
+## The idea in one scene
 
-## The first complete journey
+A café owner is making a poster for a new dessert with an AI. They type "make it more premium" four times. The phone propped beside the monitor buzzes:
 
-1. Import a development session about retries.
-2. Find evidence that an operation may succeed even when its response is lost, creating a duplicate-processing risk.
-3. Choose an idempotency design, revise the implementation, and verify the result.
-4. Turn the same decision into **notes, manuals, flashcards, two-person podcasts, and vertical shorts**.
-5. Practice a changed scenario, distinguishing independent work from coached or AI-produced answers.
-6. Approve a rule for a specific scope, evaluate its use in later work, and return to the original task.
+> You've asked for "more premium" 4×. Who is this dessert for?
 
-Visual and spoken practice, an evidence ledger, approved rules, and weekly synthesis remain part of the full product scope. See [Product scope](docs/PRODUCT.md).
+They answer out loud — office workers near the station, 6,500 won, a calm morning feel — then type it in their own words. The poster finally changes. After the session the Caddie proposes a **Caddie card** for their AI: *Before making a poster, ask me who it's for, the price, one feeling, and whether I have a real photo.* A week later, in a new chat that starts with that card, the AI asks those questions first. The Caddie notices and stays quiet: *Your AI asked first.*
+
+## How it works
+
+| Part | What it does |
+| --- | --- |
+| **Phone · Caddie** (`/caddie`) | Points its camera at your monitor. On-device change detection sends a frame only when the screen changed and settled. Only the boxed screen area is uploaded. A NOW card and haptic nudge when the Caddie steps in; you answer by voice. |
+| **PC · Desk** (`/desk`) | A thin tab: QR pairing, a copy inbox for what the Caddie sends, and evidence rows per moment (frame · what you said · what the Caddie did · what changed). |
+| **Sample** (`/sample`) | No phone needed: replays synthetic screens; the Caddie's readings and replies are live model output. |
+
+**Meta models in the product**
+
+- **Muse Spark 1.3** — reads each camera frame into a structured moment, decides whether to intervene (and why it stays quiet), plans one shared learning design per session, and writes the five formats.
+- **SAM 3.1** — finds the monitor in the one disclosed setup photo so the phone can crop on-device from then on.
+- **Muse Voice Transcribe** — your spoken answers and practice briefs.
+- **Muse Image** — Practice Range renders your spoken brief, and scenes for the short.
+
+Speech for the podcast and short uses the open-source **Kokoro-82M** model (Apache-2.0) on Modal, because Meta's API has no text-to-speech.
+
+**After a session — five formats, five moments** (the Caddie decides which are worth making, with a one-line reason):
+note (right after) · **My playbook** manual split into "for your AI" and "you decide" (source of the Caddie card) · flashcards that apply the rule to new situations (10 min, then 1, 3, 7, 14 days) · a two-voice podcast with an objecting guest, where you can pause to ask and resume at the same line · a 30–45 s 9:16 short built on your own before/after screens.
+
+**Honest evidence:** every observation is labeled *on your own*, *with the Caddie*, *AI wrote it*, or *not seen yet*. Not seen yet never means you can't. Practice that the Caddie opened, or that you did after viewing a hint, never counts as on your own.
 
 ## Run locally
 
-Requirements: Node.js 22.12+ and npm. Python 3.12+ with [uv](https://docs.astral.sh/uv/) is needed for the optional Modal tooling.
+Requirements: Node.js 22.12+ and npm. Python 3.12+ with ffmpeg, numpy and Pillow for the optional media checks.
 
 ```bash
 git clone https://github.com/dkssudgo112/coevo-meta-hackathon.git
 cd coevo-meta-hackathon
 npm ci
 npm run setup
-npm run dev
+npm run build
+npx wrangler dev --local --ip 127.0.0.1 --port 8788
 ```
 
-- Web: http://127.0.0.1:5178
-- Health endpoint: http://127.0.0.1:8788/api/health
-- Stop both servers with Ctrl+C.
-- The starting screen works without API credentials. Mock mode is the default, and live calls are disabled.
-- Public documentation, interface text, accessibility labels, and default generated content use **English**.
-
-Optional Modal tooling:
-
-```bash
-uv sync
-```
-
-Configure your own credentials using [API setup](docs/API-SETUP.md). Credentials are not included in this repository.
+- Open http://127.0.0.1:8788 — the Worker serves the app, API, Durable Objects and local R2.
+- `npm run dev` runs Vite with hot reload on :5178 against the API on :8788.
+- Phone cameras require HTTPS; use the deployed URL or an HTTPS tunnel to test with a real phone.
+- Live model calls are **off** by default. Set your own `MODEL_API_KEY` and `COEVO_ALLOW_LIVE_CALLS="true"` in `.dev.vars` only after checking billing. See [API setup](docs/API-SETUP.md).
 
 ## Check the project
 
 ```bash
-npm run verify             # Type checks, production build, Worker dry-run, local checks
-npm run check:release      # Inspect publishable working-tree files
-npm run check:release -- --staged  # Inspect the exact Git index before a commit
-npm run meta:models        # Optional: authenticate and list models, without inference
+npm run verify             # type checks, unit tests, build, Worker dry-run, release checks
+npm run test:integration   # HTTP checks against a running server (default http://127.0.0.1:8788)
+npm run test:media         # media composition with a synthetic tone (no TTS, no Modal)
+npm run check:release -- --staged
 ```
-
-Live inference and remote compute require a separate, deliberate opt-in after checking billing. A successful model-list request does not establish that inference or promotional credits are available.
 
 ## Structure
 
 | Path | Purpose |
 | --- | --- |
-| `apps/web` | React + TypeScript + Vite bootstrap UI |
-| `apps/api` | Cloudflare Workers health endpoint |
-| `packages/contracts` | Work scope, evidence, and assistance types |
-| `infra/modal` | Opt-in CPU connection check |
-| `docs` | Product, development, event, and submission documentation |
-| `scripts` | Local setup, credential entry, and validation |
-| `.env.example` | Public configuration template with no credentials |
-
-Local secrets, agent notes, private references, screenshots, dependency folders, and build output are excluded from Git. A local pre-commit hook runs the exact-index check in this checkout. After cloning, enable it with `git config core.hooksPath .githooks`. Review the exact staged diff before every publication; a scanner does not establish ownership or guarantee that all sensitive information has been found.
+| `apps/web` | React + TypeScript app: phone Caddie, PC Desk, sample session |
+| `apps/api` | Cloudflare Worker, `Workspace` and `Budget` Durable Objects, Meta and media adapters |
+| `packages/contracts` | Shared types: moments, decisions, evidence labels, cards, content |
+| `packages/core` | Model task prompts and schemas, ladder guardrails, labeling rules, change detection, spaced repetition, budget |
+| `infra/modal` | Media service: Kokoro TTS + ffmpeg composition |
+| `scripts` | Setup, integration checks, sample-screen generator, release checks |
+| `docs` | Product, verification, build plan, decisions, submission |
 
 ## Documentation
 
-- [Current implementation status](docs/STATUS.md)
-- [Hackathon requirements and schedule](docs/HACKATHON.md)
-- [Full product scope](docs/PRODUCT.md)
-- [API and local configuration](docs/API-SETUP.md)
-- [Build plan](docs/BUILD-PLAN.md)
-- [Submission checklist and three-minute demo](docs/SUBMISSION.md)
-- [Design decisions](docs/DECISIONS.md)
-- [Public references](docs/SOURCES.md)
+[Status](docs/STATUS.md) · [Product](docs/PRODUCT.md) · [Verification matrix](docs/VERIFICATION.md) · [Build plan](docs/BUILD-PLAN.md) · [Decisions](docs/DECISIONS.md) · [API setup](docs/API-SETUP.md) · [Hackathon](docs/HACKATHON.md) · [Submission](docs/SUBMISSION.md) · [Sources](docs/SOURCES.md)
 
-Submission deadline recorded from the participant guide: **November 4, 2026, 21:00 EST / November 5, 2026, 11:00 KST**. Check the official guide for changes.
-
-No cloud deployment or final hackathon submission has been completed. A project license has not yet been selected; public visibility alone does not grant an open-source license.
+Submission deadline: **November 4, 2026, 21:00 EST / November 5, 2026, 11:00 KST**. A project license has not been selected yet; public visibility alone does not grant an open-source license.

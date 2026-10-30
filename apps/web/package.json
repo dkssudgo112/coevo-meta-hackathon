@@ -9,6 +9,8 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
+    "jsqr": "1.4.0",
+    "qrcode-generator": "1.4.4",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

@@ -1,0 +1,82 @@
+import type { ReactNode } from 'react';
+import type { Assistance, Moment, Snapshot } from '../../../../packages/contracts/index.ts';
+import type { Creds } from '../lib/api.ts';
+import { useMedia } from '../lib/media.ts';
+
+export type FlagState = 'watching' | 'asking' | 'quiet' | 'off';
+
+export function Flag({ state, label }: { state: FlagState; label?: string }) {
+  return (
+    <svg className="flag" data-state={state} viewBox="0 0 26 26" role="img" aria-label={label ?? `Caddie is ${state}`}>
+      <path d="M6 3v20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path className="cloth" d="M7 4h12l-3.2 4L19 12H7z" fill="currentColor" />
+    </svg>
+  );
+}
+
+const LABEL_TEXT: Record<Assistance, string> = {
+  independent: 'On your own',
+  coached: 'With the Caddie',
+  'ai-produced': 'AI wrote it',
+  unobserved: 'Not seen yet',
+};
+
+export function AssistLabel({ value, extra }: { value: Assistance; extra?: string }) {
+  return <span className={`label ${value}`} title={value}>{LABEL_TEXT[value]}{extra ? ` · ${extra}` : ''}</span>;
+}
+
+export function FixtureTag() {
+  return <span className="tag fixture" title="Synthetic sample data, not a real user session">Sample data</span>;
+}
+
+export function clock(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+export function ago(iso: string): string {
+  const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} d ago`;
+}
+
+export function MediaImage({ creds, k, alt, className }: { creds: Creds | null; k: string | null | undefined; alt: string; className?: string }) {
+  const { url, state } = useMedia(creds, k);
+  if (!k) return <div className={className ?? 'thumb'}>Frame deleted</div>;
+  if (state === 'gone') return <div className={className ?? 'thumb'}>Not available</div>;
+  if (!url) return <div className={className ?? 'thumb'} aria-busy="true">Loading…</div>;
+  return <img className={className ?? 'thumb'} src={url} alt={alt} />;
+}
+
+export function Empty({ children }: { children: ReactNode }) {
+  return <div className="notice">{children}</div>;
+}
+
+export const INGREDIENT_TEXT: Record<string, string> = {
+  audience: 'who it’s for', price: 'price', mood: 'a concrete feeling', realPhoto: 'a real photo', productDetail: 'product details',
+};
+
+export function latestSession(s: Snapshot | null) {
+  return s ? [...s.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0] ?? null : null;
+}
+
+export function sessionMoments(s: Snapshot | null, sessionId: string | null | undefined): Moment[] {
+  if (!s || !sessionId) return [];
+  return s.moments.filter(m => m.work.sessionId === sessionId).sort((a, b) => a.index - b.index);
+}
+
+/** Short human line for a moment in the flow. Model text where it exists, plain status otherwise. */
+export function momentLine(m: Moment): { text: string; kind: 'caddie' | 'quiet' | 'change' | 'status' } {
+  if (m.readingStatus === 'pending') return { text: 'Reading your screen…', kind: 'status' };
+  if (m.readingStatus === 'disabled' || m.readingStatus === 'error' || m.readingStatus === 'budget') return { text: m.readingError ?? 'The Caddie could not read this frame.', kind: 'status' };
+  if (m.readingStatus === 'illegible') return { text: 'Couldn’t read the screen in this frame.', kind: 'status' };
+  if (m.decision?.action === 'intervene') return { text: `Caddie: ${m.decision.message}`, kind: 'caddie' };
+  if (m.change) return { text: `Seen: ${m.change.summary}`, kind: 'change' };
+  return { text: m.decision?.note ?? (m.decision?.reason ? `Quiet — ${m.decision.reason}` : 'Quiet'), kind: 'quiet' };
+}
+
+export function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : 'Something went wrong.';
+}

@@ -1,0 +1,198 @@
+// Moment pipeline: reading → decision → guardrails → observed change → evidence.
+
+import type { CaddieCard, Decision, Moment, Reading, Session, SkillObservation } from '../../../packages/contracts/index.ts';
+import { applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
+import { dimensionFor, observeChange, presentIngredients, strengthFor } from '../../../packages/core/src/labels.ts';
+import { decisionTask, readingTask, type DecisionInput } from '../../../packages/core/src/prompts.ts';
+import { BudgetExceeded, InvalidOutput, LiveCallsDisabled, MetaError, runTask, type Spender } from './meta.ts';
+import type { Env } from './env.ts';
+import type { Store } from './store.ts';
+import { id, now } from './util.ts';
+
+export interface Ctx {
+  env: Env;
+  wsId: string;
+  store: Store;
+  spender: Spender;
+  r2: R2Bucket;
+  memory: () => Promise<string[]>;
+  remember: (fact: string) => Promise<void>;
+  notice: (level: 'info' | 'warn', code: string, message: string) => void;
+  /** Register a Modal media job for alarm-driven polling. */
+  trackJob: (contentId: string, jobId: string) => Promise<void>;
+}
+
+export function failureStatus(e: unknown): { status: Moment['readingStatus']; message: string } {
+  if (e instanceof LiveCallsDisabled) return { status: 'disabled', message: 'Live model calls are off on this server, so the Caddie cannot read the screen yet.' };
+  if (e instanceof BudgetExceeded) return { status: 'budget', message: 'The daily model budget is used up. The Caddie will stay quiet until it resets.' };
+  if (e instanceof MetaError) return { status: 'error', message: e.status === 402 ? 'Model billing is not available.' : `The model service returned ${e.status}.` };
+  if (e instanceof InvalidOutput) return { status: 'error', message: 'The model reply could not be used.' };
+  return { status: 'error', message: 'The Caddie could not reach the model service.' };
+}
+
+export function sessionMoments(store: Store, sessionId: string): Moment[] {
+  return store.list('moment').filter(m => m.work.sessionId === sessionId).sort((a, b) => a.index - b.index);
+}
+
+export function activeCards(store: Store): CaddieCard[] {
+  return store.list('card').filter(c => c.status === 'approved' || c.status === 'applied' || c.status === 'observed-working');
+}
+
+function repeatedVague(history: Moment[], reading: Reading): DecisionInput['repeatedVagueTerm'] {
+  const counts = new Map<string, number>();
+  const seen = new Set<string>();
+  for (const m of [...history.filter(h => h.reading?.legible && !h.misread), { reading } as Moment]) {
+    const req = m.reading?.userRequest;
+    if (!req || seen.has(req)) continue;
+    seen.add(req);
+    for (const t of m.reading?.vagueTerms ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  let best: DecisionInput['repeatedVagueTerm'] = null;
+  for (const [term, count] of counts) if (!best || count > best.count) best = { term, count };
+  return best && best.count >= 2 ? best : null;
+}
+
+export async function buildDecisionInput(ctx: Ctx, reading: Reading, history: Moment[]): Promise<DecisionInput> {
+  const legible = history.filter(m => m.reading?.legible && !m.misread);
+  const interventions = history.filter(m => m.decision?.action === 'intervene');
+  const last = interventions[interventions.length - 1];
+  const seen = new Set<string>();
+  const recentRequests: DecisionInput['recentRequests'] = [];
+  for (const m of legible) {
+    const t = m.reading!.userRequest;
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    recentRequests.push({ at: m.at, text: t, vagueTerms: m.reading!.vagueTerms, ingredients: presentIngredients(m.reading) });
+  }
+  return {
+    firstSighting: legible.length === 0,
+    reading,
+    recentRequests: recentRequests.slice(-6),
+    repeatedVagueTerm: repeatedVague(history, reading),
+    interventions: interventions.slice(-4).map(m => ({ at: m.decision!.decidedAt, step: m.decision!.step, message: m.decision!.message ?? '', response: m.response ? `${m.response.kind}${m.response.transcript ? `: ${m.response.transcript}` : ''}` : null })),
+    activeCards: activeCards(ctx.store).map(c => c.text),
+    memory: (await ctx.memory()).slice(-8),
+    secondsSinceLastIntervention: last?.decision ? Math.round((Date.now() - Date.parse(last.decision.decidedAt)) / 1000) : null,
+  };
+}
+
+function ruleDecision(reason: string, guardrail: string): Decision {
+  return { action: 'stay-quiet', step: 'watch', reason, quote: null, message: null, note: null, missingIngredients: [], exampleBrief: null, guardrail, provenance: 'rule', model: null, decidedAt: now() };
+}
+
+export async function decide(ctx: Ctx, reading: Reading, history: Moment[], extra = ''): Promise<Decision> {
+  const input = await buildDecisionInput(ctx, reading, history);
+  const res = await runTask(ctx.env, ctx.spender, decisionTask, { text: `${extra}${JSON.stringify(input)}` });
+  const proposal: Proposal = res.value;
+  const guarded = applyGuardrails(proposal, { reading, history, nowMs: Date.now(), activeCard: activeCards(ctx.store).length > 0 });
+  return toDecision(guarded, res.model, now(), 'live-model');
+}
+
+async function recordSkills(ctx: Ctx, moment: Moment, session: Session): Promise<void> {
+  const change = moment.change;
+  if (!change) return;
+  const priorSessions = ctx.store.list('session').filter(s => s.id !== session.id && Date.parse(s.startedAt) < Date.parse(session.startedAt));
+  const coachedBefore = priorSessions.some(s => ctx.store.list('moment').some(m => m.work.sessionId === s.id && m.decision?.action === 'intervene'));
+  for (const dimension of dimensionFor(change)) {
+    // The AI asking first is evidence that the applied card works; the rule came from the Caddie.
+    const assistance = dimension === 'delegation' ? 'coached' : change.assistance;
+    const obs: SkillObservation = {
+      id: id('sk'), dimension, assistance,
+      strength: strengthFor(assistance, { transfer: coachedBefore }),
+      momentId: moment.id, practiceId: null, note: change.summary, at: now(), fixture: session.fixture,
+    };
+    await ctx.store.put('skill', obs);
+  }
+}
+
+async function observeCards(ctx: Ctx, moment: Moment): Promise<void> {
+  if (!moment.reading?.aiAskedClarifyingQuestion) return;
+  for (const card of activeCards(ctx.store)) {
+    if (card.status === 'observed-working' || card.sessionId === moment.work.sessionId) continue;
+    await ctx.store.update('card', card.id, c => ({
+      ...c, status: 'observed-working',
+      history: [...c.history, { status: 'observed-working', at: now(), by: 'observation', note: `The AI asked clarifying questions first (moment ${moment.index + 1}).` }],
+    }));
+  }
+}
+
+/** Decide whether to keep the frame as evidence; otherwise delete it from storage. */
+async function retainOrDiscard(ctx: Ctx, moment: Moment, history: Moment[]): Promise<Moment> {
+  const f = moment.frame;
+  if (!f?.storedKey) return moment;
+  const prevReq = [...history].reverse().find(m => m.reading?.legible)?.reading?.userRequest ?? null;
+  const keep = moment.decision?.action === 'intervene' || !!moment.change || (moment.reading?.legible && moment.reading.userRequest !== prevReq) || moment.reading?.aiAskedClarifyingQuestion || !!moment.reading?.artifactVisible;
+  if (keep) return moment;
+  await ctx.r2.delete(f.storedKey);
+  return { ...moment, frame: { ...f, storedKey: undefined, deleted: true } };
+}
+
+export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: string): Promise<void> {
+  let moment = ctx.store.get('moment', momentId);
+  if (!moment) return;
+  const session = ctx.store.get('session', moment.work.sessionId);
+  if (!session) return;
+  const history = sessionMoments(ctx.store, session.id).filter(m => m.index < moment!.index);
+
+  let reading: Reading;
+  try {
+    reading = (await runTask(ctx.env, ctx.spender, readingTask, { text: 'Read this screen photo.', images: [imageDataUrl] })).value;
+  } catch (e) {
+    const f = failureStatus(e);
+    // Raw frame is discarded when it could not be read.
+    if (moment.frame?.storedKey) await ctx.r2.delete(moment.frame.storedKey);
+    await ctx.store.put('moment', { ...moment, readingStatus: f.status, readingError: f.message, frame: moment.frame ? { ...moment.frame, storedKey: undefined, deleted: true } : null, decision: ruleDecision(f.message, f.status) });
+    return;
+  }
+
+  if (!reading.legible) {
+    // Unreadable frames are never kept.
+    if (moment.frame?.storedKey) await ctx.r2.delete(moment.frame.storedKey);
+    await ctx.store.put('moment', {
+      ...moment, readingStatus: 'illegible', reading,
+      frame: moment.frame ? { ...moment.frame, storedKey: undefined, deleted: true } : null,
+      decision: ruleDecision('The screen was not readable in this frame.', 'illegible'),
+    });
+    return;
+  }
+
+  moment = { ...moment, readingStatus: 'ok', reading, change: observeChange(reading, history) };
+  await ctx.store.put('moment', moment);
+  if (session.tool !== reading.tool || session.task !== reading.task) {
+    await ctx.store.put('session', { ...session, tool: reading.tool ?? session.tool, task: reading.task ?? session.task });
+  }
+
+  let decision: Decision;
+  try {
+    decision = await decide(ctx, reading, history);
+  } catch (e) {
+    const f = failureStatus(e);
+    decision = ruleDecision(f.message, `decision-${f.status}`);
+  }
+  moment = { ...ctx.store.get('moment', momentId)!, decision };
+  moment = await retainOrDiscard(ctx, moment, history);
+  await ctx.store.put('moment', moment);
+  await recordSkills(ctx, moment, session);
+  await observeCards(ctx, moment);
+}
+
+/** After a voice answer or an example request, the Caddie replies on a frameless moment. */
+export async function followUp(ctx: Ctx, source: Moment, extra: string): Promise<void> {
+  const session = ctx.store.get('session', source.work.sessionId);
+  if (!session || !source.reading) return;
+  const all = sessionMoments(ctx.store, session.id);
+  const reply: Moment = {
+    id: id('m'), work: source.work, index: all.length ? all[all.length - 1].index + 1 : 0, at: now(), frame: null,
+    readingStatus: 'ok', readingError: null, reading: { ...source.reading, userTyping: false }, misread: false,
+    decision: null, response: null, change: null, provenance: 'live-model',
+  };
+  await ctx.store.put('moment', reply);
+  let decision: Decision;
+  try {
+    decision = await decide(ctx, reply.reading!, all, extra);
+  } catch (e) {
+    const f = failureStatus(e);
+    decision = ruleDecision(f.message, `decision-${f.status}`);
+  }
+  await ctx.store.put('moment', { ...ctx.store.get('moment', reply.id)!, decision });
+}

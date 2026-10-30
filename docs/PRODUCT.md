@@ -1,48 +1,60 @@
-# Product scope
+# Product
 
-This document preserves the full intended scope. It is an implementation plan, not a list of completed features.
+Coevo Caddie coaches **how a person directs their AI tool**, not the AI's output. It lives on a phone propped beside the monitor, sees the screen through the camera, and steps in only when it matters. The person learns to give their AI better material; their AI learns, through an approved Caddie card, to ask for it; and the Caddie steps back.
 
-## User and problem
+## User and moment
 
-The first user is a developer who works with coding agents every day. Completing an artifact and being able to explain, verify, or adapt the underlying decision are different outcomes. Coevo connects coaching, learning, and evidence within the same work context, with a clear route back to the task being read.
+- **Who:** anyone who works with AI tools — not only developers. Demo persona (fixture): a first-time café owner making a promotional poster for a new menu item.
+- **When:** while working at the PC with the phone beside it, the same habit people already have. Not a separate study app.
+- **Problem:** when results disappoint, people repeat vague requests ("more premium"). The missing piece is the person's own material — who it's for, price, a concrete feeling, a real photo. General AI tools fix the output inside one chat; the habit stays, and the AI starts from zero next time.
 
-## One complete journey
+## What the Caddie decides, what the person decides
 
-1. Import a real, permissioned or synthetic coding session about retries.
-2. Identify evidence of duplicate processing when an external operation succeeds but its response is lost.
-3. Let the user choose an idempotency or deduplication approach, revise the implementation, and verify it. Separate an AI completion claim from an observed tool result.
-4. Build all five content formats from one shared learning design for that decision.
-5. Present a changed situation for a first attempt, keeping independent answers separate from assisted answers.
-6. Apply a user-approved, scoped rule to later work and inspect the actual difference.
-7. Return to the original task.
-
-## Feature groups to preserve
-
-| Group | Included scope |
+| The Caddie decides | The person decides |
 | --- | --- |
-| Work and review | Requests, code changes, tool results, user decisions, revisions, and verification |
-| Coaching | Interventions grounded in observable failure, correction, or changed conditions, including reasons not to intervene |
-| Content | **Notes, manuals, flashcards, two-person podcasts, and 9:16 vertical shorts** |
-| Visual and spoken practice | Visual scenes, spoken explanations, meeting or role rehearsal; bounded inputs for the first demo |
-| Evidence ledger | First attempts, assistance level, source references, rubric versions, transfer, and retention observations |
-| Human and agent improvement | Approved rules, explicit application scope, later application, and replay checks |
-| Weekly synthesis | Evidence-linked patterns, automation opportunities, and learning recommendations |
+| Whether to speak now, or stay quiet, always with a reason | Their answers and their own brief |
+| The ladder step: watch → question → ingredients → example | Approve, edit, reject or turn off a Caddie card |
+| Which content formats are worth making, and when | Later, deleting frames, pausing, correcting a misread |
+| When to suggest the Practice Range | |
 
-## Planned model responsibilities
+Rules that change the person's AI always need the person's approval.
 
-- **Muse Spark:** work coaching and structured shared learning design.
-- **Muse Image:** visual scenes. Render factual text, numbers, and state diagrams in application code.
-- **Muse Voice Transcribe:** speech-to-text. It does not replace text-to-speech for podcasts; a separate TTS provider is needed.
-- **Cross-session synthesis:** start with the configured Spark model. Evaluate Wonder only if available to the deployment account; retain synthesis when substituting an available Meta model.
-- **Modal:** Meta open-model inference and bounded code checks in Sandboxes. Validate GPU access and billing separately.
-- **Muse Code:** a session-event input adapter. Verify the actual hooks, execution, and export interfaces. Begin with a JSONL fixture import to stabilize the contract.
+## Journey
 
-## Evidence boundaries
+1. **Pair (no setup questions):** open `/desk` on the PC, open `/caddie` on the phone, point it at the QR. Aim: drag a box over the screen, or let SAM 3.1 find it from one disclosed setup photo. From then on only the boxed screen area is sent.
+2. **Watch:** on-device change detection sends a frame when the screen changed and settled. Muse Spark reads it (tool, latest request verbatim, vague words, ingredients present, whether the AI asked first). The first reading produces a short model-written acknowledgement.
+3. **Step in:** after repeated vague requests the phone buzzes. The NOW card quotes the person's words and asks one question. They answer by voice; the Caddie replies without writing the brief for them. "Show me an example" is available only after the ingredients step and anything copied from it is labeled *AI wrote it*.
+4. **Observe the change:** the next frame shows new ingredients → labeled *with the Caddie* (or *on your own* if no intervention happened).
+5. **Wrap:** the session ends by button or after 10 idle minutes. One shared learning design decides each format, with a reason.
+6. **AI grows:** the playbook's rule becomes a proposed Caddie card. Approved cards go to the Desk inbox with tool-specific instructions (Meta AI: send as the first message of a chat; Memory did not persist in our check).
+7. **Value check:** in a later session, if the AI asks the clarifying questions first, the card becomes *seen working* and the Caddie stays quiet.
 
-- Validating an exact source anchor and validating its interpretation are separate checks.
-- Preserve `projectId/sessionId/workId` across input, generation, playback, persistence, replay, and recovery.
-- Never conflate `independent`, `coached`, `ai-produced`, and `unobserved`.
-- Do not score an unobserved action as a failure or lack of understanding.
-- Deterministic scoring can make a calculation reproducible; it does not validate a professional certification.
-- Clearly label synthetic demo data. Do not present it as real user performance or measured long-term learning impact.
-- English is the default service language. Additional language support must not silently change this default.
+## Five formats, five moments
+
+| Format | Role | Arrives |
+| --- | --- | --- |
+| Note | What changed the result, quoting the person's words; decided vs AI-produced; open conditions | Right after the session |
+| Manual (My playbook) | Next-time steps, each with what it checks; pitfalls; "for your AI" vs "you decide"; the card rule | Right after the session |
+| Flashcards | Apply the rule to a changed situation; never pure recall; reviews at 10 min, 1, 3, 7, 14 days | Idle moments on the phone |
+| Two-voice podcast | Caddie and a skeptical guest argue the trade-off; ≥ 60 s; pause to ask, resume at the same line | Prep or commute time |
+| 9:16 short | One mechanism in 4–6 scenes (hook → own before/after evidence → cause diagram → rule → question), 30–45 s | Reviewing or sharing |
+
+The Caddie makes a format only when the session earned it; a skipped format shows why and can still be requested. A failed format never blocks the others.
+
+## Practice Range
+
+A one-sentence request with a changed condition (new item, season or audience). The person briefs the AI out loud; Muse Image draws what those words produce; the brief is checked for ingredients. Viewing the hint, or an exercise opened by the Caddie, makes the attempt *with the Caddie*.
+
+## Evidence rules
+
+- Labels: `independent` (on your own), `coached` (with the Caddie), `ai-produced` (AI wrote it), `unobserved` (not seen yet). Strength: transfer to later real work > practice > in-task.
+- The Caddie's reading is an interpretation; the frame is the observation. Misreads can be corrected and are removed from evidence.
+- Quotes must appear in the source (normalized for quotes and markdown); ungrounded quotes are dropped.
+- No levels or scores. 4D observations: description, delegation, discernment, diligence.
+- Fixture data and simulated persona tests are always labeled and never presented as real users.
+
+## Privacy and cost
+
+- Only the device-cropped screen area is uploaded; the setup photo for SAM is disclosed and never stored. Raw frames are discarded after reading unless they are evidence for a moment; kept frames can be deleted.
+- Standard Meta models only; contributor variants are never used for user data.
+- Server-enforced caps: $4.00/day global, $0.60/day per workspace, $0.15 per sample session.

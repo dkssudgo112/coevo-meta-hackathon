@@ -21,3 +21,27 @@ Keep all five content formats, visual and spoken practice, evidence, approved ru
 The maintainer authorized a public GitHub repository and initial push. English is the default for README files, public documentation, product UI, accessibility labels, demo material, and generated content. Conversation can remain in the user's preferred language.
 
 Keep private agent instructions, account records, raw application references, screenshots, and credentials outside Git. Preserve the earlier local documentation privately while publishing a portable, reviewed version. Use a GitHub noreply identity for commit metadata. A project license still requires a maintainer decision.
+
+## October 30, 2026 — Coevo Caddie replaces the retry/idempotency plan
+
+After a structured product interview the maintainer approved a new plan. Coevo becomes **Coevo Caddie**: a phone beside the screen that coaches how a person directs any AI tool, for workers in general (demo persona: a first-time café owner making a poster). The developer-only retry/idempotency journey is retired. The five content formats stay, each mapped to a different moment of use.
+
+## October 30, 2026 — The earlier Coevo is a design reference
+
+The author's earlier Coevo product is used for design rules (coach intervention, evidence labels, format roles, UX principles). All code here is newly written during the event; no earlier code, text, history or private material is copied.
+
+## October 30, 2026 — Caddie decides, the person approves rules
+
+The Caddie decides whether and how to intervene (watch → question → ingredients → example) and which content to make, always with a reason. Deterministic guardrails block interrupting while typing, skipping ladder steps, nagging, praise and ungrounded quotes. Only rules that change the person's AI need approval.
+
+## October 30, 2026 — Camera first, with disclosed setup and on-device crop
+
+The phone camera watches the monitor so any AI tool works without integration. SAM 3.1 runs only on one disclosed setup photo to find the screen; afterwards the phone crops on-device and uploads only the screen area, and only after a settled change. Fallbacks: a single photo, or Desk screen sharing.
+
+## October 30, 2026 — Models, speech and costs
+
+Muse Spark 1.3 (reading, decisions, learning design, content), SAM 3.1 (screen location), Muse Voice Transcribe (spoken answers), Muse Image (Practice Range, short scenes). Standard models only — never contributor variants for user data. Meta's API has no text-to-speech, so Kokoro-82M (Apache-2.0) runs on Modal for the podcast and short. Server-side caps: $4/day global, $0.60/day per workspace, $0.15 per sample session. The Open Weight bonus is not pursued.
+
+## October 30, 2026 — Meta AI card fallback
+
+In a Korean Meta AI account, image generation worked, but a "Remember that…" rule was not applied in a new chat and no Memory setting was found. Caddie cards for Meta AI are therefore sent as the first message of a chat, and the Caddie verifies the effect by observing whether the AI asks first.

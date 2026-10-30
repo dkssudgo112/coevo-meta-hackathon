@@ -1,41 +1,40 @@
 # Submission and three-minute demo
 
-Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Deadline: **November 5, 2026, 11:00 KST**. The final project has not been submitted.
+Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Deadline: **November 5, 2026, 11:00 KST**. The maintainer presses the final submit button; nothing has been submitted.
 
-## Prepare the form
+## Form checklist
 
 - [ ] Team name and all approved contributors.
-- [ ] Indie Developer / Build for Your World.
-- [ ] English project description.
-- [ ] Public GitHub repository URL.
-- [ ] Accessible three-minute demo video.
-- [ ] Explanation of which Meta products the project uses.
-- [ ] Explanation of why those models are important to the solution.
-- [ ] Optional product/partner feedback.
-- [ ] Optional public post URL for the Most Viral category.
-- [ ] Review the final usage, sharing, and promotion consent language at submission time.
+- [ ] Track: Indie Developer / Build for Your World.
+- [ ] English project description (draft below once features are verified).
+- [ ] Public GitHub repository URL, checked while signed out.
+- [ ] Accessible three-minute demo video, checked while signed out.
+- [ ] Which Meta models the project uses, and why they matter.
+- [ ] Live product URL with the sample-session entrance and a stated budget cap.
+- [ ] Optional feedback and public post URL.
+- [ ] Review the usage, sharing and promotion consent language at submission time.
 
-## Before publication or final submission
+## Before publication
 
-- [ ] Include only new event implementation and properly licensed dependencies/assets.
-- [ ] Pass `npm run verify` and `npm run check:release -- --staged`.
-- [ ] Inspect `git ls-files` and the exact staged diff; exclude secrets, private notes, local agent files, screenshots, and raw logs.
-- [ ] Inspect commit metadata and history as well as file contents.
-- [ ] Decide the project license and review relevant OSS/model terms.
-- [ ] Check repository/video access while signed out.
-- [ ] Provide a reproducible README, sample-data provenance, and model/cost limitations.
-- [ ] Explain the earlier concept and this event's new implementation in the README and the demo opening.
+- [ ] Only event-period code and properly licensed dependencies/assets (Kokoro-82M Apache-2.0; fonts via Google Fonts OFL).
+- [ ] `npm run verify` and `npm run check:release -- --staged` pass; the exact staged diff and commit metadata reviewed.
+- [ ] No secrets, private notes, account screenshots, raw sessions or personal frames.
+- [ ] Project license decided by the maintainer.
+- [ ] README explains the earlier concept and the new implementation; demo opening says the same.
+- [ ] Claims match evidence: real model output, fixture data and simulated persona tests are labeled.
 
 ## Three-minute storyboard
 
-| Time | What to show |
-| --- | --- |
-| 0:00–0:15 | User, problem, earlier concept, and new event implementation |
-| 0:15–0:50 | Detect duplicate-processing risk and its source evidence in a retry task |
-| 0:50–1:20 | User decision, implementation revision, and actual verification |
-| 1:20–1:55 | All five content formats connected to the same evidence |
-| 1:55–2:25 | Changed-condition practice, independent/assisted work, and the evidence ledger |
-| 2:25–2:50 | Approved-rule application, weekly synthesis, and return to the original task |
-| 2:50–3:00 | Meta model roles, observed value, and current limitations |
+Composition: a real desk shot first (phone propped beside the monitor), then a split screen — PC capture on the left, phone mirror on the right. Every Caddie line on screen is live model output; the persona and screens are labeled sample data; the "next week" scene is a second recorded session and says so.
 
-Use only verified learning, usage, and performance claims. Do not edit planned features or sample outputs to look like completed functionality. Keep English as the default demo language.
+| Time | Scene | Shows |
+| --- | --- | --- |
+| 0:00–0:12 | Desk shot | Café owner, AI tool, phone beside the monitor. "Built during the hackathon, from my earlier Coevo concept." |
+| 0:12–0:40 | Split screen | "more premium" again and again; the flow shows *Quiet — on track*; then the buzz and the NOW card: "You've asked for 'more premium' 4×. Who is this dessert for?" |
+| 0:40–1:05 | Voice answer | Owner speaks, then types it in their own words; the poster changes; Desk row labeled *with the Caddie*. |
+| 1:05–1:30 | Wrap | Note quoting the owner; My playbook split; Caddie card approved → Desk inbox → pasted into the AI. |
+| 1:30–1:55 | Five moments | Flashcard, podcast (two voices, pause-to-ask), short built on the owner's own screens — each with "why now". |
+| 1:55–2:15 | Practice Range | Spoken brief → Muse Image → ingredient check → *on your own (practice)*. |
+| 2:15–2:45 | **Climax** | New chat: "Make a poster for our new drink." The AI asks first. Phone: "Your AI asked first. I'll stay quiet." "You learned. Your AI learned. Your Caddie stepped back." |
+| 2:45–2:55 | Cameo | A cover letter in another AI tool: "Smooth, but anyone could write this. What's one thing only you did?" |
+| 2:55–3:00 | Close | The four Meta models and their roles; live output; one-line limitation. |
