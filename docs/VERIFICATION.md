@@ -20,7 +20,7 @@ This matrix tracks every approved requirement through three depth levels and rec
 
 **Local fake-model journey** (`npm run test:e2e-fake`, TEST ONLY): with a scripted fake model server on 127.0.0.1 the whole server path passes 35/35 checks — frames → readings → quiet/intervene decisions with grounded quotes → voice answer → frameless reply → coached change → wrap with a reason per format → all five formats ready (123.8 s podcast, 40.8 s short, both downloadable) → card edit/approve/apply → next session "AI asked first" → card observed-working → practice labels (independent; coached after hint) → podcast Ask → flashcard interval → misread → frame deletion → revoke history → spend under cap. All of it is labeled `fixture`; it proves the server logic, not real model quality, camera legibility or deployment.
 
-Last updated: 2026-10-30.
+Last updated: 2026-10-30 (late KST).
 
 ## A. Observation
 
@@ -56,7 +56,7 @@ Last updated: 2026-10-30.
 | C1 | Desk shows a QR; the phone camera scans it and pairs | ◐ | ☐ | ☐ | local: pairing link in a second browser tab; integration: one-time secret | Camera QR scan needs `device` |
 | C2 | Real-time sync over SSE (phone ↔ Desk) | ☑ | ◐ | ☐ | local: Desk showed "Phone connected" live; integration: snapshot over SSE | Reconnect with backoff implemented |
 | C3 | Send to PC + copy (inbox) | ◐ | ☐ | ☐ | code: inbox API + Desk copy | |
-| C4 | Session isolation: per-workspace tokens, no cross-workspace access | ☑ | ☑ | ☐ | integration: cross-workspace 401, one-time pair secret, unauthenticated 401 | Re-run on deployed URL |
+| C4 | Session isolation: per-workspace tokens, no cross-workspace access | ☑ | ☑ | ☐ | deployed + local integration: cross-workspace 401, one-time pair secret, unauthenticated 401 | |
 
 ## D. Evidence
 
@@ -88,7 +88,7 @@ Last updated: 2026-10-30.
 | F4 | Flashcards with spaced repetition (10 min, 1, 3, 7, 14 days) | ◐ | ☐ | ☐ | unit: spaced | |
 | F5 | Two-voice podcast ≥ 60 s, transcript, Ask + resume at the same line | ◐ | ☐ | ☐ | local: 120 s timeline with per-line timings (tone); UI: Ask + resume | S5 |
 | F6 | 30–45 s 9:16 short: captions, TTS, mp4 | ◐ | ☐ | ☐ | local: `npm run test:media` (tone instead of TTS) → 30.8 s 1080×1920 mp4 | S5, S7 |
-| F7 | A failed format never blocks the others; per-format retry | ☐ | ☐ | ☐ | | |
+| F7 | A failed format never blocks the others; per-format retry | ☑ | ◐ | ☐ | fake e2e (fixture): injected short + podcast failures → other three ready, podcast script kept, retry recovers both | Real failure modes pending live |
 
 ## G. Practice Range
 
@@ -103,9 +103,9 @@ Last updated: 2026-10-30.
 
 | ID | Requirement | L1 | L2 | L3 | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| H1 | Cloudflare Worker + Durable Objects + R2 + static assets | ☐ | ☐ | ☐ | | R5 |
-| H2 | Health/status, security headers, rate limits | ☑ | ◐ | ☐ | integration: CSP + Permissions-Policy, frame 429, workspace-creation limit | |
-| H3 | Cost caps: global, per workspace, per sample session | ◐ | ☐ | ☐ | unit: budget + adapter settlement | Live run needed |
+| H1 | Cloudflare Worker + Durable Objects + R2 + static assets | ☑ | ◐ | ☐ | deployed: https://coevo-caddie.coevo-meta-hackathon.workers.dev (live calls off) | Live calls pending R1 |
+| H2 | Health/status, security headers, rate limits | ☑ | ☑ | ☐ | deployed integration 17/17: CSP, Permissions-Policy, frame 429, admin routes closed, test mode off | |
+| H3 | Cost caps: one lifetime authority ($3), per workspace, per sample session | ☑ | ◐ | ☐ | unit: budget, reservations kept on ambiguous failures, Retry-After; deployed health shows the lifetime ledger; fake e2e spend under cap | Live run needed |
 | H4 | Three entrances: camera / photo / sample session (live model, fixture frames labeled) | ☐ | ☐ | ☐ | | |
 | H5 | English docs, reproducible setup | ◐ | ☐ | ☐ | | |
 | H6 | Three-minute demo video | ☐ | ☐ | ☐ | | R7 |
