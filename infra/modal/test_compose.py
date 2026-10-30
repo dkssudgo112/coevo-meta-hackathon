@@ -57,6 +57,15 @@ def main():
     os.unlink(path)
     print(f"timing: podcast {p['timing_s']}, short {s['timing_s']}")
 
+    # Long titles wrap inside the frame (at most two lines) instead of running off the edge.
+    from PIL import ImageDraw
+    long_title = "From More Premium to a Clear Brief for the Morning Crowd"
+    layer = compose.caption_overlay("Narration", None, long_title, True)
+    probe_draw = ImageDraw.Draw(layer)
+    tlines = compose._wrap(probe_draw, long_title, compose._font(58, serif=True), compose.W - 160)
+    assert len(tlines) >= 2 and all(probe_draw.textlength(l, font=compose._font(58, serif=True)) <= compose.W - 160 for l in tlines[:2]), tlines
+    print(f"title wrap ok: {tlines[:2]}")
+
     # Length policy: 25 s of speech becomes a 30 s short with a reflection pause; too long or too short fails.
     assert compose.short_plan(25.0) == 30.0
     assert compose.short_plan(40.0) == 40.8

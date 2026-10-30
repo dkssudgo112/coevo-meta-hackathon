@@ -22,7 +22,7 @@ export interface ModelTask<T> {
   read: (json: unknown) => T;
 }
 
-const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote. Never mention clock times; refer to a moment by what happened in it.`;
+const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote, at most 15 words at a time (use … to skip words). Prefer what they typed to the AI over voice transcripts: transcripts can contain recognition errors and repeated words, so never quote those parts. Never mention clock times; refer to a moment by what happened in it.`;
 
 const ingredientsSchema = S.obj({
   audience: S.bool('Says who it is for: a specific customer group, reader, hiring team or audience.'),
@@ -194,7 +194,7 @@ export const noteTask: ModelTask<NotePayload> = {
   name: 'note',
   effort: 'low',
   maxOutputTokens: 900,
-  instructions: `Write the session note: what changed the result. Lead with the person's turning-point words (quote exactly). Separate what the person decided from what the AI produced; list open conditions. Do not restate what the AI already explained. Body at most 800 characters. ${STYLE}`,
+  instructions: `Write the session note: what changed the result. Lead with the person's turning-point words (quote exactly). Separate what the person decided from what the AI produced; when the change is labeled coached, say plainly that it came after the Caddie's question; when ai-produced, say the AI wrote it. List open conditions. Do not restate what the AI already explained. Body at most 800 characters. ${STYLE}`,
   schema: S.obj({
     title: S.str('Short title.', 80),
     body: S.str('At most 800 characters.', 800),
@@ -266,7 +266,7 @@ export const podcastTask: ModelTask<{ title: string; guest: string; lines: Omit<
   name: 'podcast',
   effort: 'medium',
   maxOutputTokens: 2200,
-  instructions: `Write a two-person podcast script (8–14 lines, 200–280 words in total, about 80–110 seconds spoken). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
+  instructions: `Write a two-person podcast script (8–14 lines, 200–280 words in total, about 80–110 seconds spoken). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). The caddie speaks in the first person about its own questions ("when I asked …"). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
   schema: S.obj({
     title: S.str('Episode title.', 80),
     guest: S.str('Guest display name with their situation, e.g. "Jun, bakery owner".', 40),
@@ -299,7 +299,7 @@ export const shortTask: ModelTask<{ title: string; scenes: Omit<ShortScene, 'ima
   name: 'short',
   effort: 'medium',
   maxOutputTokens: 1600,
-  instructions: `Plan a 30–45 second vertical (9:16) short that shows ONE mechanism from this session. 4–6 scenes in this arc: hook (a question or surprise) → evidence (the person's own before/after; set evidence to "before" or "after", imagePrompt null) → cause (a 2–4 node diagram of why vague words fail and ingredients work) → rule (the rule with its condition) → question (a closing transfer question). Each scene: 1–2 complete spoken sentences of narration (total 75–115 words). Captions show the narration in full, so write it to be read too. imagePrompt (only for hook/rule/question scenes) describes a calm, photographic or illustrated background with NO text in the image. ${STYLE}`,
+  instructions: `Plan a 30–45 second vertical (9:16) short that shows ONE mechanism from this session. 4–6 scenes in this arc: hook (a question or surprise) → evidence (the person's own screen; set evidence to "before" or "after", imagePrompt null; when the result visibly changed, use two evidence scenes: "before", then "after") → cause (a 2–4 node diagram of why vague words fail and ingredients work) → rule (the rule with its condition) → question (a closing transfer question). Each scene: 1–2 complete spoken sentences of narration (total 75–115 words). Captions show the narration in full, so write it to be read too. imagePrompt (only for hook/rule/question scenes) describes a calm, photographic or illustrated background with NO text in the image. ${STYLE}`,
   schema: S.obj({
     title: S.str('Title.', 60),
     scenes: S.arr(S.obj({

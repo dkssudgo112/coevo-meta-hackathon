@@ -181,13 +181,21 @@ def caption_overlay(text: str, label: str | None, title: str | None, dark: bool,
     layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     fg = (246, 243, 236) if dark else INK
+    label_top = 180
     if title:
-        draw.text((80, 120), title, font=_font(58, serif=True), fill=fg)
+        tf = _font(58, serif=True)
+        tlines = _wrap(draw, title, tf, W - 160)[:2]
+        if dark:
+            # A soft band keeps a light title readable over bright photos.
+            draw.rectangle([0, 0, W, 120 + len(tlines) * 72 + 40], fill=(10, 14, 12, 120))
+        for i, ln in enumerate(tlines):
+            draw.text((80, 120 + i * 72), ln, font=tf, fill=fg)
+        label_top = max(label_top, 120 + len(tlines) * 72 + 24)
     if label:
         f = _font(40)
         tw = draw.textlength(label, font=f)
-        draw.rounded_rectangle([80, 180, 80 + tw + 60, 250], radius=35, fill=ACCENT)
-        draw.text((110, 215), label, font=f, fill=(246, 243, 236), anchor="lm")
+        draw.rounded_rectangle([80, label_top, 80 + tw + 60, label_top + 70], radius=35, fill=ACCENT)
+        draw.text((110, label_top + 35), label, font=f, fill=(246, 243, 236), anchor="lm")
     if cue:
         cf = _font(42)
         draw.text((80, H - 120), cue, font=cf, fill=(246, 243, 236) if dark else ACCENT)
