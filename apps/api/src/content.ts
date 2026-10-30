@@ -54,8 +54,18 @@ function sources(ctx: Ctx, session: Session): string[] {
 
 const grounded = (quote: string, srcs: string[]) => srcs.some(s => isGroundedQuote(quote, s));
 
+/** Raised when the content item (or its session) was deleted mid-generation. */
+class Gone extends Error {
+  constructor() { super('deleted'); this.name = 'Gone'; }
+}
+
+function ensureAlive(ctx: Ctx, contentId: string): void {
+  if (!ctx.store.alive('content', contentId)) throw new Gone();
+}
+
 async function setItem(ctx: Ctx, item: ContentItem, patch: Partial<ContentItem>): Promise<ContentItem> {
-  const cur = ctx.store.get('content', item.id) ?? item;
+  ensureAlive(ctx, item.id);
+  const cur = ctx.store.get('content', item.id)!;
   return ctx.store.put('content', { ...cur, ...patch, updatedAt: now() });
 }
 
@@ -68,10 +78,12 @@ export async function wrapSession(ctx: Ctx, sessionId: string): Promise<void> {
   try {
     design = (await runTask(ctx.env, ctx.spender, designTask, { text: evidence })).value;
   } catch (e) {
+    if (!ctx.store.alive('session', sessionId)) return;
     await ctx.store.put('session', { ...ctx.store.get('session', sessionId)!, wrapStatus: 'failed' });
     ctx.notice('warn', 'wrap-failed', failureStatus(e).message);
     return;
   }
+  if (!ctx.store.alive('session', sessionId)) return; // deleted while planning: make nothing
   session = await ctx.store.put('session', { ...ctx.store.get('session', sessionId)!, wrapStatus: 'planned', design });
   const at = Date.now();
   for (const format of CONTENT_FORMATS) {
@@ -87,6 +99,7 @@ export async function wrapSession(ctx: Ctx, sessionId: string): Promise<void> {
     await ctx.store.put('content', item);
   }
   for (const format of CONTENT_FORMATS) {
+    if (!ctx.store.alive('session', sessionId)) return;
     const item = ctx.store.list('content').find(c => c.sessionId === sessionId && c.format === format);
     if (item?.status === 'queued') await generate(ctx, item.id);
   }
@@ -112,7 +125,7 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
       case 'manual': {
         const v = (await runTask(ctx.env, ctx.spender, manualTask, { text })).value;
         await setItem(ctx, base, { status: 'ready', payload: v satisfies ManualPayload });
-        await proposeCard(ctx, session, v.cardRule, item.sourceMomentIds);
+        if (ctx.store.alive('session', session.id)) await proposeCard(ctx, session, v.cardRule, item.sourceMomentIds);
         break;
       }
       case 'flashcards': {
@@ -128,6 +141,7 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
         if (speechSeconds(v.lines.map(l => l.text).join(' ')) < 60) throw new Error(`The script is too short for 60 seconds (${words} words).`);
         const payload: PodcastPayload = { title: v.title, words, speakers: { caddie: 'Caddie', guest: v.guest }, lines: v.lines.map(l => ({ ...l, start: 0, end: 0 })), audioKey: null, durationSec: null, asks: [] };
         await setItem(ctx, base, { status: 'generating', payload });
+        ensureAlive(ctx, base.id); // never dispatch new media for deleted content
         await startMedia(ctx, base.id, { kind: 'podcast', lines: v.lines, voices: { ...VOICES } });
         break;
       }
@@ -150,7 +164,9 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
             const obj = frame?.storedKey ? await ctx.r2.get(frame.storedKey) : null;
             bytes = obj ? new Uint8Array(await obj.arrayBuffer()) : null;
           } else if (s.imagePrompt) {
+            ensureAlive(ctx, base.id);
             const img = await generateImage(ctx.env, ctx.spender, `${s.imagePrompt}. Vertical composition, calm natural light, no text, no letters, no logos.`, '1024x1536');
+            ensureAlive(ctx, base.id); // deleted while the image was being made: do not store it
             const key = `w/${ctx.wsId}/short/${base.id}/${i}.png`;
             await ctx.r2.put(key, img.bytes, { httpMetadata: { contentType: img.mime } });
             scenes[i] = { ...s, imageKey: key };
@@ -159,11 +175,13 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
           jobScenes.push({ role: s.role, narration: s.narration, imageB64: bytes ? bytesToDataUrl(bytes, 'image/png').split(',')[1] : null, diagram: s.diagram, label: s.evidence ? (s.evidence === 'before' ? 'Before · your screen' : 'After · your screen') : null });
         }
         await setItem(ctx, base, { payload: { ...payload, scenes } });
+        ensureAlive(ctx, base.id);
         await startMedia(ctx, base.id, { kind: 'short', title: v.title, voice: VOICES.caddie, scenes: jobScenes });
         break;
       }
     }
   } catch (e) {
+    if (e instanceof Gone || !ctx.store.alive('content', base.id)) return; // deleted: nothing to record
     const message = e instanceof MediaUnavailable ? e.message : e instanceof Error && !(e.name === 'MetaError' || e.name === 'LiveCallsDisabled' || e.name === 'BudgetExceeded' || e.name === 'InvalidOutput') ? e.message : failureStatus(e).message;
     await setItem(ctx, base, { status: 'failed', error: message });
   }

@@ -16,6 +16,10 @@ let readingIndex = 0;
 const jobs = new Map();
 /** One-shot failure injection: task names (e.g. "short") or "media-podcast" / "media-short". */
 const failNext = new Set();
+/** One-shot response delays per task name (ms), and simple stats for race tests. */
+const delayNext = new Map();
+const stats = { calls: {}, jobsStarted: 0 };
+const pause = ms => new Promise(r => setTimeout(r, ms));
 
 const none = { audience: false, price: false, mood: false, realPhoto: false, productDetail: false };
 const READINGS = [
@@ -109,6 +113,8 @@ createServer(async (req, res) => {
       const body = JSON.parse(raw.toString());
       if (body.model === 'sam-3.1') return send(res, 200, message('<0f>0<|box;x1=128;y1=72;x2=1151;y2=647;w=1280;h=720;c=0.93|><|mask;x=0;y=0;data=2,2,!AA|>'));
       const name = body.text?.format?.name;
+      stats.calls[name] = (stats.calls[name] ?? 0) + 1;
+      if (delayNext.has(name)) { const ms = delayNext.get(name); delayNext.delete(name); await pause(ms); }
       if (failNext.delete(name)) return send(res, 500, { error: { message: `fake: injected failure for ${name}`, type: 'server_error', code: null } });
       if (name === 'screen_reading') return send(res, 200, message(reading()));
       if (name === 'caddie_turn') {
@@ -132,6 +138,7 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && url.startsWith('/v1/asr/transcribe')) return send(res, 200, { transcript: '[test] Office workers near the station, six thousand five hundred won, a calm morning feel.', audioDurationMs: 4000, turns: [] });
     if (req.method === 'POST' && url === '/media/jobs') {
       const id = `job_${jobs.size + 1}`;
+      stats.jobsStarted++;
       const job = JSON.parse(raw.toString());
       jobs.set(id, failNext.delete(`media-${job.kind}`) ? Promise.resolve({ status: 'failed', error: 'fake: injected render failure' }) : render(job).catch(e => ({ status: 'failed', error: String(e) })));
       return send(res, 200, { job_id: id });
@@ -143,7 +150,9 @@ createServer(async (req, res) => {
       const done = await Promise.race([p, new Promise(r => setTimeout(() => r(null), 50))]);
       return done ? send(res, done.status === 'failed' ? 500 : 200, done) : send(res, 202, { status: 'running' });
     }
-    if (url === '/reset') { readingIndex = 0; failNext.clear(); return send(res, 200, { ok: true }); }
+    if (url === '/reset') { readingIndex = 0; failNext.clear(); delayNext.clear(); return send(res, 200, { ok: true }); }
+    if (req.method === 'POST' && url === '/delay') { const b = JSON.parse(raw.toString()); delayNext.set(b.name, b.ms); return send(res, 200, { ok: true }); }
+    if (req.method === 'GET' && url === '/stats') return send(res, 200, stats);
     if (req.method === 'POST' && url === '/fail') { failNext.add(JSON.parse(raw.toString()).name); return send(res, 200, { ok: true, failNext: [...failNext] }); }
     send(res, 404, { error: { message: 'not found' } });
   } catch (e) {

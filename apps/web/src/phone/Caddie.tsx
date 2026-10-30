@@ -48,13 +48,23 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
   const session = latestSession(state);
   const paused = session?.status === 'paused';
 
+  const benchDone = bench && (benchStopped || benchCount >= BENCHMARK_MAX);
+  // The camera runs only while actively watching. Pause, benchmark stop and benchmark
+  // completion turn the camera itself off (tracks stopped), not just the uploads.
+  const cameraOn = Boolean(crop) && !paused && !benchDone;
+
   useEffect(() => {
-    if (!crop || !videoRef.current) return;
+    if (!cameraOn || !crop || !videoRef.current) {
+      if (crop) setMessage(paused ? 'Paused — camera off, nothing is sent' : benchDone ? 'Benchmark finished — camera off' : 'Camera off');
+      return;
+    }
     let stream: MediaStream | null = null;
     let cancelled = false;
+    setMessage('Starting the camera…');
     startRearCamera(videoRef.current).then(s => {
-      stream = s;
+      // A late getUserMedia resolution after pause/unmount must not leave the camera on.
       if (cancelled) { stopStream(s); return; }
+      stream = s;
       sampler.current = new FrameSampler(videoRef.current!, creds, crop, 'camera', {
         onVerdict: v => setMessage(v.kind === 'camera-moved' ? 'Camera moved — hold still or re-aim' : v.kind === 'settling' ? 'Screen is changing…' : 'Watching your screen'),
         onSent: () => setMessage('Sent the boxed screen area'),
@@ -62,15 +72,20 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
       });
       sampler.current.benchmark = bench;
       sampler.current.start();
-    }).catch(() => setMessage('Camera unavailable — use photos from the menu'));
-    return () => { cancelled = true; sampler.current?.stop(); sampler.current = null; stopStream(stream); };
-  }, [crop?.x, crop?.y, crop?.w, crop?.h, creds.token]);
+    }).catch(() => { if (!cancelled) setMessage('Camera unavailable — use photos from the menu'); });
+    return () => {
+      cancelled = true;
+      sampler.current?.stop();
+      sampler.current = null;
+      stopStream(stream);
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+  }, [cameraOn, crop?.x, crop?.y, crop?.w, crop?.h, creds.token]);
 
-  useEffect(() => {
-    if (!sampler.current) return;
-    if (paused || (bench && (benchStopped || benchCount >= BENCHMARK_MAX))) sampler.current.stop();
-    else { sampler.current.reset(); sampler.current.start(); }
-  }, [paused, benchStopped, bench && benchCount >= BENCHMARK_MAX]);
+  const exitBenchmark = () => {
+    try { sessionStorage.removeItem(BENCH_KEY); } catch { /* tab only */ }
+    location.replace('/caddie');
+  };
 
   const onPhoto = (file: File) => setPhoto({ file, url: URL.createObjectURL(file), crop: crop ?? { x: 0.05, y: 0.05, w: 0.9, h: 0.9 }, aspect: null });
 
@@ -80,7 +95,8 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
         <div className="notice warn" role="status" style={{ borderRadius: 0, position: 'sticky', top: 0, zIndex: 6 }}>
           <div className="row wrap">
             <strong className="grow">Benchmark test mode · {Math.min(benchCount, BENCHMARK_MAX)}/{BENCHMARK_MAX} frames</strong>
-            {!benchStopped && benchCount < BENCHMARK_MAX ? <button className="btn small" onClick={() => setBenchStopped(true)}>Stop</button> : <span>Stopped — export or delete on the Desk</span>}
+            {!benchStopped && benchCount < BENCHMARK_MAX ? <button className="btn small" onClick={() => setBenchStopped(true)}>Stop</button> : <span>Stopped — camera off. Export or delete on the Desk</span>}
+            <button className="btn small ghost" onClick={exitBenchmark}>Exit benchmark mode</button>
           </div>
           <span className="faint">For a synthetic test conversation only. Device-cropped frames are kept for evaluation until you delete them on the Desk.</span>
         </div>

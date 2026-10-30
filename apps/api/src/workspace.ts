@@ -198,7 +198,7 @@ export class Workspace extends DurableObject<Env> {
     const remainingJobs: Job[] = [];
     for (const job of jobs) {
       const item = this.store.get('content', job.contentId);
-      if (!item) continue;
+      if (!item || !this.store.alive('content', job.contentId)) continue; // deleted: drop the job, store nothing
       if (Date.now() - job.startedAt > JOB_TIMEOUT_MS) {
         await this.store.put('content', { ...item, status: 'failed', error: 'Rendering took too long. Retry to render again.', updatedAt: now() });
         continue;
@@ -207,6 +207,7 @@ export class Workspace extends DurableObject<Env> {
         const r = await pollJob(this.env, job.jobId);
         if (r.status === 'running') { remainingJobs.push(job); continue; }
         if (r.status === 'failed') { await this.store.put('content', { ...item, status: 'failed', error: r.error, updatedAt: now() }); continue; }
+        if (!this.store.alive('content', item.id)) continue;
         const ext = item.format === 'podcast' ? 'm4a' : 'mp4';
         const key = `w/${this.meta!.id}/media/${item.id}-${item.attempts}.${ext}`;
         await this.env.MEDIA.put(key, r.bytes, { httpMetadata: { contentType: r.mime } });
@@ -445,6 +446,8 @@ export class Workspace extends DurableObject<Env> {
       if (!owner) keys.push(o.key);
     }
     if (keys.length) await this.env.MEDIA.delete(keys);
+    const jobs = (await this.ctx.storage.get<Job[]>('jobs')) ?? [];
+    await this.ctx.storage.put('jobs', jobs.filter(j => this.store.alive('content', j.contentId)));
     await this.store.remove('session', s.id);
   }
 

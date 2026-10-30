@@ -72,7 +72,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
       {camera?.mode === 'camera' && (
         <div className="camstrip" aria-label="Live camera view of your screen">
           <video ref={camera.videoRef as RefObject<HTMLVideoElement>} playsInline muted />
-          <span className="cam-msg" role="status">{session?.status === 'paused' ? 'Paused — nothing is sent' : camera.message}</span>
+          <span className="cam-msg" role="status">{session?.status === 'paused' ? 'Paused — camera off, nothing is sent' : camera.message}</span>
         </div>
       )}
       <main>

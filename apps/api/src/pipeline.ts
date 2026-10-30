@@ -177,6 +177,7 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
       timing.countMs += res.countMs; timing.generateMs += res.latencyMs; timing.calls += res.calls;
     }
   } catch (e) {
+    if (!ctx.store.alive('moment', momentId)) return; // deleted while the model was running
     const f = failureStatus(e);
     // Raw frame is discarded when it could not be read (benchmark frames are kept for evaluation).
     const drop = !moment.benchmark;
@@ -184,6 +185,9 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
     await ctx.store.put('moment', { ...moment, readingStatus: f.status, readingError: f.message, frame: moment.frame && drop ? { ...moment.frame, storedKey: undefined, deleted: true } : moment.frame, decision: ruleDecision(f.message, f.status), timing: { ...timing, totalMs: Date.now() - Date.parse(moment.at) } });
     return;
   }
+
+  // The user may have deleted the session or frame while the model was running.
+  if (!ctx.store.alive('moment', momentId) || !ctx.store.alive('session', session.id)) return;
 
   if (!reading.legible) {
     // Unreadable frames are never kept (except benchmark frames, kept for evaluation).
@@ -217,10 +221,12 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
       decision = ruleDecision(f.message, `decision-${f.status}`);
     }
   }
+  if (!ctx.store.alive('moment', momentId) || !ctx.store.alive('session', session.id)) return;
   timing.totalMs = Date.now() - Date.parse(moment.at);
   moment = { ...ctx.store.get('moment', momentId)!, decision, timing };
   moment = await retainOrDiscard(ctx, moment, history);
   await ctx.store.put('moment', moment);
+  if (!ctx.store.alive('moment', momentId)) return;
   await recordSkills(ctx, moment, session);
   await observeCards(ctx, moment);
 }
@@ -243,5 +249,6 @@ export async function followUp(ctx: Ctx, source: Moment, extra: string): Promise
     const f = failureStatus(e);
     decision = ruleDecision(f.message, `decision-${f.status}`);
   }
+  if (!ctx.store.alive('moment', reply.id)) return; // session deleted meanwhile
   await ctx.store.put('moment', { ...ctx.store.get('moment', reply.id)!, decision });
 }

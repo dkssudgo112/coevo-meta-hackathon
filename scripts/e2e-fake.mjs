@@ -176,6 +176,38 @@ check('benchmark export has readings, timing and images', exp.res.ok && exp.body
 const del2 = await call('/benchmark', { method: 'DELETE' });
 check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 && !(await state()).moments.some(m => m.benchmark));
 
+// Deletion races: a late model response must never recreate deleted content.
+{
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'caddie_turn', ms: 6000 }) });
+  const sess = (await call('/sessions', { method: 'POST', body: '{}' })).body;
+  const fd = new FormData();
+  fd.append('frame', new File([png(9)], 'f.png', { type: 'image/png' }));
+  fd.append('source', 'camera');
+  await sleep(2600);
+  const up = await call('/frames', { method: 'POST', body: fd });
+  await call(`/sessions/${up.body.sessionId}`, { method: 'DELETE' });
+  await sleep(9000); // provider answers after the deletion
+  const st = await state();
+  check('late reading after deletion recreates nothing', !st.sessions.some(x => x.id === up.body.sessionId) && !st.moments.some(m => m.work.sessionId === up.body.sessionId) && !st.skills.some(k => k.momentId === up.body.momentId), `session ${sess.id === up.body.sessionId ? 'same' : 'new'}`);
+}
+{
+  await fetch(`${fake}/reset`);
+  const sess = (await call('/sessions', { method: 'POST', body: '{}' })).body;
+  await sleep(2600);
+  for (const seed of [0, 1]) await frame(seed);
+  const before = await (await fetch(`${fake}/stats`)).json();
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'note', ms: 6000 }) });
+  await call(`/sessions/${sess.id}/end`, { method: 'POST' });
+  await until(s => s.content.some(c => c.sessionId === sess.id && c.format === 'note' && c.status === 'generating'), 'note generating', 30);
+  await call(`/sessions/${sess.id}`, { method: 'DELETE' });
+  await sleep(12000);
+  const st = await state();
+  const after = await (await fetch(`${fake}/stats`)).json();
+  check('deleting during content generation leaves no content or cards behind', !st.content.some(c => c.sessionId === sess.id) && !st.cards.some(c => c.sessionId === sess.id) && !st.sessions.some(x => x.id === sess.id));
+  check('no new media jobs are dispatched for deleted content', after.jobsStarted === before.jobsStarted, `jobs ${before.jobsStarted} → ${after.jobsStarted}`);
+  check('no further generations ran after deletion (manual, flashcards, podcast, short)', ['manual', 'flashcards', 'podcast', 'short'].every(n => (after.calls[n] ?? 0) === (before.calls[n] ?? 0)));
+}
+
 const fin = await state();
 check('spend recorded under the workspace cap', fin.workspace.budget.spentUsd > 0 && fin.workspace.budget.spentUsd <= fin.workspace.budget.capUsd, `$${fin.workspace.budget.spentUsd}`);
 check('all generated content labeled fixture (never live-model) in test mode', fin.content.every(c => c.provenance === 'fixture') && fin.moments.every(m => m.decision?.provenance !== 'live-model'));
