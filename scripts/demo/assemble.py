@@ -66,11 +66,28 @@ def caption_png(text, path):
 
 
 def card_png(card, path):
+    """Title and subtitle wrap to the frame; a long title steps down in size instead of running off the edge."""
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
-    d.text((W // 2, H // 2 - 40), card.get("title", ""), font=font(96, serif=True), fill=INK, anchor="mm")
-    if card.get("sub"):
-        d.text((W // 2, H // 2 + 60), card["sub"], font=font(40), fill=ACCENT, anchor="mm")
+    size = 96
+    while True:
+        tf = font(size, serif=True)
+        title = wrap(d, card.get("title", ""), tf, W - 240)
+        if len(title) <= 2 or size <= 56:
+            break
+        size -= 8
+    sf = font(40)
+    sub = wrap(d, card.get("sub", ""), sf, W - 360)[:3] if card.get("sub") else []
+    th, sh, gap = int(size * 1.2), 54, 40
+    total = len(title) * th + (gap + len(sub) * sh if sub else 0)
+    y = (H - total) // 2
+    for ln in title:
+        d.text((W // 2, y + th // 2), ln, font=tf, fill=INK, anchor="mm")
+        y += th
+    y += gap
+    for ln in sub:
+        d.text((W // 2, y + sh // 2), ln, font=sf, fill=ACCENT, anchor="mm")
+        y += sh
     img.save(path)
 
 
