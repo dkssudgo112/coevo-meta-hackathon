@@ -292,7 +292,7 @@ test('SAM image count must be a positive integer, otherwise one image stays char
   }
 });
 
-test('a transient token-count failure is retried once (counting is unbilled)', async () => {
+test('transient token-count failures are retried (counting is unbilled)', async () => {
   let counts = 0;
   const f = (async (url: string) => {
     if (url.endsWith('/input_tokens')) { counts++; return counts === 1 ? response({ error: { message: 'oops', type: 'server_error', code: null } }, 500) : response({ object: 'response.input_tokens', input_tokens: 1000 }); }
@@ -304,6 +304,20 @@ test('a transient token-count failure is retried once (counting is unbilled)', a
   const g = (async (url: string) => { if (url.endsWith('/input_tokens')) { bad++; return response({ error: { message: 'bad', type: 'invalid_request_error', code: null } }, 400); } return ok('{}'); }) as unknown as typeof fetch;
   await assert.rejects(runTask(env, ledger().spender, readingTask, { text: 'x' }, g), CostUnverifiable);
   assert.equal(bad, 1, 'a 400 is not retried');
+  // The provider's intermittent 404 model_not_found on counting is retried (up to 3 attempts).
+  let nf = 0;
+  const h = (async (url: string) => {
+    if (url.endsWith('/input_tokens')) { nf++; return nf < 3 ? response({ error: { message: 'The requested model was not found.', type: 'invalid_request_error', code: 'model_not_found' } }, 404) : response({ object: 'response.input_tokens', input_tokens: 1000 }); }
+    return ok(JSON.stringify(reading));
+  }) as unknown as typeof fetch;
+  await runTask(env, ledger().spender, readingTask, { text: 'x' }, h);
+  assert.equal(nf, 3);
+  let always = 0;
+  const k = (async (url: string) => { if (url.endsWith('/input_tokens')) { always++; return response({ error: { message: 'nf', type: 'invalid_request_error', code: 'model_not_found' } }, 404); } return ok('{}'); }) as unknown as typeof fetch;
+  const l = ledger();
+  await assert.rejects(runTask(env, l.spender, readingTask, { text: 'x' }, k), CostUnverifiable);
+  assert.equal(always, 3, 'gives up after 3 attempts and refuses the call');
+  assert.equal(l.total(), 0, 'nothing is reserved or spent when the count never succeeds');
 });
 
 test('media jobs over the renderer limit fail fast with a clear message and are never sent', async () => {

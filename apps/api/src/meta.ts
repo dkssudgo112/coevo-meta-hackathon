@@ -206,15 +206,22 @@ export const INPUT_COUNT_PAD = 64;
  * generation must not be sent.
  */
 export async function countInputTokens(env: MetaEnv, body: Record<string, unknown>, f: Fetch = fetch): Promise<number> {
-  let data: { input_tokens?: unknown };
+  let data: { input_tokens?: unknown } | null = null;
   try {
-    try {
-      data = (await post(env, '/responses/input_tokens', JSON.stringify(body), { 'Content-Type': 'application/json' }, f, 20_000)) as { input_tokens?: unknown };
-    } catch (first) {
-      // Counting records no generation usage, so one retry after a transient failure costs nothing.
-      if (first instanceof LiveCallsDisabled || first instanceof RetryLater || (first instanceof MetaError && first.status < 500 && first.status !== 429)) throw first;
-      await sleep(1000);
-      data = (await post(env, '/responses/input_tokens', JSON.stringify(body), { 'Content-Type': 'application/json' }, f, 20_000)) as { input_tokens?: unknown };
+    // Counting records no generation usage, so retrying a transient failure costs nothing.
+    // Besides 5xx/network errors, the provider has intermittently answered 404 model_not_found
+    // for a listed model (observed for minutes at a time); other 4xx are not retried.
+    const transient = (e: unknown) => !(e instanceof LiveCallsDisabled || e instanceof RetryLater)
+      && (!(e instanceof MetaError) || e.status >= 500 || e.status === 429 || (e.status === 404 && e.code === 'model_not_found'));
+    const waits = [1500, 3000];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        data = (await post(env, '/responses/input_tokens', JSON.stringify(body), { 'Content-Type': 'application/json' }, f, 20_000)) as { input_tokens?: unknown };
+        break;
+      } catch (e) {
+        if (!transient(e) || attempt >= waits.length) throw e;
+        await sleep(waits[attempt]);
+      }
     }
   } catch (e) {
     if (e instanceof LiveCallsDisabled) throw e;
@@ -222,7 +229,7 @@ export async function countInputTokens(env: MetaEnv, body: Record<string, unknow
     console.error(JSON.stringify({ event: 'count_failed', task: (body.text as { format?: { name?: string } } | undefined)?.format?.name ?? null, ...detail }));
     throw new CostUnverifiable(`Input tokens could not be counted (${e instanceof MetaError ? e.status : (e as Error).name}).`);
   }
-  const n = data.input_tokens;
+  const n = data?.input_tokens;
   if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) throw new CostUnverifiable('The token count response had no usable input_tokens.');
   return n;
 }
