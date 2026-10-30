@@ -177,7 +177,8 @@ async function startMedia(ctx: Ctx, contentId: string, job: Parameters<typeof st
   try {
     jobId = await startJob(ctx.env, job);
   } catch (e) {
-    await ctx.spender.settle(ticket, 0);
+    // Refund only when the job was certainly not started (disabled or rejected).
+    if (e instanceof MediaUnavailable) await ctx.spender.settle(ticket, 0);
     throw e;
   }
   await ctx.spender.settle(ticket, MEDIA_JOB_USD[job.kind]);

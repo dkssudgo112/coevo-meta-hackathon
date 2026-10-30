@@ -60,6 +60,36 @@ export class InvalidOutput extends Error {
   constructor(message: string) { super(message); this.name = 'InvalidOutput'; }
 }
 
+/** The provider asked us to wait longer than we can block for. Surface "try later". */
+export class RetryLater extends Error {
+  readonly waitSeconds: number;
+  constructor(waitSeconds: number) { super(`The model service asked to wait ${Math.ceil(waitSeconds)} s.`); this.name = 'RetryLater'; this.waitSeconds = waitSeconds; }
+}
+
+/**
+ * Only outcomes the provider documents as unbilled may be refunded to $0:
+ * calls never sent, 4xx rejections, and 503 overload/shutdown. Timeouts, lost
+ * responses, malformed bodies, 500 and 504 may have completed and been billed,
+ * so their reservation is kept.
+ */
+export function unbilled(e: unknown): boolean {
+  if (e instanceof LiveCallsDisabled || e instanceof BudgetExceeded || e instanceof RetryLater) return true;
+  if (e instanceof MetaError) return (e.status >= 400 && e.status < 500) || e.status === 503;
+  return false;
+}
+
+/** Parse Retry-After (delta-seconds or HTTP-date) into seconds; null when absent or invalid. */
+export function retryAfterSeconds(value: string | null, nowMs = Date.now()): number | null {
+  if (!value) return null;
+  const n = Number(value);
+  if (Number.isFinite(n) && n >= 0) return n;
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? Math.max(0, (at - nowMs) / 1000) : null;
+}
+
+/** Longest delay we will block a request for before surfacing RetryLater. */
+export const MAX_BLOCKING_WAIT_S = 10;
+
 const FORBIDDEN = /-contributor$/;
 
 export function liveEnabled(env: MetaEnv): boolean {
@@ -94,7 +124,11 @@ function base(env: MetaEnv): string {
 type Fetch = typeof fetch;
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-/** POST with bounded retries: 429/503 honor Retry-After (≤ 2 retries), 500 once. Never 504. */
+/**
+ * POST with bounded retries for documented unbilled rejections only (429, 503),
+ * honoring Retry-After in full. Never retries 500/504 or transport failures,
+ * which may have been billed: the caller owns that decision and its budget.
+ */
 async function post(env: MetaEnv, path: string, body: BodyInit, headers: Record<string, string>, f: Fetch, timeoutMs: number): Promise<unknown> {
   if (!liveEnabled(env)) throw new LiveCallsDisabled();
   let attempt = 0;
@@ -108,11 +142,12 @@ async function post(env: MetaEnv, path: string, body: BodyInit, headers: Record<
     if (res.ok) return res.json();
     const data = (await res.json().catch(() => ({}))) as { error?: { message?: string; type?: string; code?: string } };
     const err = new MetaError(res.status, data.error?.message ?? `Meta API error ${res.status}`, data.error?.type ?? null, data.error?.code ?? null);
-    const retryAfter = Number(res.headers.get('retry-after'));
-    const retryable = res.status === 429 || res.status === 503 ? attempt < 2 : res.status === 500 ? attempt < 1 : false;
-    if (!retryable) throw err;
+    if (!(res.status === 429 || res.status === 503) || attempt >= 2) throw err;
+    const asked = retryAfterSeconds(res.headers.get('retry-after'));
+    const wait = asked ?? 0.8 * 2 ** attempt;
+    if (wait > MAX_BLOCKING_WAIT_S) throw new RetryLater(wait);
     attempt++;
-    await sleep(Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 800 * 2 ** attempt, 8000));
+    await sleep(wait * 1000);
   }
 }
 
@@ -165,7 +200,8 @@ export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T
     try {
       raw = (await post(env, '/responses', body, { 'Content-Type': 'application/json' }, f, 60_000)) as ResponsesOutput;
     } catch (e) {
-      await spend.settle(ticket, 0);
+      // Keep the reservation unless the provider documents the outcome as unbilled.
+      if (unbilled(e)) await spend.settle(ticket, 0);
       throw e;
     }
     const usage = raw.usage ?? {};
@@ -196,7 +232,7 @@ export async function generateImage(env: MetaEnv, spend: Spender, prompt: string
     await spend.settle(ticket, PRICES.imageEach);
     return { bytes: Uint8Array.from(atob(b64), c => c.charCodeAt(0)), mime: 'image/png', costUsd: PRICES.imageEach };
   } catch (e) {
-    await spend.settle(ticket, e instanceof MetaError && e.status >= 400 && e.status < 500 ? 0 : PRICES.imageEach);
+    await spend.settle(ticket, unbilled(e) ? 0 : PRICES.imageEach);
     throw e;
   }
 }
@@ -216,7 +252,7 @@ export async function transcribe(env: MetaEnv, spend: Spender, wav: Uint8Array, 
     await spend.settle(ticket, cost);
     return { transcript: (data.transcript ?? '').trim(), durationMs, costUsd: cost };
   } catch (e) {
-    await spend.settle(ticket, 0);
+    if (unbilled(e)) await spend.settle(ticket, 0);
     throw e;
   }
 }
@@ -251,7 +287,7 @@ export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: s
     await spend.settle(ticket, PRICES.samPerImage * (raw.usage?.images_processed ?? 1));
     return { boxes: parseSamBoxes(outputText(raw)), costUsd: PRICES.samPerImage, latencyMs: Date.now() - started };
   } catch (e) {
-    await spend.settle(ticket, 0);
+    if (unbilled(e)) await spend.settle(ticket, 0);
     throw e;
   }
 }

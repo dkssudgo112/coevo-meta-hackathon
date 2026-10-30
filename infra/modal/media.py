@@ -34,7 +34,7 @@ token_secret = modal.Secret.from_name("coevo-media-token")
 MAX_REQUEST_BYTES = 12_000_000
 
 
-@app.cls(cpu=2.0, memory=3072, timeout=600, scaledown_window=60, min_containers=0, max_containers=2)
+@app.cls(cpu=2.0, memory=3072, timeout=600, scaledown_window=5, min_containers=0, max_containers=1)
 class Renderer:
     @modal.enter()
     def load(self) -> None:
@@ -62,7 +62,7 @@ class Renderer:
         raise ValueError("unknown job kind")
 
 
-@app.function(secrets=[token_secret], cpu=0.25, memory=256, scaledown_window=60, min_containers=0)
+@app.function(secrets=[token_secret], cpu=0.25, memory=256, scaledown_window=5, min_containers=0, max_containers=1)
 @modal.asgi_app()
 def web():
     from fastapi import FastAPI, HTTPException, Request

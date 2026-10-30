@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateImage, LiveCallsDisabled, MetaError, models, outputText, parseSamBoxes, runTask, segmentBoxes, transcribe, type MetaEnv, type Spender } from '../src/meta.ts';
+import { generateImage, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, type MetaEnv, type Spender } from '../src/meta.ts';
 import { readingTask } from '../../../packages/core/src/prompts.ts';
 
 const env: MetaEnv = { MODEL_API_KEY: 'test-key', COEVO_ALLOW_LIVE_CALLS: 'true', META_API_BASE_URL: 'https://api.meta.ai/v1' };
@@ -48,19 +48,52 @@ test('runTask sends strict json_schema, store:false, and settles real cost', asy
   assert.ok(Math.abs(l.total() - (2000 * 1.25 + 300 * 4.25) / 1e6) < 1e-9);
 });
 
-test('429 honors Retry-After then succeeds; 400 and 504 are not retried', async () => {
+test('429 honors Retry-After then succeeds', async () => {
   let n = 0;
   const f = (async () => { n++; return n === 1 ? response({ error: { message: 'slow down', type: 'rate_limit_error', code: 'rate_limit_exceeded' } }, 429, { 'retry-after': '0.01' }) : ok(JSON.stringify(reading)); }) as unknown as typeof fetch;
   await runTask(env, ledger().spender, readingTask, { text: 'x' }, f);
   assert.equal(n, 2);
-  for (const status of [400, 504]) {
+});
+
+test('documented unbilled rejections refund; 500/504 are not retried and keep the reservation', async () => {
+  for (const [status, refunded] of [[400, true], [402, true], [429, true], [503, true], [500, false], [504, false]] as const) {
     let calls = 0;
-    const g = (async () => { calls++; return response({ error: { message: 'no', type: 'invalid_request_error', code: null } }, status); }) as unknown as typeof fetch;
+    const g = (async () => { calls++; return response({ error: { message: 'no', type: 'x', code: null } }, status, status === 429 || status === 503 ? { 'retry-after': '0' } : {}); }) as unknown as typeof fetch;
     const l = ledger();
     await assert.rejects(runTask(env, l.spender, readingTask, { text: 'x' }, g), (e: unknown) => e instanceof MetaError && e.status === status);
-    assert.equal(calls, 1);
-    assert.equal(Math.round(l.total() * 1e9), 0, 'failed calls settle to zero');
+    assert.equal(calls, status === 429 || status === 503 ? 3 : 1, `attempts for ${status}`);
+    assert.equal(l.total() === 0, refunded, `refund for ${status}`);
   }
+});
+
+test('lost responses keep the reservation: timeout after acceptance and malformed body', async () => {
+  const timeout = (async () => { throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); }) as unknown as typeof fetch;
+  const l1 = ledger();
+  await assert.rejects(runTask(env, l1.spender, readingTask, { text: 'x' }, timeout));
+  assert.ok(l1.total() > 0, 'a request the provider may have completed stays charged');
+  const malformed = (async () => new Response('{not json', { status: 200 })) as unknown as typeof fetch;
+  const l2 = ledger();
+  await assert.rejects(runTask(env, l2.spender, readingTask, { text: 'x' }, malformed));
+  assert.ok(l2.total() > 0);
+  const img = ledger();
+  await assert.rejects(generateImage(env, img.spender, 'p', '1024x1536', timeout));
+  assert.ok(Math.abs(img.total() - 0.01) < 1e-9);
+});
+
+test('Retry-After is honored in full: long waits surface RetryLater instead of a shortened retry', async () => {
+  let calls = 0;
+  const started = Date.now();
+  const f = (async () => { calls++; return response({ error: { message: 'busy', type: 'server_error', code: 'service_overloaded' } }, 503, { 'retry-after': '60' }); }) as unknown as typeof fetch;
+  const l = ledger();
+  await assert.rejects(runTask(env, l.spender, readingTask, { text: 'x' }, f), (e: unknown) => e instanceof RetryLater && e.waitSeconds === 60);
+  assert.equal(calls, 1, 'no early retry');
+  assert.ok(Date.now() - started < 1000);
+  assert.equal(l.total(), 0, 'a 503 rejection is unbilled');
+  assert.equal(retryAfterSeconds('2.5'), 2.5);
+  const now = Date.parse('2026-11-01T00:00:00Z');
+  assert.equal(retryAfterSeconds('Sun, 01 Nov 2026 00:00:30 GMT', now), 30);
+  assert.equal(retryAfterSeconds(null), null);
+  assert.ok(MAX_BLOCKING_WAIT_S >= 5);
 });
 
 test('invalid model output is retried once, then rejected', async () => {
