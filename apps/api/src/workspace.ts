@@ -462,7 +462,10 @@ export class Workspace extends DurableObject<Env> {
     if (!meta) return error(404, 'not_found', 'Unknown workspace.');
     // TEST ONLY: how many records this object still stores (a moved source keeps only its routing record).
     if (path === '/test/storage-keys' && fakeMeta(this.env)) return json({ keys: (await this.ctx.storage.list()).size, movedTo: meta.movedTo ?? null });
-    if (meta.movedTo) return this.moved(meta.movedTo);
+    if (meta.movedTo) {
+      await this.retireSource();
+      return this.moved(meta.movedTo);
+    }
     if (path === '/pair' && method === 'POST') return this.pair(req);
 
     const role = await this.auth(req);
@@ -639,6 +642,23 @@ export class Workspace extends DurableObject<Env> {
       } catch { this.colo = null; }
     }
     return !!this.colo && RESTRICTED_COLOS.has(this.colo);
+  }
+
+  private retired = false;
+
+  /**
+   * A source moved by an earlier build kept its full copy after the move. Its destination was
+   * verified when it was made, so here too only the routing record stays (once per instance).
+   */
+  private async retireSource(): Promise<void> {
+    if (this.retired) return;
+    this.retired = true;
+    const keys = [...(await this.ctx.storage.list()).keys()].filter(k => k !== 'meta');
+    for (let i = 0; i < keys.length; i += 128) await this.ctx.storage.delete(keys.slice(i, i + 128));
+    if (keys.length) {
+      await this.ctx.storage.deleteAlarm();
+      console.log(JSON.stringify({ event: 'workspace_source_retired', records: keys.length }));
+    }
   }
 
   private moved(to: string): Response {
