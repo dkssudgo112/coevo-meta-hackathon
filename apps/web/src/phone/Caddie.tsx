@@ -93,7 +93,7 @@ function Watching({ creds, crop, onReaim, onUnpair }: { creds: Creds; crop: Crop
       stopStream(stream);
       if (videoRef.current) videoRef.current.srcObject = null;
     };
-  }, [cameraOn, crop?.x, crop?.y, crop?.w, crop?.h, creds.token]);
+  }, [cameraOn, crop?.x, crop?.y, crop?.w, crop?.h, creds.token, state !== null]); // <video> renders only after the first state
 
   // An unreadable frame is retried quietly (same view, once more) until three in a row fail;
   // then the NOW card asks to tilt the phone or take one photo.

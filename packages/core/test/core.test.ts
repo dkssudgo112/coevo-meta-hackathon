@@ -379,3 +379,18 @@ test('live SAM numbers: the poster price is chosen over the same price in the ch
   const missing = choosePointers(['price'], [], poster, {}, 'muse-spark')[0];
   assert.equal(missing.source, 'muse-spark');
 });
+
+test('a small real chat change (1.6% at 64 px) is sent once settled; 0.8% noise is not', () => {
+  const N = 64 * 36;
+  const base = new Uint8Array(N).fill(200);
+  const shifted = (frac: number) => { const t = new Uint8Array(base); const k = Math.round(N * frac / (100 / 255)); for (let i = 0; i < k; i++) t[i] = 100; return t; };
+  const d = new ChangeDetector({ minIntervalMs: 0 });
+  // Reference frame: first look is sent after it settles.
+  for (let i = 0; i < 3; i++) d.sample(base, i * 700);
+  const noise = shifted(0.008);
+  const noiseVerdicts = [3, 4, 5].map(i => d.sample(noise, i * 700).kind);
+  assert.ok(!noiseVerdicts.includes('send'), `noise sent: ${noiseVerdicts}`);
+  const change = shifted(0.016);
+  const verdicts = [6, 7, 8, 9].map(i => d.sample(change, i * 700).kind);
+  assert.ok(verdicts.includes('send'), `change not sent: ${verdicts}`);
+});

@@ -16,8 +16,12 @@ export interface ChangeOptions {
   motionThreshold: number;
 }
 
+// changeThreshold: consecutive screens of an actual AI chat (a new request and reply) differed by
+// only 0.016–0.069 at this 64-px resolution when drawn as a camera would see a monitor, so 0.035
+// missed the repeated vague requests the Caddie must see. 0.015 stays above the settle (noise)
+// allowance; a physical camera's noise floor was not measured (assumed setup).
 export const DEFAULT_CHANGE_OPTIONS: ChangeOptions = {
-  changeThreshold: 0.035,
+  changeThreshold: 0.015,
   settleThreshold: 0.012,
   settleSamples: 2,
   minIntervalMs: 4000,
