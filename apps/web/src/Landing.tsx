@@ -47,7 +47,7 @@ export function Landing() {
           ) : (
             <div className="row wrap" style={{ gap: 12 }}>
               <a className="btn primary" href="/desk">Start on this computer</a>
-              <span className="faint">Takes about a minute. You will need your phone.</span>
+              <span className="faint">Four short steps. You will need your phone.</span>
             </div>
           )}
         </div>
