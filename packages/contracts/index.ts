@@ -135,6 +135,19 @@ export interface Moment {
   /** Observed change compared with the previous legible moment. */
   change: ObservedChange | null;
   provenance: Provenance;
+  /** Server-side latency breakdown for this moment, in milliseconds. */
+  timing?: MomentTiming | null;
+}
+
+export interface MomentTiming {
+  mode: 'separate' | 'combined';
+  /** Token-count round trips (before each generation). */
+  countMs: number;
+  /** Generation round trips. */
+  generateMs: number;
+  /** Upload accepted → decision stored. */
+  totalMs: number;
+  calls: number;
 }
 
 export interface ObservedChange {

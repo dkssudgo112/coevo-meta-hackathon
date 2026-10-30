@@ -8,7 +8,7 @@ import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, ME
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
 import { applyHint } from '../src/cards.ts';
-import { decisionTask, readingTask, shortTask, podcastTask, manualTask } from '../src/prompts.ts';
+import { decisionTask, readingTask, shortTask, podcastTask, manualTask, turnTask } from '../src/prompts.ts';
 import type { Moment, Reading } from '../../contracts/index.ts';
 
 const thumb = (v: number, n = 64) => new Uint8Array(n).fill(v);
@@ -190,4 +190,14 @@ test('lifetime ledger: never resets, never exceeds the cap under many concurrent
   assert.equal(ledgerAdjust(emptyLedger('x'), -5).spentUsd, 0);
   assert.equal(ledgerReserve(emptyLedger('x'), Number.NaN, 2.5).ok, false);
   assert.equal(ledgerReserve(emptyLedger('x'), -1, 2.5).ok, false);
+});
+
+test('combined turn reuses the strict reading and decision readers', () => {
+  const r = { legible: true, tool: 'Meta AI', task: 'poster', userRequest: 'more premium', userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, artifactVisible: true, vagueTerms: ['premium'], ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false }, confidence: 0.9 };
+  const d = { action: 'intervene', step: 'question', reason: 'r', quote: 'more premium', message: 'Who is it for?', note: null, missingIngredients: ['audience'], exampleBrief: null };
+  const out = turnTask.read({ reading: r, decision: d });
+  assert.equal(out.reading.userRequest, 'more premium');
+  assert.equal(out.proposal.step, 'question');
+  assert.throws(() => turnTask.read({ reading: r }));
+  assert.equal(turnTask.schema.additionalProperties, false);
 });

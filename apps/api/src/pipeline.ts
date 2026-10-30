@@ -1,9 +1,9 @@
 // Moment pipeline: reading → decision → guardrails → observed change → evidence.
 
-import type { CaddieCard, Decision, Moment, Reading, Session, SkillObservation } from '../../../packages/contracts/index.ts';
+import type { CaddieCard, Decision, Moment, MomentTiming, Reading, Session, SkillObservation } from '../../../packages/contracts/index.ts';
 import { applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
 import { dimensionFor, observeChange, presentIngredients, strengthFor } from '../../../packages/core/src/labels.ts';
-import { decisionTask, readingTask, type DecisionInput } from '../../../packages/core/src/prompts.ts';
+import { decisionTask, readingTask, turnTask, type DecisionInput, type TurnContext } from '../../../packages/core/src/prompts.ts';
 import { BudgetExceeded, CostUnverifiable, InvalidAudio, InvalidOutput, LiveCallsDisabled, MetaError, modelProvenance, ModelNotAllowed, RetryLater, runTask, type Spender } from './meta.ts';
 import type { Env } from './env.ts';
 import type { Store } from './store.ts';
@@ -87,12 +87,28 @@ function ruleDecision(reason: string, guardrail: string): Decision {
   return { action: 'stay-quiet', step: 'watch', reason, quote: null, message: null, note: null, missingIngredients: [], exampleBrief: null, guardrail, provenance: 'rule', model: null, decidedAt: now() };
 }
 
-export async function decide(ctx: Ctx, reading: Reading, history: Moment[], extra = ''): Promise<Decision> {
+export async function decide(ctx: Ctx, reading: Reading, history: Moment[], extra = ''): Promise<{ decision: Decision; countMs: number; generateMs: number; calls: number }> {
   const input = await buildDecisionInput(ctx, reading, history);
   const res = await runTask(ctx.env, ctx.spender, decisionTask, { text: `${extra}${JSON.stringify(input)}` });
-  const proposal: Proposal = res.value;
+  return { decision: guard(ctx, res.value, reading, history, res.model), countMs: res.countMs, generateMs: res.latencyMs, calls: res.calls };
+}
+
+function guard(ctx: Ctx, proposal: Proposal, reading: Reading, history: Moment[], model: string): Decision {
   const guarded = applyGuardrails(proposal, { reading, history, nowMs: Date.now(), activeCard: activeCards(ctx.store).length > 0 });
-  return toDecision(guarded, res.model, now(), modelProvenance(ctx.env));
+  return toDecision(guarded, model, now(), modelProvenance(ctx.env));
+}
+
+/** Context for the combined turn: everything the decision needs except the reading itself. */
+async function buildTurnContext(ctx: Ctx, history: Moment[]): Promise<TurnContext> {
+  const legibleNone = !history.some(m => m.reading?.legible && !m.misread);
+  const placeholder = { legible: true, tool: null, task: null, userRequest: null, userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, artifactVisible: false, vagueTerms: [], ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false }, confidence: 0 } satisfies Reading;
+  const d = await buildDecisionInput(ctx, placeholder, history);
+  return { firstSightingIfLegible: legibleNone, recentRequests: d.recentRequests, interventions: d.interventions, activeCards: d.activeCards, memory: d.memory, secondsSinceLastIntervention: d.secondsSinceLastIntervention };
+}
+
+/** 'combined' reads and decides in one call (fewer round trips); 'separate' uses two calls. */
+export function turnMode(ctx: Ctx): MomentTiming['mode'] {
+  return ctx.env.COEVO_TURN_MODE === 'separate' ? 'separate' : 'combined';
 }
 
 async function recordSkills(ctx: Ctx, moment: Moment, session: Session): Promise<void> {
@@ -141,14 +157,29 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
   if (!session) return;
   const history = sessionMoments(ctx.store, session.id).filter(m => m.index < moment!.index);
 
+  const mode = turnMode(ctx);
+  const timing: MomentTiming = { mode, countMs: 0, generateMs: 0, totalMs: 0, calls: 0 };
   let reading: Reading;
+  let combinedProposal: Proposal | null = null;
+  let combinedModel = '';
   try {
-    reading = (await runTask(ctx.env, ctx.spender, readingTask, { text: 'Read this screen photo.', images: [imageDataUrl] })).value;
+    if (mode === 'combined') {
+      const context = await buildTurnContext(ctx, history);
+      const res = await runTask(ctx.env, ctx.spender, turnTask, { text: `Context: ${JSON.stringify(context)}`, images: [imageDataUrl] });
+      reading = res.value.reading;
+      combinedProposal = res.value.proposal;
+      combinedModel = res.model;
+      timing.countMs += res.countMs; timing.generateMs += res.latencyMs; timing.calls += res.calls;
+    } else {
+      const res = await runTask(ctx.env, ctx.spender, readingTask, { text: 'Read this screen photo.', images: [imageDataUrl] });
+      reading = res.value;
+      timing.countMs += res.countMs; timing.generateMs += res.latencyMs; timing.calls += res.calls;
+    }
   } catch (e) {
     const f = failureStatus(e);
     // Raw frame is discarded when it could not be read.
     if (moment.frame?.storedKey) await ctx.r2.delete(moment.frame.storedKey);
-    await ctx.store.put('moment', { ...moment, readingStatus: f.status, readingError: f.message, frame: moment.frame ? { ...moment.frame, storedKey: undefined, deleted: true } : null, decision: ruleDecision(f.message, f.status) });
+    await ctx.store.put('moment', { ...moment, readingStatus: f.status, readingError: f.message, frame: moment.frame ? { ...moment.frame, storedKey: undefined, deleted: true } : null, decision: ruleDecision(f.message, f.status), timing: { ...timing, totalMs: Date.now() - Date.parse(moment.at) } });
     return;
   }
 
@@ -159,6 +190,7 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
       ...moment, readingStatus: 'illegible', reading,
       frame: moment.frame ? { ...moment.frame, storedKey: undefined, deleted: true } : null,
       decision: ruleDecision('The screen was not readable in this frame.', 'illegible'),
+      timing: { ...timing, totalMs: Date.now() - Date.parse(moment.at) },
     });
     return;
   }
@@ -170,13 +202,20 @@ export async function processMoment(ctx: Ctx, momentId: string, imageDataUrl: st
   }
 
   let decision: Decision;
-  try {
-    decision = await decide(ctx, reading, history);
-  } catch (e) {
-    const f = failureStatus(e);
-    decision = ruleDecision(f.message, `decision-${f.status}`);
+  if (combinedProposal) {
+    decision = guard(ctx, combinedProposal, reading, history, combinedModel);
+  } else {
+    try {
+      const d = await decide(ctx, reading, history);
+      decision = d.decision;
+      timing.countMs += d.countMs; timing.generateMs += d.generateMs; timing.calls += d.calls;
+    } catch (e) {
+      const f = failureStatus(e);
+      decision = ruleDecision(f.message, `decision-${f.status}`);
+    }
   }
-  moment = { ...ctx.store.get('moment', momentId)!, decision };
+  timing.totalMs = Date.now() - Date.parse(moment.at);
+  moment = { ...ctx.store.get('moment', momentId)!, decision, timing };
   moment = await retainOrDiscard(ctx, moment, history);
   await ctx.store.put('moment', moment);
   await recordSkills(ctx, moment, session);
@@ -196,7 +235,7 @@ export async function followUp(ctx: Ctx, source: Moment, extra: string): Promise
   await ctx.store.put('moment', reply);
   let decision: Decision;
   try {
-    decision = await decide(ctx, reply.reading!, all, extra);
+    decision = (await decide(ctx, reply.reading!, all, extra)).decision;
   } catch (e) {
     const f = failureStatus(e);
     decision = ruleDecision(f.message, `decision-${f.status}`);

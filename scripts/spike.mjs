@@ -57,12 +57,15 @@ if (which === 's1') {
       file: f, status: m?.readingStatus, legible: m?.reading?.legible ?? null, totalMs: Date.now() - t0,
       toolMatch: e?.tool ? (m?.reading?.tool ?? '').toLowerCase().includes(e.tool.toLowerCase()) : null,
       requestSimilarity: e ? Number(sim(m?.reading?.userRequest, e.text).toFixed(2)) : null, decision: m?.decision?.action ?? null,
+      serverTiming: m?.timing ?? null,
     });
     await sleep(2600);
   }
   const sims = rows.map(r => r.requestSimilarity).filter(x => typeof x === 'number');
   const tools = rows.filter(r => r.toolMatch !== null && r.toolMatch !== undefined);
   out.rows = rows;
+  const st = rows.map(r => r.serverTiming).filter(Boolean);
+  out.serverTiming = st.length ? { mode: st[0].mode, p50CountMs: pct(st.map(t => t.countMs), 0.5), p50GenerateMs: pct(st.map(t => t.generateMs), 0.5), p50ServerTotalMs: pct(st.map(t => t.totalMs), 0.5), calls: st[0].calls } : null;
   out.summary = { frames: rows.length, legible: rows.filter(r => r.legible).length, requestAccuracyAt0_8: sims.length ? sims.filter(s => s >= 0.8).length / sims.length : null, toolAccuracy: tools.length ? tools.filter(r => r.toolMatch).length / tools.length : null, p50TotalMs: pct(rows.map(r => r.totalMs), 0.5), p90TotalMs: pct(rows.map(r => r.totalMs), 0.9) };
 }
 
@@ -105,5 +108,5 @@ out.lifetime = { before: before.spentUsd, after: after.spentUsd, cap: after.capU
 for (const ses of s.sessions) await call(`/sessions/${ses.id}`, { method: 'DELETE' });
 const checks = path.join(root, 'private/checks');
 mkdirSync(checks, { recursive: true, mode: 0o700 });
-writeFileSync(path.join(checks, `spike-${which}.json`), JSON.stringify(out, null, 2) + '\n', { mode: 0o600 });
-console.log(JSON.stringify({ spike: which, summary: out.summary ?? out.rows, workspaceSpentUsd: out.workspaceSpentUsd, lifetime: out.lifetime }, null, 2));
+writeFileSync(path.join(checks, `spike-${which}${process.env.SPIKE_TAG ? `-${process.env.SPIKE_TAG}` : ''}.json`), JSON.stringify(out, null, 2) + '\n', { mode: 0o600 });
+console.log(JSON.stringify({ spike: which, summary: out.summary ?? out.rows, serverTiming: out.serverTiming ?? undefined, workspaceSpentUsd: out.workspaceSpentUsd, lifetime: out.lifetime }, null, 2));

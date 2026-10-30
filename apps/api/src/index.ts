@@ -91,12 +91,21 @@ async function route(req: Request, env: Env): Promise<Response> {
   return error(404, 'not_found', 'Unknown route.');
 }
 
+/** Path without workspace ids or tokens, safe to log. */
+function safePath(path: string): string {
+  return path.replace(/w_[a-z0-9]+/g, 'w_*').replace(/\/(m|f|c|card|pr|in|s)_[a-z0-9]+/g, '/$1_*');
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     try {
       return withHeaders(await route(req, env));
-    } catch {
-      return withHeaders(error(500, 'server_error', 'Something went wrong on the server.'));
+    } catch (e) {
+      // Diagnosable 500s: error class, message and a safe path go to Workers Logs. No tokens or bodies.
+      const ref = id('err');
+      const err = e as Error;
+      console.error(JSON.stringify({ event: 'route_error', ref, method: req.method, path: safePath(new URL(req.url).pathname), name: err?.name ?? 'Error', message: String(err?.message ?? e).slice(0, 300) }));
+      return withHeaders(json({ error: { code: 'server_error', message: 'Something went wrong on the server.', ref } }, 500));
     }
   },
 } satisfies ExportedHandler<Env>;

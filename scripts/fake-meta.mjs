@@ -111,6 +111,16 @@ createServer(async (req, res) => {
       const name = body.text?.format?.name;
       if (failNext.delete(name)) return send(res, 500, { error: { message: `fake: injected failure for ${name}`, type: 'server_error', code: null } });
       if (name === 'screen_reading') return send(res, 200, message(reading()));
+      if (name === 'caddie_turn') {
+        const text = body.input[0].content[0].text;
+        const ctxIn = JSON.parse(text.slice(text.indexOf('{')));
+        const r = reading();
+        const seen = new Set(); const counts = new Map();
+        for (const q of [...ctxIn.recentRequests, { text: r.userRequest, vagueTerms: r.vagueTerms }]) { if (!q.text || seen.has(q.text)) continue; seen.add(q.text); for (const t of q.vagueTerms) counts.set(t, (counts.get(t) ?? 0) + 1); }
+        let best = null; for (const [term, count] of counts) if (!best || count > best.count) best = { term, count };
+        const d = decision({ firstSighting: ctxIn.firstSightingIfLegible, reading: r, repeatedVagueTerm: best && best.count >= 2 ? best : null, interventions: ctxIn.interventions, activeCards: ctxIn.activeCards });
+        return send(res, 200, message({ reading: r, decision: d }));
+      }
       if (name === 'caddie_decision') {
         const text = body.input[0].content[0].text;
         return send(res, 200, message(decision(JSON.parse(text.slice(text.indexOf('{'))))));

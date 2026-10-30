@@ -148,8 +148,12 @@ export class Workspace extends DurableObject<Env> {
   }
 
   private enqueue(task: () => Promise<void>): void {
-    this.queue = this.queue.then(task).catch(e => this.notice('warn', 'task-failed', e instanceof Error ? e.message : 'A background task failed.'));
-    this.ctx.waitUntil(this.queue);
+    this.queue = this.queue.then(task).catch(e => {
+      console.error(JSON.stringify({ event: 'task_error', name: (e as Error)?.name, message: String((e as Error)?.message ?? e).slice(0, 300) }));
+      this.notice('warn', 'task-failed', 'A background step failed. You can retry it.');
+    });
+    // Durable Objects stay alive while I/O is pending; waitUntil is used when the runtime offers it.
+    (this.ctx as unknown as { waitUntil?: (p: Promise<unknown>) => void }).waitUntil?.(this.queue);
   }
 
   private async schedule(inMs: number): Promise<void> {
@@ -337,6 +341,8 @@ export class Workspace extends DurableObject<Env> {
       return error(404, 'not_found', 'Unknown route.');
     } catch (e) {
       if (e instanceof SyntaxError) return error(400, 'bad_request', 'Malformed request.');
+      if (e instanceof TypeError && /form|multipart|boundary/i.test(String((e as Error).message))) return error(400, 'bad_request', 'The upload could not be read.');
+      console.error(JSON.stringify({ event: 'workspace_error', path: path.replace(/_[a-z0-9]+/g, '_*'), name: (e as Error)?.name, message: String((e as Error)?.message ?? e).slice(0, 300) }));
       throw e;
     }
   }

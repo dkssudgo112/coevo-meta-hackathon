@@ -354,3 +354,30 @@ export const FORMAT_TASKS: Record<Exclude<ContentFormat, never>, string> = {
 };
 
 export { ShapeError };
+
+// ---------------------------------------------------------------- combined turn (reading + decision in one call)
+
+export interface TurnContext {
+  firstSightingIfLegible: boolean;
+  recentRequests: DecisionInput['recentRequests'];
+  interventions: DecisionInput['interventions'];
+  activeCards: string[];
+  memory: string[];
+  secondsSinceLastIntervention: number | null;
+}
+
+/** One call that reads the screen and decides, to cut latency. Same schemas and readers as the separate tasks. */
+export const turnTask: ModelTask<{ reading: Reading; proposal: Proposal }> = {
+  name: 'caddie_turn',
+  effort: 'low',
+  maxOutputTokens: 1500,
+  instructions: `Two steps in one answer.
+STEP 1 — "reading": ${readingTask.instructions}
+STEP 2 — "decision": ${decisionTask.instructions}
+For step 2, use your step-1 reading plus the context JSON in the message. When counting repeated vague requests, include the latest request you just read if it is new. If the screen is not legible, stay quiet. firstSighting applies only when the context says firstSightingIfLegible=true and the screen is legible.`,
+  schema: S.obj({ reading: readingTask.schema, decision: decisionTask.schema }),
+  read(json) {
+    const o = R.obj(json, 'turn');
+    return { reading: readingTask.read(o.reading), proposal: decisionTask.read(o.decision) };
+  },
+};

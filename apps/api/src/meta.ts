@@ -194,7 +194,7 @@ const HEADROOM = { minimal: 400, low: 1500, medium: 3500, high: 6000 } as const;
 
 export interface TaskInput { text: string; images?: string[] }
 
-export interface TaskResult<T> { value: T; costUsd: number; model: string; latencyMs: number }
+export interface TaskResult<T> { value: T; costUsd: number; model: string; latencyMs: number; countMs: number; calls: number }
 
 /** Safety margin on top of the provider's input-token count (documented for context checks, not billing). */
 export const INPUT_COUNT_MARGIN = 1.1;
@@ -240,8 +240,13 @@ export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T
   };
   const body = JSON.stringify({ ...shared, max_output_tokens: maxOut, store: false });
   let lastError: Error | null = null;
+  let countMs = 0;
+  let calls = 0;
   for (let attempt = 0; attempt < 2; attempt++) {
+    const c0 = Date.now();
     const counted = await countInputTokens(env, shared, f);
+    countMs += Date.now() - c0;
+    calls += 2;
     const maxCost = sparkMaxCost(Math.ceil(counted * INPUT_COUNT_MARGIN) + INPUT_COUNT_PAD, maxOut);
     const ticket = await spend.reserve(maxCost, task.name);
     const started = Date.now();
@@ -260,7 +265,7 @@ export async function runTask<T>(env: MetaEnv, spend: Spender, task: ModelTask<T
     try {
       if (raw.status === 'incomplete') throw new InvalidOutput(`Incomplete output (${raw.incomplete_details?.reason ?? 'unknown'})`);
       const value = task.read(parseJsonText(outputText(raw)));
-      return { value, costUsd: cost, model: m, latencyMs: Date.now() - started };
+      return { value, costUsd: cost, model: m, latencyMs: Date.now() - started, countMs, calls };
     } catch (e) {
       lastError = e instanceof ShapeError || e instanceof SyntaxError ? new InvalidOutput(`Invalid ${task.name} output: ${(e as Error).message}`) : (e as Error);
       if (!(lastError instanceof InvalidOutput) || attempt === 1) throw lastError;
