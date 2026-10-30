@@ -2,17 +2,24 @@
 
 Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Deadline: **November 5, 2026, 11:00 KST**. The maintainer presses the final submit button; nothing has been submitted.
 
-## Form checklist
+## Form fields (in the platform's order)
 
-- [ ] Team name and all approved contributors.
-- [ ] Track: Indie Developer / Build for Your World.
-- [ ] English project description (draft below once features are verified).
-- [ ] Public GitHub repository URL, checked while signed out.
-- [ ] Accessible three-minute demo video, checked while signed out.
-- [ ] Which Meta models the project uses, and why they matter.
-- [ ] Live product URL with the sample-session entrance and a stated budget cap.
-- [ ] Optional feedback and public post URL.
-- [ ] Review the usage, sharing and promotion consent language at submission time.
+| # | Field | Plan |
+| --- | --- | --- |
+| 1 | Team name | Maintainer |
+| 2 | Team members | Only actual collaborators |
+| 3 | Track | Indie Developer |
+| 4 | Problem statement | Build for Your World |
+| 5 | Most Viral X post (optional) | Optional |
+| 6 | Project description | Draft below; includes the live app URL (the form has no separate field) |
+| 7 | Public GitHub repository | https://github.com/dkssudgo112/coevo-meta-hackathon (check while signed out) |
+| 8 | 3-minute demo video | Public video URL (check while signed out) |
+| 9 | Use of Meta products | Draft below |
+| 10 | Why Meta's models matter | Draft below |
+| 11 | Partner technology feedback | Draft below |
+| 12–13 | Likelihood and opinion surveys | The maintainer's own answers |
+| 14 | Consent checkbox | The maintainer decides at final submission |
+| 15 | Submit | The maintainer only |
 
 ## Before publication
 
@@ -41,16 +48,37 @@ Composition: a real desk shot first (phone propped beside the monitor), then a s
 
 ## Draft texts (finalize only with verified numbers)
 
-**One-liner.** Coevo Caddie is a coach on the phone beside your screen: it watches how you work with any AI, steps in only when it matters, and helps both you and your AI get better.
+**6 · Project description**
 
-**Description.** People stuck with an AI tool repeat vague requests — "make it more premium" — because nobody shows them what the AI is missing. Coevo Caddie turns the phone you already keep beside your monitor into a caddie. Its camera reads your screen only when it changes and sends only the screen area. Muse Spark decides whether to step in, always with a reason, and staying quiet is a decision too. When it does step in, it asks one question in your own words, and you answer out loud. Afterwards it makes only the learning that session earned: a note, a playbook, applied flashcards, a two-voice podcast you can interrupt, and a 9:16 short built on your own before/after screens. It then proposes a Caddie card for your AI. Approve it and start a pinned chat with it, and next time your AI asks the right questions first while the Caddie stays quiet. Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
+Coevo Caddie is a coach on the phone beside your screen. It watches how you work with any AI tool, steps in only when it matters, and helps both you and your AI get better.
 
-**Meta models and why they matter.**
-- Muse Spark 1.3 reads any AI tool's screen from a phone photo, which makes every tool supported with no integration. It also makes the intervention decision with deterministic guardrails, and writes one learning design that becomes five formats.
-- SAM 3.1 locates the monitor on one disclosed setup photo, so the phone can crop on-device and keep the room out of every later frame.
-- Muse Voice Transcribe lets a busy owner answer by voice, and those spoken details become the brief.
-- Muse Image is the Practice Range: it draws exactly what your spoken brief would produce.
+People stuck with an AI tool often repeat vague requests like "make it more premium", because nothing shows them what the AI is missing. Coevo Caddie turns the phone you already keep beside your monitor into a caddie:
 
-**Built during the hackathon.** Everything in the repository: contracts and guardrails, Worker and Durable Objects, adapters, phone and Desk apps, media pipeline, tests. The concept continues the author's earlier Coevo work, used as a design reference only.
+- **It watches quietly.** The camera reads your screen only when it changes, and only the screen area leaves the phone.
+- **It decides when to speak.** Muse Spark decides whether to step in, always with a reason, and staying quiet is a decision too. When it steps in, it asks one question in your own words, and you answer out loud.
+- **It makes only what the session earned.** Afterwards you get a note, a playbook, applied flashcards, a two-voice podcast you can interrupt, and a 9:16 short built on your own before/after screens.
+- **Your AI learns too.** It proposes a Caddie card for your AI. Approve it and start a pinned chat with it, and next time your AI asks the right questions first while the Caddie stays quiet.
 
-**Verified results (fill in):** S1 reading accuracy [ ], S3 p50 latency [ ], S5 podcast/short lengths [ ], S8 cost per session [ ], persona simulations [labeled simulated].
+Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
+
+Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone, or /sample with no phone. Sample screens are synthetic. Model spend is capped by the app.
+
+**9 · Use of Meta products**
+
+- **Muse Spark 1.3** reads phone photos of any AI tool's screen into structured moments. It decides each intervention, or each silence, with deterministic guardrails. It writes one learning design per session and the five formats from it. It also writes and checks Practice Range requests.
+- **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards.
+- **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
+- **Muse Image** draws what a spoken practice brief produces, and the background scenes of the short.
+- **Meta AI** (consumer) is the demo's work tool. Its poster image generation and in-chat rule following were checked in a real account.
+
+All model calls are server-side with Standard models, strict JSON schemas, and an application-enforced lifetime budget.
+
+**10 · Why Meta's models matter**
+
+Seeing the screen is what makes the Caddie work with every AI tool without integrations. Muse Spark's image understanding turns a phone photo of ChatGPT, Gemini or Meta AI into the same structured moment. SAM 3.1 keeps the room out of every later frame. Voice Transcribe lets a busy café owner answer while working, and those spoken details become the brief. Muse Image closes the loop in practice: you hear your own words, then see what they produce.
+
+**11 · Partner technology feedback**
+
+Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition for the podcast and the short. Meta's API has no text-to-speech. We used explicit CPU and memory limits, one container, and no warm pool. [Add one sentence of real experience after the media probe.]
+
+**Verified results (fill in, never estimate):** S1 reading accuracy [ ], S3 p50 latency [ ], S5 podcast/short lengths [ ], S8 real cost per session [ ], persona simulations [labeled simulated].
