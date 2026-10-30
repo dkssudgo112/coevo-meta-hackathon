@@ -101,9 +101,33 @@ def has_audio(src):
     return bool(r.stdout.strip())
 
 
+def preflight(edl, base):
+    """Refuse to render a cut with unfilled clip slots, missing files, placeholder captions or a plan over 3 minutes."""
+    problems, planned = [], 0.0
+    for i, seg in enumerate(edl["segments"]):
+        label = seg.get("mark") or seg.get("src") or seg.get("still") or "card"
+        for key in ("src", "still", "audio"):
+            if seg.get(key) and not os.path.exists(os.path.join(base, seg[key])):
+                problems.append(f"segment {i} ({label}): missing file {seg[key]}")
+        if "src" in seg:
+            if not isinstance(seg.get("in"), (int, float)) or not isinstance(seg.get("out"), (int, float)) or seg["out"] <= seg["in"]:
+                problems.append(f"segment {i} ({label}): in/out not set")
+            else:
+                planned += seg["out"] - seg["in"]
+        else:
+            planned += seg.get("duration", 4 if "card" in seg else 5)
+        if (seg.get("caption") or "").startswith("TODO"):
+            problems.append(f"segment {i} ({label}): caption still a placeholder")
+    if planned > 180:
+        problems.append(f"planned length {planned:.1f} s is over 180 s")
+    if problems:
+        sys.exit("Not rendering:\n- " + "\n- ".join(problems))
+
+
 def main(edl_path):
     edl = json.load(open(edl_path))
     base = os.path.dirname(os.path.abspath(edl_path))
+    preflight(edl, base)
     out = os.path.join(base, edl["output"])
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with tempfile.TemporaryDirectory() as d:
