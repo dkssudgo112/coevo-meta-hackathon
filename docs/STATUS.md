@@ -52,9 +52,13 @@ The maintainer decided that, as in the earlier Coevo project, the phone is assum
 - Reading accuracy and latency on real phone-camera frames (S1, S3) and SAM screen finding on real phone photos (S2; the protocol is ready).
 - Haptics, the camera-in-use indicator on pause, and a real human voice (speech so far is synthetic).
 
+## First use (Oct 31)
+
+The landing page now starts the real service: *Start on this computer* opens the Desk, then four short steps (scan the code with the phone, aim at the screen, tap Start watching, keep working in the usual AI tool), with a labeled setup illustration. The Desk shows the same steps with the current one marked and a *phone connected* state; the phone's setup screens say which step they are. The demo and the recorded session stay available as secondary ways to look first. The README leads with the product and real screens of this flow.
+
 ## Still to do
 
-- Nothing left to build. The three-minute demo is published at /demo with its exact reviewed bytes (still captures of the live run and recorded clips, each scene tagged with its run). The final submission is the maintainer's.
+- A new three-minute film, made with video-shotcraft from real captures of the deployed app, is in production and review. The current demo at /demo stays published until the new one passes the exact-byte review. The final submission is the maintainer's.
 
 ## Publication
 
