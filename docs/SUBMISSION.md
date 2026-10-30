@@ -61,7 +61,7 @@ People stuck with an AI tool often repeat vague requests like "make it more prem
 
 Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
 
-Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone, or /sample with no phone. The sample replays screenshots of actual Meta AI replies to a scripted, fictional café scenario; the Caddie's part is live model output. Model spend is capped by the app.
+Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone, or /sample with no phone. The sample replays a labeled recorded live run on screenshots of actual Meta AI replies to a scripted, fictional café scenario — the Caddie's real output, five formats, podcast and short — with no new model calls; "Run it live" makes fresh calls. Model spend is capped by the app.
 
 **9 · Use of Meta products**
 

@@ -14,9 +14,9 @@ These runs use screenshots of **actual Meta AI replies** to a scripted café-own
 - **A full session through the deployed app.** Five Meta AI screens → quiet notes for the first two → an intervention at the question step that quoted the person ("You keep saying "more premium" — what one mood should it give, calm minimal or dark luxury?") → a spoken answer transcribed by Voice Transcribe → the Caddie's reply → the specific brief labeled **with the Caddie** (coached). The wrap made all five formats: note, My playbook, flashcards, a 93 s two-voice podcast and a 38.9 s 1080×1920 short. Cost of that session: Meta $0.163, plus a $0.08 media reservation.
 - **The card in the real AI, end to end.** The app-generated card "Before you make a poster, ask me who it is for, what it is, the price, one feeling, and whether a real photo exists." was sent as the first message of a dedicated, pinned Meta AI chat. Asked for a new drink poster, Meta AI asked those five questions first. The Caddie read that screen (Meta AI asked for all five details the card names), stayed quiet with "AI asked first as card says", and marked the card *observed working*. This proves a rule scoped to one pinned chat, not Meta AI memory across chats (that did not carry over in our check). A card only counts as working when it was applied, the tool and task match, and the AI asked for every detail it names.
 - **Practice Range.** A spoken brief was transcribed (word-set similarity 0.86 to the script, synthetic voice), rendered by Muse Image as a 2:3 portrait, and checked for ingredients.
-- **Speech and video.** Kokoro-82M (Apache-2.0) two-voice audio was judged distinguishable and listenable by the maintainer. A 61.6 s two-voice benchmark rendered in 58 s end to end; a 76.8 s podcast took 75–77 s, and the 93 s podcast from the full session spent 41 s in speech synthesis. Shorts land in 30–45 s with captions, the person's own before screen and a diagram.
+- **Speech and video.** Kokoro-82M (Apache-2.0) two-voice audio was judged distinguishable and listenable by the maintainer (a listening judgment, not a professional audio review). A 61.6 s two-voice benchmark rendered in 58 s end to end; a 76.8 s podcast took 75–77 s, and the 93 s podcast from the full session spent 41 s in speech synthesis. Shorts land in 30–45 s with captions, the person's own before screen and a diagram.
 - **Phone pairing.** A real phone paired with the Desk by scanning its QR code.
-- **The public sample.** A full live run of /sample produced all five formats ($0.2034 Meta usage plus a $0.08 media reservation). A labeled *recorded live run* of it, replayed with no model calls, is built as the default preview so judges never exhaust the shared budget; its files are in publication review and the live sample stays one click away.
+- **The public sample.** A full live run of /sample produced all five formats ($0.2034 Meta usage plus a $0.08 media reservation). A labeled *recorded live run* of it is now the default preview, replayed with no model calls so judges never exhaust the shared budget; its JSON, podcast and short were published at exactly the reviewed bytes, with reviewer notes for one invented poster detail, and the live sample stays one click away.
 
 ## Fixed after live runs
 
@@ -27,7 +27,6 @@ Live runs and reviews found problems that mocks had not: a lost media job when t
 - **Real phone camera:** the 20-frame benchmark (reading accuracy on camera frames, latency, SAM screen detection), haptics, and the camera-off indicator on pause.
 - **A real human voice** (only synthetic speech so far).
 - The three-minute demo video, simulated persona tests (to be labeled as simulations), and the submission texts.
-- Publication of the recorded live run's files (review pending).
 
 ## Publication
 
