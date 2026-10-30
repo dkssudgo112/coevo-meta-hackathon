@@ -10,7 +10,7 @@ edl.json:
   ]
 }
 Still segments hold an image, optionally over an audio excerpt:
-    {"still": "frames/reply.jpg", "duration": 8, "audio": "podcast.m4a", "audio_in": 12.0, "caption": "..."}
+    {"still": "frames/reply.jpg", "duration": 8, "audio": "podcast.m4a", "audio_in": 12.0, "crop": [0, 0, 1600, 1000], "caption": "..."}
 Split segments put a PC recording (left) beside a phone recording (right):
     {"split": {"left": "clips/pc.mov", "left_in": 12.0, "right": "clips/phone.mov", "right_in": 3.5}, "duration": 20, "caption": "..."}
 Clips are letterboxed into 1920x1080. Audio from clips is kept (split: left audio); cards are silent.
@@ -111,7 +111,12 @@ def main(edl_path):
                 # An image held on screen, optionally over an audio excerpt (e.g. the podcast).
                 img = os.path.join(base, seg["still"])
                 dur = seg.get("duration", 5)
-                vf = f"[0:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x141917,fps={FPS}[b];[b][1:v]overlay=0:0,format=yuv420p[v]"
+                # Optional crop [x0, y0, x1, y1] in source pixels, so small UI text fills the frame.
+                crop = ""
+                if seg.get("crop"):
+                    x0, y0, x1, y1 = seg["crop"]
+                    crop = f"crop={x1 - x0}:{y1 - y0}:{x0}:{y0},"
+                vf = f"[0:v]{crop}scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x141917,fps={FPS}[b];[b][1:v]overlay=0:0,format=yuv420p[v]"
                 if seg.get("audio"):
                     aud = ["-ss", str(seg.get("audio_in", 0)), "-t", str(dur), "-i", os.path.join(base, seg["audio"])]
                 else:
