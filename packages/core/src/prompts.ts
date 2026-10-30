@@ -363,7 +363,7 @@ export const practiceScenarioTask: ModelTask<{ scenario: string; hint: string }>
   name: 'practice_scenario',
   effort: 'low',
   maxOutputTokens: 400,
-  instructions: `Create one short practice request for the Practice Range, in the person's own domain but with a changed condition (a new item, season, audience or channel). One sentence, at most 140 characters, as if a customer or partner asked for it. Also write a hint (at most 140 characters) listing what a strong brief would include, without writing the brief. ${STYLE}`,
+  instructions: `Create one short practice request for the Practice Range, in the person's own domain but with a changed condition (a new item, season, audience or channel). It must ask for something an image model can draw — a poster, flyer, menu board or social-media image — never a caption, email or other text, because the person's brief is drawn as an image. One sentence, at most 140 characters, as if a customer or partner asked for it. Also write a hint (at most 140 characters) listing what a strong brief would include, without writing the brief. ${STYLE}`,
   schema: S.obj({ scenario: S.str('Practice request.', 160), hint: S.str('Hint.', 160) }),
   read(json) { const o = R.obj(json, 'scenario'); return { scenario: R.str(o.scenario, 'scenario', 160), hint: R.str(o.hint, 'hint', 160) }; },
 };
