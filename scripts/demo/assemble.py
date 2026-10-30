@@ -51,17 +51,76 @@ def wrap(draw, text, f, max_w):
     return lines
 
 
-def caption_png(text, path):
+def caption_png(text, path, tag=None, bottom=70):
+    """Caption box near the bottom; an optional small tag (top left) names which run a scene comes from."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
     if text:
-        d = ImageDraw.Draw(img)
         f = font(44)
         lines = wrap(d, text, f, W - 360)[:3]
         h = len(lines) * 58 + 40
-        y = H - 70 - h
+        y = H - bottom - h
         d.rounded_rectangle([140, y, W - 140, y + h], radius=24, fill=(18, 24, 21, 215))
         for i, ln in enumerate(lines):
             d.text((W // 2, y + 20 + i * 58 + 29), ln, font=f, fill=(246, 243, 236), anchor="mm")
+    if tag:
+        tf = font(28)
+        w = d.textlength(tag, font=tf)
+        d.rounded_rectangle([24, 14, 24 + w + 36, 58], radius=20, fill=(31, 90, 68, 230))
+        d.text((24 + 18, 36), tag, font=tf, fill=(246, 243, 236), anchor="lm")
+    img.save(path)
+
+
+PHONE_TOP, PHONE_H = 70, 830
+
+
+def rounded(im, r):
+    mask = Image.new("L", im.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, im.width - 1, im.height - 1], radius=r, fill=255)
+    return mask
+
+
+def phone_png(seg, base, path):
+    """The actual AI screen on a monitor (left) beside the actual phone screen (right), or one or two
+    phone screens alone. Images are pasted as captured; only scaling and an optional crop are applied."""
+    img = Image.new("RGB", (W, H), (20, 25, 23))
+    d = ImageDraw.Draw(img)
+    ph = seg.get("height", PHONE_H)
+
+    def load(spec):
+        spec = spec if isinstance(spec, dict) else {"src": spec}
+        im = Image.open(os.path.join(base, spec["src"])).convert("RGB")
+        if spec.get("crop"):
+            im = im.crop(tuple(spec["crop"]))
+        h = spec.get("height", ph)  # a cropped screen keeps the same scale by giving its own height
+        s = h / im.height
+        return im.resize((round(im.width * s), h), Image.LANCZOS)
+
+    def paste_phone(im, x):
+        y = PHONE_TOP + (PHONE_H - im.height) // 2
+        d.rounded_rectangle([x - 12, y - 12, x + im.width + 12, y + im.height + 12], radius=40, fill=(6, 6, 6))
+        img.paste(im, (x, y), rounded(im, 30))
+
+    phones = [load(p) for p in (seg["phones"] if "phones" in seg else [seg["phone"]])]
+    if seg.get("screen"):
+        sw, sh = 1160, 725  # 16:10 monitor screen
+        mx, my = 90, PHONE_TOP + 10
+        d.rounded_rectangle([mx - 18, my - 18, mx + sw + 18, my + sh + 18], radius=14, fill=(12, 12, 12))
+        d.rectangle([mx + sw // 2 - 70, my + sh + 18, mx + sw // 2 + 70, my + sh + 70], fill=(40, 40, 40))
+        shot = Image.open(os.path.join(base, seg["screen"])).convert("RGB")
+        fill = shot.getpixel((2, shot.height // 2))
+        d.rectangle([mx, my, mx + sw, my + sh], fill=fill)
+        s = min(sw / shot.width, sh / shot.height)
+        shot = shot.resize((round(shot.width * s), round(shot.height * s)), Image.LANCZOS)
+        img.paste(shot, (mx + (sw - shot.width) // 2, my + (sh - shot.height) // 2))
+        paste_phone(phones[0], W - 100 - phones[0].width)
+    else:
+        gap = 90
+        total = sum(p.width for p in phones) + gap * (len(phones) - 1)
+        x = (W - total) // 2
+        for p in phones:
+            paste_phone(p, x)
+            x += p.width + gap
     img.save(path)
 
 
@@ -105,10 +164,12 @@ def preflight(edl, base):
     """Refuse to render a cut with unfilled clip slots, missing files, placeholder captions or a plan over 3 minutes."""
     problems, planned = [], 0.0
     for i, seg in enumerate(edl["segments"]):
-        label = seg.get("mark") or seg.get("src") or seg.get("still") or "card"
-        for key in ("src", "still", "audio"):
-            if seg.get(key) and not os.path.exists(os.path.join(base, seg[key])):
-                problems.append(f"segment {i} ({label}): missing file {seg[key]}")
+        label = seg.get("mark") or seg.get("src") or seg.get("still") or seg.get("phone") or "card"
+        files = [seg[k] for k in ("src", "still", "audio", "screen") if seg.get(k)]
+        files += [p if isinstance(p, str) else p["src"] for p in (seg.get("phones") or ([seg["phone"]] if seg.get("phone") else []))]
+        for f in files:
+            if not os.path.exists(os.path.join(base, f)):
+                problems.append(f"segment {i} ({label}): missing file {f}")
         if "src" in seg:
             if not isinstance(seg.get("in"), (int, float)) or not isinstance(seg.get("out"), (int, float)) or seg["out"] <= seg["in"]:
                 problems.append(f"segment {i} ({label}): in/out not set")
@@ -134,7 +195,8 @@ def main(edl_path):
         parts = []
         for i, seg in enumerate(edl["segments"]):
             cap = os.path.join(d, f"cap{i}.png")
-            caption_png(seg.get("caption"), cap)
+            is_phone = "phone" in seg or "phones" in seg
+            caption_png(seg.get("caption"), cap, seg.get("tag"), bottom=16 if is_phone else 70)
             part = os.path.join(d, f"p{i}.mp4")
             if "split" in seg:
                 sp = seg["split"]
@@ -149,13 +211,17 @@ def main(edl_path):
                 extra = [] if has_audio(left) else ["-f", "lavfi", "-t", str(dur), "-i", "anullsrc=r=48000:cl=stereo"]
                 run(["-ss", str(sp.get("left_in", 0)), "-t", str(dur), "-i", left, "-ss", str(sp.get("right_in", 0)), "-t", str(dur), "-i", right, "-i", cap, *extra,
                      "-filter_complex", vf, "-map", "[v]", *audio, "-t", str(dur), "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", part])
-            elif "still" in seg:
-                # An image held on screen, optionally over an audio excerpt (e.g. the podcast).
-                img = os.path.join(base, seg["still"])
+            elif "still" in seg or is_phone:
+                # An image held on screen, optionally over an audio excerpt (e.g. the podcast or a spoken answer).
+                if is_phone:
+                    img = os.path.join(d, f"phone{i}.png")
+                    phone_png(seg, base, img)
+                else:
+                    img = os.path.join(base, seg["still"])
                 dur = seg.get("duration", 5)
                 # Optional crop [x0, y0, x1, y1] in source pixels, so small UI text fills the frame.
                 crop = ""
-                if seg.get("crop"):
+                if seg.get("crop") and not is_phone:
                     x0, y0, x1, y1 = seg["crop"]
                     crop = f"crop={x1 - x0}:{y1 - y0}:{x0}:{y0},"
                 vf = f"[0:v]{crop}scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x141917,fps={FPS}[b];[b][1:v]overlay=0:0,format=yuv420p[v]"
@@ -163,7 +229,10 @@ def main(edl_path):
                     aud = ["-ss", str(seg.get("audio_in", 0)), "-t", str(dur), "-i", os.path.join(base, seg["audio"])]
                 else:
                     aud = ["-f", "lavfi", "-t", str(dur), "-i", "anullsrc=r=48000:cl=stereo"]
-                run(["-loop", "1", "-t", str(dur), "-i", img, "-i", cap, *aud, "-filter_complex", vf, "-map", "[v]", "-map", "2:a",
+                # Optional start delay; audio shorter than the scene is padded with silence so parts stay in sync.
+                delay = int(seg.get("audio_delay", 0) * 1000)
+                vf += f";[2:a]aresample=48000,aformat=channel_layouts=stereo,adelay={delay}|{delay},apad,atrim=0:{dur}[a]"
+                run(["-loop", "1", "-t", str(dur), "-i", img, "-i", cap, *aud, "-filter_complex", vf, "-map", "[v]", "-map", "[a]",
                      "-r", str(FPS), "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-t", str(dur), part])
             elif "card" in seg:
                 bg = os.path.join(d, f"card{i}.png")
