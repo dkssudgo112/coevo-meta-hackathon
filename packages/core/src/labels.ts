@@ -5,6 +5,9 @@ import type { Assistance, EvidenceStrength, Ingredients, Moment, ObservedChange,
 import { INGREDIENT_KEYS } from '../../contracts/index.ts';
 import { similarity } from './text.ts';
 
+/** Plain words for what a request added (shown in the habits list and passed to content). */
+const ADDED_WORDS: Record<keyof Ingredients, string> = { audience: 'who it is for', price: 'the price', mood: 'one feeling', realPhoto: 'a real photo', productDetail: 'what exactly it is' };
+
 export function presentIngredients(r: Reading | null): (keyof Ingredients)[] {
   if (!r) return [];
   return INGREDIENT_KEYS.filter(k => r.ingredients[k]);
@@ -52,7 +55,7 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
     assistance = 'coached';
   }
   const parts: string[] = [];
-  if (added.length) parts.push(`added ${added.join(', ')}`);
+  if (added.length) parts.push(`added ${added.map(k => ADDED_WORDS[k]).join(', ')}`);
   if (aiAskedFirst) parts.push('the AI asked clarifying questions first');
   if (correctedDetail) parts.push(`told the AI to fix: ${correctedDetail}`);
   if (askedNoInvention) parts.push('told the AI not to invent details');

@@ -204,6 +204,7 @@ function Answer({ creds, momentId, act, onAnswering }: { creds: Creds; momentId:
         <VoiceButton label="Answer" onActive={setVoice} onWav={wav => postBinary(creds, path, wav, 'audio/wav')} />
         <button className="btn" disabled={voice} onClick={() => act(() => post(creds, path, { kind: 'later' }))}>Later</button>
       </div>
+      {voice && <p className="faint">Your recording is turned into text; the audio itself is not kept.</p>}
       <TypeInstead onActive={setTyped} onSend={async text => { let ok = false; await act(async () => { await post(creds, path, { kind: 'typed-answer', text }); ok = true; }); return ok; }} />
     </>
   );
@@ -233,7 +234,8 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, an
       <section className="now">
         <div className="eyebrow">Now · Paused</div>
         <p className="message" style={{ fontSize: '1.3rem' }}>Caddie paused — connection.</p>
-        <p className="faint" role="status">{last.readingStatus === 'error' ? last.readingError : last.decision?.reason} Keep working; it looks again on the next change.</p>
+        <p className="muted" role="status">Can’t reach the Caddie’s AI right now. Keep working; it tries again when your screen changes.</p>
+        <p className="faint">Details: {last.readingStatus === 'error' ? last.readingError : last.decision?.reason}</p>
       </section>
     );
   }
@@ -274,7 +276,7 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, an
           </div>
         )}
         <Answer key={asking.id} creds={creds} momentId={asking.id} act={act} onAnswering={onAnswering} />
-        {waiting && <p className="faint" role="status">The Caddie has a newer note. It will show after you send or cancel this answer.</p>}
+        {waiting && <p className="faint" role="status">The Caddie has a newer question. It will show after you send or cancel this answer.</p>}
         <div className="row wrap" style={{ gap: 16 }}>
           {d.step === 'ingredients' && <button className="linklike" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'asked-example' }))}>Show me an example</button>}
           <button className="linklike" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'misread' }))}>Misread: that’s not what I wrote</button>
@@ -382,15 +384,15 @@ function ContentRow({ item, future, onOpen }: { item: ContentItem; future: boole
 const DIMS: { key: SkillDimension; name: string; about: string }[] = [
   { key: 'description', name: 'Description', about: 'Giving your AI the specifics it needs' },
   { key: 'delegation', name: 'Delegation', about: 'Deciding what your AI should ask or do' },
-  { key: 'discernment', name: 'Discernment', about: 'Judging what the AI gave back' },
-  { key: 'diligence', name: 'Diligence', about: 'Checking before it goes out' },
+  { key: 'discernment', name: 'Discernment', about: 'Catching mistakes in what the AI gave back — seen when your own request tells the AI to fix a wrong or made-up detail' },
+  { key: 'diligence', name: 'Diligence', about: 'Keeping made-up details out — seen when your own request tells the AI not to invent anything' },
 ];
 
 export function Habits({ state }: { state: Snapshot }) {
   return (
     <section className="stack">
       <h3>Your habits</h3>
-      <p className="faint">Observations only — no levels or scores. Not seen yet never means you can’t.</p>
+      <p className="faint">Observations only — no levels or scores. “Not seen yet” shows only that it has not come up in your own requests; it never means you can’t.</p>
       {DIMS.map(d => {
         const obs = state.skills.filter(s => s.dimension === d.key).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 4);
         return (

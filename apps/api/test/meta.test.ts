@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CostUnverifiable, generateImage, InvalidAudio, ModelNotAllowed, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, RetryLater, runTask, segmentBoxes, transcribe, transcribeKeywords, type MetaEnv, type Spender } from '../src/meta.ts';
+import { CostUnverifiable, generateImage, InvalidAudio, ModelNotAllowed, INPUT_COUNT_MARGIN, INPUT_COUNT_PAD, LiveCallsDisabled, MAX_BLOCKING_WAIT_S, MetaError, models, outputText, parseSamBoxes, retryAfterSeconds, samOutput, RetryLater, runTask, segmentBoxes, transcribe, transcribeKeywords, type MetaEnv, type Spender } from '../src/meta.ts';
 import { sparkMaxCost } from '../../../packages/core/src/budget.ts';
 import { readingTask } from '../../../packages/core/src/prompts.ts';
 
@@ -144,6 +144,16 @@ test('SAM special tokens parse into pixel boxes (commas in mask data are safe)',
   assert.equal(r.boxes.length, 2);
   assert.equal(sent.model, 'sam-3.1');
   assert.deepEqual(sent.metadata, { mask_encoding: 'one_bit', include_confidence: 'true' });
+});
+
+test('SAM output is read from every lane and its shape is described without mask data', () => {
+  const box = '<0f>0<|box;x1=29;y1=344;x2=337;y2=729;w=820;h=900;c=0.9|><|mask;x=0;y=0;data=4,4,!AAAA|>';
+  const both = samOutput({ output: [{ type: 'message', phase: 'commentary', content: [{ type: 'output_text', text: box }] }, { type: 'message', content: [{ type: 'output_text', text: '' }] }] });
+  assert.equal(parseSamBoxes(both.text).length, 1, 'a box in a commentary lane still counts for SAM');
+  assert.equal(parseSamBoxes(both.finalText).length, 0);
+  assert.deepEqual(both.lanes, [`message/commentary/output_text:${box.length}`, 'message/-/output_text:0']);
+  assert.deepEqual(samOutput({ output: [] }), { text: '', finalText: '', lanes: [] }, 'an empty answer is a valid zero-match result');
+  assert.throws(() => samOutput({ output: [{ type: 'message', content: [{ type: 'refusal', refusal: 'no' }] }] }), /refused/);
 });
 
 test('transcribe posts multipart request + audio parts', async () => {

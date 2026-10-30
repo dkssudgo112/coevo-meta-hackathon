@@ -393,6 +393,30 @@ export function parseSamBoxes(text: string): Box[] {
   return boxes;
 }
 
+/**
+ * SAM's answer is box tokens. Unlike `outputText` (the Spark helper, which drops commentary lanes),
+ * this reads every output_text part and describes each lane (type/phase/part:length) for the logs,
+ * so an empty answer can be told apart from one in a lane the Spark helper would skip.
+ */
+export function samOutput(r: ResponsesOutput): { text: string; finalText: string; lanes: string[] } {
+  let text = '';
+  let finalText = '';
+  const lanes: string[] = [];
+  for (const item of r.output ?? []) {
+    const parts = item.content ?? [];
+    if (!parts.length) lanes.push(`${item.type}/${item.phase ?? '-'}/none`);
+    for (const part of parts) {
+      lanes.push(`${item.type}/${item.phase ?? '-'}/${part.type}:${part.text?.length ?? 0}`);
+      if (part.type === 'refusal') throw new InvalidOutput(`Model refused: ${part.refusal ?? ''}`.trim());
+      if (part.type === 'output_text' && part.text) {
+        text += part.text;
+        if (item.phase !== 'commentary') finalText += part.text;
+      }
+    }
+  }
+  return { text, finalText, lanes };
+}
+
 /** Find objects matching a noun phrase. Returns pixel boxes in source-image coordinates. */
 export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: string, phrase: string, f: Fetch = fetch): Promise<{ boxes: Box[]; costUsd: number; latencyMs: number }> {
   const segmentModel = models(env).segment;
@@ -407,10 +431,10 @@ export async function segmentBoxes(env: MetaEnv, spend: Spender, imageDataUrl: s
     }), { 'Content-Type': 'application/json' }, f, 30_000)) as ResponsesOutput;
     const processed = verifiedImageCount(raw.usage?.images_processed);
     await spend.settle(ticket, processed === null ? SAM_USD : SAM_USD * processed);
-    const text = outputText(raw);
-    const boxes = parseSamBoxes(text);
-    // Output shape only (box tokens, no mask data), so a format change is visible in the logs.
-    console.log(JSON.stringify({ event: 'sam_output', phrase, boxes: boxes.length, chars: text.length, head: text.slice(0, 160).replace(/data=[^|]*/g, 'data=…'), parts: (raw.output ?? []).map(o => `${o.type}:${(o.content ?? []).map(c => c.type).join('/')}`) }));
+    const out = samOutput(raw);
+    const boxes = parseSamBoxes(out.text);
+    // Output shape only (lanes with phase and text length, box counts per lane; no mask data, image or keys).
+    console.log(JSON.stringify({ event: 'sam_output', phrase, boxes: boxes.length, boxesOutsideCommentary: parseSamBoxes(out.finalText).length, lanes: out.lanes, head: out.text.slice(0, 160).replace(/data=[^|]*/g, 'data=…') }));
     return { boxes, costUsd: SAM_USD, latencyMs: Date.now() - started };
   } catch (e) {
     if (unbilled(e)) await spend.settle(ticket, 0);

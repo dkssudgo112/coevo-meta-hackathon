@@ -78,7 +78,7 @@ export function VoiceButton({ label, onWav, maxSeconds = 60, disabled, onActive 
       rec.current = null;
       if (e instanceof RecorderCancelled) { setState('idle'); return; }
       setState('error');
-      setErr('Microphone access is needed to answer by voice.');
+      setErr('The microphone is blocked. Allow it in your browser settings, or type your answer.');
     }
   };
 
@@ -127,7 +127,7 @@ export function VoiceButton({ label, onWav, maxSeconds = 60, disabled, onActive 
         disabled={busy || (disabled && state !== 'recording')}
         aria-pressed={state === 'recording'}
       >
-        {state === 'recording' ? `■ Stop and send · ${Math.floor(elapsed)}s`
+        {state === 'recording' ? `■ Stop and send · ${Math.floor(elapsed / 60)}:${String(Math.floor(elapsed % 60)).padStart(2, '0')}`
           : state === 'starting' ? 'Opening the microphone…'
           : state === 'sending' ? 'Sending…'
           : `🎤 ${label}`}
