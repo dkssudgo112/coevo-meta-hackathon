@@ -23,9 +23,9 @@ function sessionOf(entity: EntityName, data: Record<string, unknown>): string | 
 
 /**
  * Removal leaves a durable tombstone. A late write (e.g. a model response that
- * finishes after the user deleted the session) for a removed entity, for an
- * entity of a removed session, or for a skill of a removed moment is refused,
- * so deleted user content can never reappear.
+ * finishes after the user deleted the session) for a removed entity, or one that
+ * would create a new entity for a removed session or moment, is refused, so
+ * deleted user content can never reappear.
  */
 export class Store {
   private maps = new Map<EntityName, Map<string, unknown>>();
@@ -59,6 +59,9 @@ export class Store {
 
   private refused(entity: EntityName, data: Record<string, unknown> & { id: string }): boolean {
     if (this.tombs.has(`${entity}:${data.id}`)) return true;
+    // Entities deliberately kept after a session is deleted (an approved card) can still be
+    // updated (revoked, edited); only new entities for a removed session or moment are refused.
+    if (this.maps.get(entity)!.has(data.id)) return false;
     const sid = sessionOf(entity, data);
     if (sid && this.tombs.has(`session:${sid}`)) return true;
     if (entity === 'skill' && typeof data.momentId === 'string' && this.tombs.has(`moment:${data.momentId}`)) return true;

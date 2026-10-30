@@ -230,6 +230,14 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
     settled = (await until(s => { const c = s.content.filter(x => x.sessionId === sess.id && (x.format === 'podcast' || x.format === 'short')); return c.length === 2 && c.every(x => x.status === 'ready' || x.status === 'failed') ? c : null; }, 'podcast and short settled', 60)).v;
   } catch { /* reported below */ }
   check('a short dispatched during a slow podcast poll still completes', Boolean(settled) && settled.every(x => x.status === 'ready'), settled ? settled.map(x => `${x.format} ${x.status}`).join(', ') : 'short never settled (job lost)');
+  // An approved card outlives its session and can still be revoked afterwards.
+  const { v: card } = await until(s => s.cards.find(c => c.sessionId === sess.id && c.status === 'proposed'), 'card proposed', 30);
+  await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'approve' }) });
+  await call(`/sessions/${sess.id}`, { method: 'DELETE' });
+  const kept = (await state()).cards.find(c => c.id === card.id);
+  await call(`/cards/${card.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'revoke' }) });
+  const revoked = (await state()).cards.find(c => c.id === card.id);
+  check('an approved card is kept after its session is deleted and can still be revoked', kept?.status === 'approved' && revoked?.status === 'revoked', `${kept?.status} → ${revoked?.status}`);
 }
 
 const fin = await state();
