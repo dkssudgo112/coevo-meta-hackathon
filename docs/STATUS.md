@@ -39,6 +39,10 @@ These run in the test build in a browser, with a scripted fake model and recorde
 
 The deployed phone screen at phone size, with a controlled camera (a canvas showing a monitor with screenshots of actual Meta AI replies), started the camera, cropped on the device, sent each screen change once and got live readings from Muse Spark. This run found and fixed two camera-path bugs: the camera never started if the Live screen first showed "Connecting…", and the change threshold (3.5%) missed real chat updates, which measured only 1.6–6.9% at the detector's resolution (now 1.5%).
 
+## Known limitation: prices said in Korean won
+
+Voice Transcribe heard "six thousand won" as "6,001" and "five thousand won" as "5001" in scripted synthetic-voice briefs ("won" taken as "one"); the rest of each brief was transcribed well (58 of 61 words). The Practice Range shows the transcript before the check, and a brief can be typed instead.
+
 ## Assumed setup, not measured (accepted by the maintainer on Oct 31)
 
 The maintainer decided that, as in the earlier Coevo project, the phone is assumed to stand beside the monitor: the flow is checked in a phone-sized browser with controlled camera and microphone input and screenshots of actual AI replies, not on a physical phone. These physical characteristics are therefore **not measured**, and are not claimed:

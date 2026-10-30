@@ -460,19 +460,42 @@ check('practice origin: an attempt in a fixture session is stored as sample inpu
   await call('/sessions', { method: 'POST', body: '{}' });
   await sleep(2600);
   const kept = await frame(0);
+  // A write in flight (a frame still being read) holds the move back; nothing is lost. Four requests
+  // (two roles, one the event stream) arrive together: they wait, then all join one move.
+  await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'caddie_turn', ms: 5000 }) });
+  const fd = new FormData(); fd.append('frame', new File([png(5)], 'f.png', { type: 'image/png' })); fd.append('source', 'camera'); fd.append('deviceCropped', 'true');
+  const pending = (await call('/frames', { method: 'POST', body: fd })).body;
   const before = await state();
   await call('/test/restricted', { method: 'POST' });
-  const moved = await call('/state');
-  const to = moved.body?.error?.movedTo;
   const desk = { Authorization: `Bearer ${legacy.deskToken}` };
+  const phone = { Authorization: `Bearer ${lp.phoneToken}` };
+  const t0 = Date.now();
+  const all = await Promise.all([
+    fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: phone }),
+    fetch(`${base}/api/w/${legacy.workspaceId}/events`, { headers: desk }),
+    fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: desk }),
+    fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: phone }),
+  ]);
+  const waitedMs = Date.now() - t0;
+  const bodies = await Promise.all(all.map(r => r.json().catch(() => null)));
+  const dests = new Set(bodies.map(b => b?.error?.movedTo));
+  const to = [...dests][0];
+  const moved = { res: all[0], body: bodies[0] };
+  check('a move waits for work in flight, then all concurrent requests get the same single destination', all.every(r => r.status === 409) && dests.size === 1 && /^wu_/.test(to ?? '') && waitedMs > 1500, `${all.map(r => r.status).join(',')} → ${dests.size} destination(s) after ${waitedMs} ms`);
   const old = await fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: desk });
+  const retired = await (await fetch(`${base}/api/w/${legacy.workspaceId}/test/storage-keys`)).json();
   creds = { ws: to, token: lp.phoneToken };
   const after = await state();
   const deskAfter = await (await fetch(`${base}/api/w/${to}/state`, { headers: desk })).json();
   const media = kept.m.frame?.storedKey ? await fetch(`${base}/api/w/${to}/media/${kept.m.frame.storedKey}`, { headers: { Authorization: `Bearer ${lp.phoneToken}` } }) : null;
-  check('a restricted-region workspace moves: 409 with a wu_ id, data and both tokens work there, old media still served', legacy.workspaceId.startsWith('w_') && moved.res.status === 409 && /^wu_/.test(to ?? '') && old.status === 409 && after?.workspace?.id === to && after.moments.length === before.moments.length && after.sessions.length === before.sessions.length && deskAfter?.workspace?.id === to && (media ? media.status === 200 : true), `${legacy.workspaceId.slice(0, 4)}… → ${to?.slice(0, 5)}… moments ${before.moments.length}/${after?.moments?.length} media ${media?.status}`);
+  check('a restricted-region workspace moves: data and both tokens work there, the in-flight frame was not lost, old media still served', legacy.workspaceId.startsWith('w_') && moved.res.status === 409 && old.status === 409 && after?.workspace?.id === to && after.moments.length === before.moments.length && after.moments.some(m => m.id === pending.momentId && m.decision) && after.sessions.length === before.sessions.length && deskAfter?.workspace?.id === to && (media ? media.status === 200 : true), `${legacy.workspaceId.slice(0, 4)}… → ${to?.slice(0, 5)}… moments ${before.moments.length}/${after?.moments?.length} media ${media?.status}`);
+  check('the original keeps only its routing record after a verified copy', retired.keys === 1 && retired.movedTo === to, `${retired.keys} record(s) left`);
   const next = await frame(1);
   check('the moved workspace keeps working (a new frame is read there)', next.m.readingStatus === 'ok');
+  const sid = next.m.work.sessionId;
+  await call(`/sessions/${sid}`, { method: 'DELETE' });
+  const gone = kept.m.frame?.storedKey ? await fetch(`${base}/api/w/${to}/media/${kept.m.frame.storedKey}`, { headers: { Authorization: `Bearer ${lp.phoneToken}` } }) : null;
+  check('deleting the session after a move also deletes its media stored under the original id', !!gone && gone.status === 404, `old-prefix frame → ${gone?.status}`);
 }
 
 const fin = await state();

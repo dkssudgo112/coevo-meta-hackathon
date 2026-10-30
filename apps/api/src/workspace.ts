@@ -31,6 +31,8 @@ interface Meta {
   testLedger?: string;
   /** This (older) workspace was copied to a US-jurisdiction workspace; clients are told to move there. */
   movedTo?: string;
+  /** Destination chosen for a move in progress; a retry after a crash reuses it (never a second copy). */
+  movingTo?: string;
   /** This workspace is a copy of an older one; its media keys keep the original id. */
   movedFrom?: string;
 }
@@ -328,6 +330,17 @@ export class Workspace extends DurableObject<Env> {
   // ------------------------------------------------------------ alarm
 
   async alarm(): Promise<void> {
+    if (this.meta?.movedTo) return; // moved: the copy polls the jobs
+    if (this.moving) { await this.schedule(5_000); return; } // a move is copying right now
+    this.alarmBusy = true;
+    try {
+      await this.runAlarm();
+    } finally {
+      this.alarmBusy = false;
+    }
+  }
+
+  private async runAlarm(): Promise<void> {
     const meta = await this.loadMeta();
     if (!meta || meta.movedTo) return; // a moved workspace's copy polls its own jobs
     const ctx = this.context();
@@ -400,7 +413,46 @@ export class Workspace extends DurableObject<Env> {
 
   // ------------------------------------------------------------ routing
 
+  private active = 0;
+  private alarmBusy = false;
+  /** The move in progress: resolves to the destination id (null if it failed and nothing changed). */
+  private moving: Promise<string | null> | null = null;
+
+  /**
+   * Every request waits while a move is copying this workspace. An authenticated request to an older
+   * workspace whose object sits where Meta's API is not offered takes the move path: it waits until
+   * no other request, background task or alarm is running here, then the first one starts the copy
+   * and every other one joins it, so there is one destination and no write lands after the copy.
+   */
   async fetch(req: Request): Promise<Response> {
+    if (this.moving) await this.moving.catch(() => undefined);
+    const meta = await this.loadMeta();
+    if (meta && !meta.movedTo && meta.id.startsWith('w_') && (await this.auth(req)) && (await this.restricted())) {
+      if (await this.waitIdle()) {
+        if (!this.moving && !this.meta!.movedTo) this.relocate(); // no await between check and lock
+        const to = this.moving ? await this.moving : this.meta!.movedTo ?? null;
+        // Each request gets its own response (a Response body can be read only once).
+        return to ? this.moved(to) : error(503, 'moving', 'This workspace is moving to a supported region. Try again in a moment.');
+      }
+    }
+    this.active++;
+    try {
+      return await this.handle(req);
+    } finally {
+      this.active--;
+    }
+  }
+
+  /** Wait until nothing else runs here (or a move started); false after 60 s, so the request is served. */
+  private async waitIdle(): Promise<boolean> {
+    for (let i = 0; i < 600; i++) {
+      if (this.moving || (this.active === 0 && this.inflight === 0 && !this.alarmBusy)) return true;
+      await new Promise(r => setTimeout(r, 100));
+    }
+    return false;
+  }
+
+  private async handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/api\/w\/[^/]+/, '') || '/';
     const method = req.method;
@@ -408,14 +460,13 @@ export class Workspace extends DurableObject<Env> {
 
     if (path === '/init' && method === 'POST') return this.init(req, url);
     if (!meta) return error(404, 'not_found', 'Unknown workspace.');
+    // TEST ONLY: how many records this object still stores (a moved source keeps only its routing record).
+    if (path === '/test/storage-keys' && fakeMeta(this.env)) return json({ keys: (await this.ctx.storage.list()).size, movedTo: meta.movedTo ?? null });
     if (meta.movedTo) return this.moved(meta.movedTo);
     if (path === '/pair' && method === 'POST') return this.pair(req);
 
     const role = await this.auth(req);
     if (!role) return error(401, 'unauthorized', 'Pair this device first.');
-    // An older workspace whose object sits where Meta's API is not offered moves itself to the US
-    // jurisdiction (data and token hashes copied, nothing here rewritten) once no work is running.
-    if (meta.id.startsWith('w_') && this.inflight === 0 && (await this.restricted())) return this.relocate();
     const ctx = this.context();
     const seg = path.split('/').filter(Boolean);
 
@@ -599,28 +650,52 @@ export class Workspace extends DurableObject<Env> {
    * workspace in the US jurisdiction, then point clients there. The copy keeps all ids and evidence as
    * they are; this object keeps its data and only records where it moved. Nothing is proxied.
    */
-  private async relocate(): Promise<Response> {
+  private relocate(): void {
+    this.moving = this.copyToUs().catch(e => {
+      this.moving = null; // nothing changed for clients; a later request retries to the same destination
+      console.error(JSON.stringify({ event: 'workspace_relocation_failed', message: String((e as Error)?.message ?? e).slice(0, 200) }));
+      return null;
+    });
+  }
+
+  private async copyToUs(): Promise<string> {
     const from = this.meta!.id;
-    const to = id('wu');
+    // Durable intent first, so a retry after a crash reuses this destination.
+    const to = this.meta!.movingTo ?? id('wu');
+    if (!this.meta!.movingTo) { this.meta = { ...this.meta!, movingTo: to }; await this.saveMeta(); }
     const entries = [...(await this.ctx.storage.list()).entries()];
     const us = usWorkspaces(this.env);
-    await us.get(us.idFromName(to)).importFrom(entries, from, to);
-    this.meta = { ...this.meta!, movedTo: to };
-    await this.saveMeta();
+    const written = await us.get(us.idFromName(to)).importFrom(entries, from, to);
+    if (written !== entries.length) throw new Error(`copied ${written} of ${entries.length} records`);
+    // Verified: clients go to the copy from now on. This object keeps only its routing metadata, so
+    // deleting a session there never leaves a stale second copy of the person's records here.
+    this.meta = { ...this.meta!, movedTo: to, movingTo: undefined };
+    await this.ctx.storage.put('meta', this.meta);
+    const rest = entries.map(([k]) => k).filter(k => k !== 'meta');
+    for (let i = 0; i < rest.length; i += 128) await this.ctx.storage.delete(rest.slice(i, i + 128));
+    await this.ctx.storage.deleteAlarm();
     console.log(JSON.stringify({ event: 'workspace_relocated', from, to, colo: this.colo ?? (this.forceRestricted ? 'test' : null), records: entries.length }));
     for (const w of this.clients) w.close().catch(() => undefined);
     this.clients.clear();
-    return this.moved(to);
+    return to;
   }
 
   /** RPC from an older workspace that is moving here (never reachable over HTTP). */
-  async importFrom(entries: [string, unknown][], from: string, to: string): Promise<void> {
-    if (await this.ctx.storage.get('meta')) throw new Error('This workspace already exists.');
-    for (let i = 0; i < entries.length; i += 100) await this.ctx.storage.put(Object.fromEntries(entries.slice(i, i + 100)));
-    const meta = (await this.ctx.storage.get<Meta>('meta'))!;
-    await this.ctx.storage.put('meta', { ...meta, id: to, movedFrom: from, movedTo: undefined });
+  async importFrom(entries: [string, unknown][], from: string, to: string): Promise<number> {
+    const existing = await this.ctx.storage.get<Meta>('meta');
+    if (existing && existing.movedFrom !== from) throw new Error('This workspace already exists.');
+    // A retry replaces an earlier partial or complete copy; clients were never sent here before the
+    // source recorded movedTo, so nothing else wrote to it.
+    if (existing || (await this.ctx.storage.list({ limit: 1 })).size) await this.ctx.storage.deleteAll();
+    const meta = entries.find(([k]) => k === 'meta')?.[1] as Meta | undefined;
+    if (!meta) throw new Error('The source has no workspace record.');
+    const rest = entries.filter(([k]) => k !== 'meta');
+    for (let i = 0; i < rest.length; i += 100) await this.ctx.storage.put(Object.fromEntries(rest.slice(i, i + 100)));
+    // The workspace record is written last: a copy without it is incomplete and is never served.
+    await this.ctx.storage.put('meta', { ...meta, id: to, movedFrom: from, movedTo: undefined, movingTo: undefined });
     this.meta = null;
     if (((await this.ctx.storage.get<Job[]>('jobs')) ?? []).length) await this.schedule(5_000);
+    return rest.length + 1;
   }
 
   private async init(req: Request, url: URL): Promise<Response> {
@@ -719,10 +794,13 @@ export class Workspace extends DurableObject<Env> {
       await this.store.remove('practice', pr.id);
     }
     for (const sk of this.store.list('skill')) if (sk.momentId && !this.store.get('moment', sk.momentId)) await this.store.remove('skill', sk.id);
-    const listed = await this.bucket().list({ prefix: `w/${this.meta!.id}/` });
-    for (const o of listed.objects) if (o.key.includes(`/short/`) || o.key.includes('/media/')) {
-      const owner = this.store.list('content').some(c => o.key.includes(c.id));
-      if (!owner) keys.push(o.key);
+    // Media made before a move lives under the original id's prefix; it belongs to this workspace too.
+    for (const owner of [this.meta!.id, this.meta!.movedFrom].filter((x): x is string => !!x)) {
+      const listed = await this.bucket().list({ prefix: `w/${owner}/` });
+      for (const o of listed.objects) if (o.key.includes(`/short/`) || o.key.includes('/media/')) {
+        const kept = this.store.list('content').some(c => o.key.includes(c.id));
+        if (!kept) keys.push(o.key);
+      }
     }
     if (keys.length) await this.bucket().delete(keys);
     const jobs = (await this.ctx.storage.get<Job[]>('jobs')) ?? [];
