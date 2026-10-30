@@ -40,7 +40,7 @@ The phone camera watches the monitor so any AI tool works without integration. S
 
 ## October 30, 2026 — Models, speech and costs
 
-Muse Spark 1.3 (reading, decisions, learning design, content), SAM 3.1 (screen location), Muse Voice Transcribe (spoken answers), Muse Image (Practice Range, short scenes). Standard models only — never contributor variants for user data. Meta's API has no text-to-speech, so Kokoro-82M (Apache-2.0) runs on Modal for the podcast and short. Server-side caps: $0.60/day per workspace and $0.15 per sample session, under a global lifetime cap (see below). The Open Weight bonus is not pursued.
+Muse Spark 1.3 (reading, decisions, learning design, content), SAM 3.1 (screen location), Muse Voice Transcribe (spoken answers), Muse Image (Practice Range, short scenes). Standard models only — never contributor variants for user data. Meta's API has no text-to-speech, so Kokoro-82M (Apache-2.0) runs on Modal for the podcast and short. Server-side caps: $0.60/day per workspace and $0.30 per sample session (raised from $0.15 after a full sample-sized run measured $0.25 with media), under a global lifetime cap (see below). The Open Weight bonus is not pursued.
 
 ## October 30, 2026 — Meta AI card fallback
 

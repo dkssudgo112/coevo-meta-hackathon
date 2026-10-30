@@ -158,7 +158,7 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
             {session && session.status !== 'ended' && <button className="btn ghost" disabled={playing} onClick={() => post(creds, `/sessions/${session.id}/end`)}>End session</button>}
           </div>
           {msg && <p className="faint" role="alert">{msg}</p>}
-          <p className="faint">Budget for this sample: ${state?.workspace.budget.spentUsd.toFixed(3) ?? '0.000'} of ${state?.workspace.budget.capUsd.toFixed(2) ?? '0.15'}.</p>
+          <p className="faint">Budget for this sample: ${state?.workspace.budget.spentUsd.toFixed(3) ?? '0.000'} of ${state?.workspace.budget.capUsd.toFixed(2) ?? '0.30'}.</p>
         </section>
         <section aria-label="The Caddie on the phone">
           <div className="phone-frame">{state ? <LiveScreen creds={creds} state={state} conn={conn} embedded /> : <p className="faint">Connecting…</p>}</div>

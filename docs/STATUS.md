@@ -1,29 +1,33 @@
 # Current status
 
-Updated: October 30, 2026 (late evening KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
+Updated: October 30, 2026 (night, KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
 
-## Implemented and tested locally (live model calls off)
+## Deployed with real model calls
 
-- **Contracts and core rules** (`packages/contracts`, `packages/core`): moments, decisions, evidence labels, cards, five formats; ladder guardrails (no interrupting typing, no step skipping, cooldowns, praise removal, grounded quotes); deterministic labeling; on-device change detection; spaced repetition; budget math; WAV encoding; model task prompts with strict JSON schemas and readers. 14 unit tests.
-- **Meta adapters** (`apps/api/src/meta.ts`): Responses API with strict `json_schema`, image generation, Voice Transcribe multipart, SAM 3.1 box parsing; live-call switch, contributor-model refusal, bounded retries (429/503 with Retry-After, 500 once, never 504), cost reservation and settlement. 9 unit tests with mocked fetch.
-- **Worker and Durable Objects** (`apps/api`): one `Workspace` object per paired phone + Desk (tokens, one-time QR pairing, SSE, entity store, alarms for media polling, stuck-job watchdog and idle session end), a global `Budget` object (daily cap, workspace-creation rate limit), security headers. **Local integration: 14/14 checks** — pairing, token isolation between workspaces, SSE snapshot, frame rate limit, honest `disabled` state, session deletion.
-- **Web app** (`apps/web`): phone Caddie (QR pairing, aim/crop, camera sampler, NOW card, flow, voice answers, drawer with playbook, habits, past sessions, privacy), Desk (QR, copy inbox, evidence rows, screen share and screenshot upload), sample session with synthetic screens, players for all five formats, Practice Range. Calm Caddie visual system with dark mode and reduced motion.
-- **Media composition** (`infra/modal/compose.py`): podcast timeline with per-line timings and loudness normalization; 9:16 short with scene images, evidence frames, diagrams and full captions. Verified locally with a synthetic tone: 120 s podcast, 30.8 s 1080×1920 short with audio.
+https://coevo-caddie.coevo-meta-hackathon.workers.dev — Cloudflare Worker, Durable Objects, private R2 and static assets; Kokoro speech and video composition on Modal. Real Meta model calls are on behind an **application-enforced budget**: the maintainer approved US$3.00 in total for Meta Model API development and validation; the deployment's Budget object stops at a $2.50 lifetime ceiling (never reset), reserves the exact maximum before every call from counted input tokens, keeps reservations for ambiguous outcomes and settles each durable ticket once. Media rendering has its own, separate ceiling.
 
-## Deployed (live model calls off)
+## Verified with real models (scripted, fictional café scenario)
 
-- https://coevo-caddie.coevo-meta-hackathon.workers.dev — Worker, Durable Objects, R2 and static assets. Public integration checks pass 17/17: security headers, pairing, workspace isolation, SSE, rate limits, honest "live calls off" state, closed admin routes, test mode off.
-- **Application-enforced budget:** the maintainer approved US$3.00 in total for Meta Model API development and validation. The deployment's Budget object stops at $2.50 (lifetime, never reset), reserves the exact maximum before every attempt from counted input tokens, keeps reservations for ambiguous outcomes, and settles each durable ticket once. Verified with unit tests and against a real local Durable Object (concurrency, restart, duplicate settlement). Live calls stay off until an independent review enables them.
+These runs use screenshots of **actual Meta AI replies** to a scripted café-owner scenario and a synthetic voice for spoken answers. They prove the real path works; they are not real-user or learning evidence.
+
+- **Reading real screens.** Muse Spark read actual Meta AI screens correctly (latest request word-set match 1.0, tool 1.0). Reading and deciding in one combined call cut the median from 11.5 s to 5.9 s (3 runs on one screen capture, not phone photos).
+- **A full session through the deployed app.** Five Meta AI screens → quiet notes for the first two → an intervention at the question step that quoted the person ("You keep saying "more premium" — what one mood should it give, calm minimal or dark luxury?") → a spoken answer transcribed by Voice Transcribe → the Caddie's reply → the specific brief labeled **with the Caddie** (coached). The wrap made all five formats: note, My playbook, flashcards, a 93 s two-voice podcast and a 38.9 s 1080×1920 short. Cost of that session: Meta $0.163, plus a $0.08 media reservation.
+- **The card in the real AI.** An app-generated Caddie card, sent as the first message of a dedicated, pinned Meta AI chat, made Meta AI ask for audience, product, price and mood before generating a new poster; the Caddie read that screen, stayed quiet and marked the card *observed working*. This proves a rule scoped to one pinned chat, not Meta AI memory across chats (that did not carry over in our check).
+- **Practice Range.** A spoken brief was transcribed (word-set similarity 0.86 to the script, synthetic voice), rendered by Muse Image as a 2:3 portrait, and checked for ingredients.
+- **Speech and video.** Kokoro-82M (Apache-2.0) two-voice audio was judged distinguishable and listenable by the maintainer. A 61.6 s two-voice benchmark rendered in 58 s end to end; a 76.8 s podcast took 75–77 s, and the 93 s podcast from the full session spent 41 s in speech synthesis. Shorts land in 30–45 s with captions, the person's own before screen and a diagram.
+- **Phone pairing.** A real phone paired with the Desk by scanning its QR code.
+
+## Fixed after live runs
+
+Live runs found problems that mocks had not: a lost media job when two renders overlapped, a coached change mislabeled as independent, a voice-answer rejection caused by multi-word keyword hints, UTC clock times in generated text, a card written in the wrong voice, a short title running off the frame, and deletion races. Each fix has a regression test; the local fake-model journey passes 48/48 (test mode only).
 
 ## Not yet verified
 
-- **Any real Meta model output.** Live calls stay off until billing/credit is confirmed. Readings, decisions and content have only been exercised with mocks in unit tests.
-- **Kokoro TTS on Modal** (code written, never run) and the deployed media service.
-- **Real phone camera** legibility, latency and haptics.
-- **Meta AI as the user's tool:** confirmed in a Korean account — poster image generation works, and a Caddie-style rule sent as the first message of a dedicated (pinned) chat made Meta AI ask for audience, price, mood and a photo before generating. A "Remember that…" rule did **not** carry into other new chats, so the Desk tells Meta AI users to keep one pinned poster chat.
-- **Modal:** a one-call CPU probe succeeded; the media service itself (Kokoro TTS) has not run yet.
-- Demo video, simulated persona tests, submission texts.
+- **Real phone camera:** the 20-frame benchmark (reading accuracy on camera frames, latency, SAM screen detection), haptics, and the camera-off indicator on pause.
+- **A real human voice** (only synthetic speech so far).
+- The three-minute demo video, simulated persona tests (to be labeled as simulations), and the submission texts.
+- How the public sample should share the fixed budget with judges (see [DECISIONS.md](DECISIONS.md) once settled).
 
 ## Publication
 
-Public repository: https://github.com/dkssudgo112/coevo-meta-hackathon. No deployment or competition submission has been completed. Account records, coordination notes and private checks stay in ignored local files.
+Public repository: https://github.com/dkssudgo112/coevo-meta-hackathon. No competition submission has been made. Account records, coordination notes and private checks stay in ignored local files. Published screenshots are listed with their exact SHA-256 in `scripts/reviewed-assets.json`.

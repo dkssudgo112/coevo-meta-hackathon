@@ -42,7 +42,8 @@ export function isPriced(op: Operation, model: string): boolean {
 export const CAPS = {
   globalLifetimeUsd: META_OPERATING_CEILING_USD,
   workspacePerDayUsd: 0.6,
-  sampleWorkspaceUsd: 0.15,
+  // One full sample run (5 screens, an answer, five formats incl. two media renders) measured $0.25.
+  sampleWorkspaceUsd: 0.3,
 } as const;
 
 /** Configuration may LOWER the Meta ceiling, never raise it above the approved operating ceiling. */
