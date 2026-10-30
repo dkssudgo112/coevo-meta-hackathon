@@ -10,6 +10,8 @@ Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer / Build f
 
 ## The idea in one scene
 
+*Illustrative: this scene and its quoted lines were written to explain the idea; they are not recorded output. What was actually observed is in the [demo](https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo) and [docs/STATUS.md](docs/STATUS.md).*
+
 A café owner is making a poster for a new dessert with an AI. They type "make it more premium" four times. The phone propped beside the monitor buzzes:
 
 > You've asked for "more premium" 4×. Who is this dessert for?

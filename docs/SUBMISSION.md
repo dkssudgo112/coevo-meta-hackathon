@@ -26,13 +26,13 @@ Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-develope
 - [ ] Only event-period code and properly licensed dependencies/assets (Kokoro-82M Apache-2.0; fonts via Google Fonts OFL).
 - [ ] `npm run verify` and `npm run check:release -- --staged` pass; the exact staged diff and commit metadata reviewed.
 - [ ] No secrets, private notes, account screenshots, raw sessions or personal frames.
-- [ ] Project license decided by the maintainer.
+- Optional: a project license is the maintainer's choice. The competition requires a public repository, not a license.
 - [x] README explains the earlier concept and the new implementation; demo opening says the same.
 - [ ] Claims match evidence: real model output, fixture data and simulated persona tests are labeled.
 
 ## Three-minute storyboard
 
-Composition (maintainer's decision, Oct 31): the phone is **assumed** to stand beside the monitor, as in the earlier Coevo project. The opening card says so. The run scenes are still captures of the deployed app at phone size, taken during one live run with a controlled camera (a monitor showing screenshots of actual Meta AI replies) and a synthetic voice; each is shown beside the Meta AI screen the camera saw at that moment. Every Caddie line on screen is real model output; the café owner is a scripted, fictional persona. A tag on each scene names its run: this run, an earlier recorded live run (replay, podcast, short), a separate Practice sample session, a separate pinned-chat check with an earlier card, and a separate ChatGPT run. The full cut is 2:40.
+Composition (maintainer's decision, Oct 31): the phone is **assumed** to stand beside the monitor, as in the earlier Coevo project. The opening card says so. The run scenes are still captures of the deployed app at phone size, taken during one live run with a controlled camera (a monitor showing screenshots of actual Meta AI replies) and a synthetic voice; each is shown beside the Meta AI screen the camera saw at that moment. Every Caddie line on screen is real model output; the café owner is a scripted, fictional persona. A tag on each scene names its run: this run, an earlier recorded live run (replay, podcast, short), a separate Practice sample session, a separate pinned-chat check with an earlier card, and a separate ChatGPT run. The Practice scene is a screen recording of the stored result (no new model calls). The full cut is 2:41.
 
 | Time | Scene | What is shown |
 | --- | --- | --- |
@@ -41,16 +41,16 @@ Composition (maintainer's decision, Oct 31): the phone is **assumed** to stand b
 | 0:28–0:46 | Answer | The synthetic spoken answer plays ("It is matcha Basque cheesecake…"), then: "You named matcha, but the poster still shows berry. Tell AI your price, your real matcha photo, and who it's for." |
 | 0:46–1:03 | Brief and wrap | The full brief, labeled *with the Caddie*, SAM 3.1's price marker; session end: note, playbook, flashcards and a short; no podcast: "No real objection or trade-off was stated." |
 | 1:03–1:48 | Earlier recorded run | The /sample replay (no new model calls); its podcast, made on request (guest objection, advice narrowed); its vertical short. |
-| 1:48–1:59 | Practice Range | "Please design a window poster for our cafe's new honey oat latte for morning commuters." → a typed scripted brief → Muse Image poster → all five ingredients (sample-labeled). |
-| 1:59–2:13 | Pinned-chat check | A separate pinned Meta AI chat that began with an earlier card: Meta AI asks five questions first; the Caddie: "AI asked first as card says, staying quiet." This run's new card stays proposed. |
-| 2:13–2:27 | Cameo | Actual ChatGPT replies to a scripted, fictional cover letter; the Caddie stayed quiet twice, then asked: "What is one real project you coordinated that you want in this letter?" |
-| 2:27–2:40 | Close | The four Meta models and their jobs; live model output with scripted personas; physical camera accuracy not measured. |
+| 1:48–2:00 | Practice Range | "Please design a window poster for our cafe's new honey oat latte for morning commuters." → a typed scripted brief → a Muse Image poster drawn from the brief → all five ingredients found in the brief (sample-labeled). |
+| 2:00–2:14 | Pinned-chat check | A separate pinned Meta AI chat that began with an earlier card: Meta AI asks five questions first; the Caddie: "AI asked first as card says, staying quiet." This run's new card stays proposed. |
+| 2:14–2:28 | Cameo | Actual ChatGPT replies to a scripted, fictional cover letter; the Caddie stayed quiet twice, then asked: "What is one real project you coordinated that you want in this letter?" |
+| 2:28–2:41 | Close | The four Meta models and their jobs; live model output with scripted personas; physical camera accuracy not measured. |
 
 ## Draft texts (finalize only with verified numbers)
 
 **6 · Project description**
 
-Coevo Caddie is a coach on the phone beside your screen. It watches how you work with any AI tool, steps in only when it matters, and helps both you and your AI get better.
+Coevo Caddie is a coach on the phone beside your screen. It watches how you work with any AI tool, steps in only when it matters, and helps both you and your AI get better. It is a new implementation written during the event, built from the concept of my earlier Coevo project.
 
 People stuck with an AI tool often repeat vague requests like "make it more premium", because nothing shows them what the AI is missing. Coevo Caddie turns the phone you already keep beside your monitor into a caddie:
 
@@ -61,7 +61,7 @@ People stuck with an AI tool often repeat vague requests like "make it more prem
 
 Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
 
-What is real: every Caddie line and every generated note, playbook, flashcard, podcast, short and practice image is live output of Meta's models through the deployed app. The café owner and job applicant are scripted, fictional personas; the AI screens are actual replies to those scripts. As in our earlier Coevo work, the phone is assumed to stand beside the monitor: the phone screen is verified in a phone-sized browser with a controlled camera and a synthetic voice, so physical camera accuracy and a human voice were not measured.
+What is real: every Caddie line, every note, playbook, flashcard, podcast script and short script, and every practice image is written or drawn live by Meta's models through the deployed app; the podcast and short voices are Kokoro-82M text-to-speech on Modal. The café owner and job applicant are scripted, fictional personas; the AI screens are actual replies to those scripts. As in our earlier Coevo work, the phone is assumed to stand beside the monitor: the phone screen is verified in a phone-sized browser with a controlled camera and a synthetic voice, so physical camera accuracy and a human voice were not measured.
 
 Demo: https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo
 
@@ -72,7 +72,7 @@ Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a
 - **Muse Spark 1.3** reads phone photos of any AI tool's screen into structured moments. It decides each intervention, or each silence, with deterministic guardrails. It writes one learning design per session and the five formats from it. It also writes and checks Practice Range requests.
 - **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards. It also points at a poster's price, title or product photo on a kept frame for visual coaching ("The price isn't visible."); on a real Meta AI screenshot it boxed the poster's price and title and ignored the same price in the chat.
 - **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
-- **Muse Image** draws what a spoken practice brief produces, and the background scenes of the short.
+- **Muse Image** draws what a spoken or typed practice brief produces, and the background scenes of the short.
 - **Meta AI** (consumer) is the demo's work tool. Its poster image generation and in-chat rule following were checked in a real account.
 
 All model calls are server-side with Standard models, strict JSON schemas, and an application-enforced lifetime budget.
@@ -93,5 +93,6 @@ Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition 
 - The card in Meta AI: sent as the first message of a pinned chat, it made Meta AI ask for audience, product, price and mood first; memory across new chats did not carry the rule.
 - Judging and checking habits: on an actual Meta AI screen where the scripted owner rejects invented opening hours and forbids invented claims, the reading recorded the correction and the no-invention request, and both habits were stored ($0.0091).
 - A server restart in the middle of reading, deciding or replying never leaves the phone stuck: the moment is marked interrupted and nothing is invented (checked with a real local process restart, test models).
+- The full flow at phone size (assumed setup: controlled camera on actual Meta AI screens, synthetic voice): quiet twice → a question → the spoken answer transcribed → the ingredients step → the brief labeled with the Caddie, with SAM 3.1's price pointer → a wrap that skipped the podcast for a stated reason; $0.1465.
 - Another tool: on four actual ChatGPT screens (scripted, fictional cover letter) the live Caddie read the tool and each request, stayed quiet twice, then asked one question; $0.038.
 - Persona simulations: see the labeled simulation section (never real-user evidence).

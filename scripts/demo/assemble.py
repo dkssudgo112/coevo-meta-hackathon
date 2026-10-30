@@ -155,6 +155,12 @@ def run(args):
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *args], check=True)
 
 
+def probe_size(src):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", src], capture_output=True, text=True)
+    w, h = r.stdout.strip().split(",")[:2]
+    return int(w), int(h)
+
+
 def has_audio(src):
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", src], capture_output=True, text=True)
     return bool(r.stdout.strip())
@@ -196,7 +202,7 @@ def main(edl_path):
         for i, seg in enumerate(edl["segments"]):
             cap = os.path.join(d, f"cap{i}.png")
             is_phone = "phone" in seg or "phones" in seg
-            caption_png(seg.get("caption"), cap, seg.get("tag"), bottom=16 if is_phone else 70)
+            caption_png(seg.get("caption"), cap, seg.get("tag"), bottom=16 if is_phone or seg.get("phone_frame") else 70)
             part = os.path.join(d, f"p{i}.mp4")
             if "split" in seg:
                 sp = seg["split"]
@@ -248,10 +254,22 @@ def main(edl_path):
                     x0, y0, x1, y1 = seg["crop"]
                     crop = f"crop={x1 - x0}:{y1 - y0}:{x0}:{y0},"
                 vf = f"[0:v]{crop}scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x141917,fps={FPS}[b];[b][1:v]overlay=0:0,format=yuv420p[v]"
+                frame_in = []
+                if seg.get("phone_frame"):
+                    # A phone-size screen recording shown in a phone frame, at the same size as the phone stills.
+                    x0, y0, x1, y1 = seg.get("crop") or [0, 0, *probe_size(src)]
+                    tw = round((x1 - x0) * PHONE_H / (y1 - y0) / 2) * 2
+                    fx = (W - tw) // 2
+                    bg = os.path.join(d, f"frame{i}.png")
+                    fimg = Image.new("RGB", (W, H), (20, 25, 23))
+                    ImageDraw.Draw(fimg).rounded_rectangle([fx - 12, PHONE_TOP - 12, fx + tw + 12, PHONE_TOP + PHONE_H + 12], radius=40, fill=(6, 6, 6))
+                    fimg.save(bg)
+                    frame_in = ["-loop", "1", "-t", str(dur), "-i", bg]
+                    vf = f"[2:v]fps={FPS}[bg];[0:v]{crop}scale={tw}:{PHONE_H},fps={FPS}[c];[bg][c]overlay={fx}:{PHONE_TOP}:shortest=1[t];[t][1:v]overlay=0:0,format=yuv420p[v]"
                 audio = ["-map", "0:a"] if has_audio(src) else []
                 extra = [] if audio else ["-f", "lavfi", "-t", str(dur), "-i", "anullsrc=r=48000:cl=stereo"]
-                amap = audio or ["-map", "2:a"]
-                run(["-ss", str(seg["in"]), "-t", str(dur), "-i", src, "-i", cap, *extra, "-filter_complex", vf, "-map", "[v]", *amap, "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest", part])
+                amap = audio or ["-map", f"{2 + (1 if frame_in else 0)}:a"]
+                run(["-ss", str(seg["in"]), "-t", str(dur), "-i", src, "-i", cap, *frame_in, *extra, "-filter_complex", vf, "-map", "[v]", *amap, "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-t", str(dur), part])
             parts.append(part)
         lst = os.path.join(d, "list.txt")
         open(lst, "w").write("\n".join(f"file '{p}'" for p in parts))

@@ -1,6 +1,6 @@
 # Current status
 
-Updated: October 30, 2026 (late night, KST, second update). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
+Updated: October 31, 2026 (KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
 
 ## Deployed with real model calls
 
@@ -16,6 +16,7 @@ These runs use screenshots of **actual Meta AI replies** to a scripted café-own
 - **Practice Range.** A spoken brief was transcribed (word-set similarity 0.86 to the script, synthetic voice), rendered by Muse Image as a 2:3 portrait, and checked for ingredients.
 - **Speech and video.** Kokoro-82M (Apache-2.0) two-voice audio was judged distinguishable and listenable by the maintainer (a listening judgment, not a professional audio review). A 61.6 s two-voice benchmark rendered in 58 s end to end; a 76.8 s podcast took 75–77 s, and the 93 s podcast from the full session spent 41 s in speech synthesis. Shorts land in 30–45 s with captions, the person's own before screen and a diagram.
 - **Phone pairing.** A real phone paired with the Desk by scanning its QR code.
+- **The full flow on the phone screen (assumed setup).** The deployed phone screen at phone size, with a controlled camera showing actual Meta AI replies and a synthetic voice, went quiet twice with reasons, asked "What exactly is your new dessert — flavor and what makes it special?", turned the spoken answer into the ingredients step ("Tell AI your price, your real matcha photo, and who it's for."), labeled the specific brief *with the Caddie* with SAM 3.1's price pointer, and at the end made a note, playbook, flashcards and a short while skipping the podcast with a reason ($0.1465). The new card stayed proposed.
 - **The public sample.** A full live run of /sample produced all five formats ($0.2034 Meta usage plus a $0.08 media reservation). A labeled *recorded live run* of it is now the default preview, replayed with no model calls so judges never exhaust the shared budget; its JSON, podcast and short were published at exactly the reviewed bytes, with reviewer notes for one invented poster detail, and the live sample stays one click away.
 
 ## Fixed after live runs
@@ -53,7 +54,7 @@ The maintainer decided that, as in the earlier Coevo project, the phone is assum
 
 ## Still to do
 
-- The three-minute demo video (concept setup labeled as such, real browser footage), and the submission texts.
+- Publish the three-minute demo at /demo after its exact-byte review (cut from still captures of the live run and recorded clips, each scene tagged with its run); final submission is the maintainer's.
 
 ## Publication
 
