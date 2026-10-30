@@ -52,6 +52,14 @@ function readIngredients(v: unknown, path: string): Ingredients {
 
 // ---------------------------------------------------------------- reading
 
+/** [x, y, w, h] fractions → a box, or null when absent, malformed or degenerate. */
+function readBox(v: unknown): Reading['artifactBox'] {
+  if (!Array.isArray(v) || v.length !== 4 || v.some(n => typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 1)) return null;
+  const [x, y, w, h] = v as number[];
+  if (w < 0.02 || h < 0.02 || x + w > 1.001 || y + h > 1.001) return null;
+  return { x, y, w, h };
+}
+
 export const readingTask: ModelTask<Reading> = {
   name: 'screen_reading',
   effort: 'low',
@@ -69,6 +77,8 @@ Report only what is visible. Never guess text you cannot read. If the conversati
 - correctsAI: if the latest request tells the AI to fix, remove or replace a specific thing in its earlier result (for example "remove the opening hours, we don't have any", "the price is 6,500 won, not 6,000"), name that thing in a few words; else null. A new style wish ("more premium") is not a correction.
 - asksNoInvention: true only if the latest request explicitly tells the AI not to invent or add details, to use only the facts given, or to mark anything it assumed.
 - artifactKind: "design" when the AI's visible result is a poster, flyer, menu, banner, social post or other designed image; "document" for text such as a letter, email or report; "other" for anything else; "none" when no result is visible.
+- artifactBox: only when artifactKind is "design": where that designed result sits on this photo as [x, y, width, height], each a fraction 0–1 of the whole photo; an empty list otherwise.
+- artifactSubject: only when artifactKind is "design": the main thing it shows as a short concrete noun ("cheesecake", "coffee cup"); null otherwise.
 - artifactShows: only when artifactKind is "design": which of these it clearly shows — "title" (a headline or product name), "photo" (a picture of the product), "price" (a readable price). Empty when there is no such artifact or none is visible. Never guess small text you cannot read.`,
   schema: S.obj({
     legible: S.bool('Whether the conversation text is readable.'),
@@ -83,6 +93,8 @@ Report only what is visible. Never guess text you cannot read. If the conversati
     correctsAI: S.nstr('What the latest request tells the AI to fix or remove from its earlier result, or null.', 80),
     asksNoInvention: S.bool('The latest request tells the AI not to invent details or to mark assumptions.'),
     artifactKind: S.enumOf(ARTIFACT_KINDS, 'Kind of visible AI result: design (poster, flyer…), document, other, or none.'),
+    artifactBox: S.arr(S.num('fraction 0-1', 0, 1), 'Designed result position [x, y, width, height] as fractions of the photo; empty if none.', 0, 4),
+    artifactSubject: S.nstr('Main thing the designed result shows, a short concrete noun; null if none.', 40),
     artifactShows: S.arr(S.enumOf(ARTIFACT_PARTS, 'part'), 'Parts a visible poster-like artifact clearly shows; empty if none.', 0, 3),
     vagueTerms: S.arr(S.str('vague word', 30), 'Vague style words in the latest request.', 0, 6),
     ingredients: ingredientsSchema,
@@ -104,6 +116,8 @@ Report only what is visible. Never guess text you cannot read. If the conversati
       correctsAI: legible && o.correctsAI !== undefined ? R.nstr(o.correctsAI, 'correctsAI', 80) : null,
       asksNoInvention: legible && o.asksNoInvention !== undefined ? R.bool(o.asksNoInvention, 'asksNoInvention') : false,
       artifactKind: o.artifactKind === undefined ? undefined : R.oneOf(o.artifactKind, ARTIFACT_KINDS, 'artifactKind'),
+      artifactBox: readBox(o.artifactBox),
+      artifactSubject: o.artifactSubject === undefined ? null : R.nstr(o.artifactSubject, 'artifactSubject', 40),
       artifactShows: o.artifactShows === undefined ? [] : R.arr(o.artifactShows, 'artifactShows', (x, p) => R.oneOf(x, ARTIFACT_PARTS, p), 0, 3),
       vagueTerms: R.arr(o.vagueTerms, 'vagueTerms', (x, p) => R.str(x, p, 30).toLowerCase(), 0, 6),
       ingredients: readIngredients(o.ingredients, 'ingredients'),

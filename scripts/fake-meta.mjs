@@ -45,7 +45,7 @@ function reading() {
   if (illegibleNext > 0) { illegibleNext--; return { legible: false, tool: null, task: null, userRequest: null, userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, aiAskedFor: [], artifactVisible: false, artifactShows: [], vagueTerms: [], ingredients: none, confidence: 0.2 }; }
   const r = READINGS[readingIndex % READINGS.length];
   readingIndex++;
-  return { legible: true, tool: 'AI Assistant', task: r.aiAskedClarifyingQuestion ? 'poster for a new drink' : 'poster for a new dessert', userTyping: false, artifactKind: r.aiAskedClarifyingQuestion ? 'none' : 'design', artifactShows: r.aiAskedClarifyingQuestion ? [] : r.ingredients.price ? ['title', 'photo'] : ['title'], aiResponseSummary: r.aiAskedClarifyingQuestion ? 'Asked who it is for, the price, the feeling and for a photo before making it.' : 'Generated a poster.', artifactVisible: !r.aiAskedClarifyingQuestion, aiAskedFor: r.aiAskedClarifyingQuestion ? ['audience', 'price', 'mood', 'realPhoto'] : [], confidence: 0.9, ...r };
+  return { legible: true, tool: 'AI Assistant', task: r.aiAskedClarifyingQuestion ? 'poster for a new drink' : 'poster for a new dessert', userTyping: false, artifactKind: r.aiAskedClarifyingQuestion ? 'none' : 'design', artifactBox: r.aiAskedClarifyingQuestion ? [] : [0.1, 0.1, 0.8, 0.8], artifactSubject: r.aiAskedClarifyingQuestion ? null : 'cheesecake', artifactShows: r.aiAskedClarifyingQuestion ? [] : r.ingredients.price ? ['title', 'photo'] : ['title'], aiResponseSummary: r.aiAskedClarifyingQuestion ? 'Asked who it is for, the price, the feeling and for a photo before making it.' : 'Generated a poster.', artifactVisible: !r.aiAskedClarifyingQuestion, aiAskedFor: r.aiAskedClarifyingQuestion ? ['audience', 'price', 'mood', 'realPhoto'] : [], confidence: 0.9, ...r };
 }
 
 function decision(input) {
@@ -128,7 +128,7 @@ createServer(async (req, res) => {
         // Poster/monitor phrases get the big box; part phrases get a smaller box inside it, plus a
         // decoy in the "chat" above the poster that the Worker must ignore.
         const phrase = body.input?.[0]?.content?.[0]?.text ?? '';
-        const part = { 'price text': 'x1=300;y1=400;x2=600;y2=460', 'headline text': 'x1=300;y1=120;x2=900;y2=190', 'product photo': 'x1=400;y1=220;x2=1000;y2=380' }[phrase];
+        const part = { price: 'x1=300;y1=400;x2=600;y2=460', title: 'x1=300;y1=120;x2=900;y2=190', cheesecake: 'x1=400;y1=220;x2=1000;y2=380' }[phrase];
         const boxes = part ? `<|box;x1=20;y1=5;x2=200;y2=40;w=1280;h=720;c=0.97|><|box;${part};w=1280;h=720;c=0.81|>` : '<|box;x1=128;y1=72;x2=1151;y2=647;w=1280;h=720;c=0.93|>';
         return send(res, 200, message(`<0f>0${boxes}<|mask;x=0;y=0;data=2,2,!AA|>`));
       }

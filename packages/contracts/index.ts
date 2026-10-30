@@ -78,6 +78,8 @@ export interface Pointer {
   confidence: number | null;
   /** Short line, e.g. "The price isn't visible." */
   text: string;
+  /** Who found the box: SAM 3.1, or Muse Spark's estimate of the poster outline (SAM found none). */
+  source?: 'sam-3.1' | 'muse-spark';
 }
 
 export interface Reading {
@@ -102,6 +104,10 @@ export interface Reading {
   asksNoInvention?: boolean;
   /** What kind of result the AI shows: a designed image (poster, flyer, menu…), a text document, something else, or none. Older readings may lack it. */
   artifactKind?: ArtifactKind;
+  /** Where the visible designed result sits on the photo (0..1), Muse Spark's estimate; null when none. */
+  artifactBox?: { x: number; y: number; w: number; h: number } | null;
+  /** The main thing the designed result shows, as a short concrete noun (e.g. "cheesecake"). */
+  artifactSubject?: string | null;
   /** For a visible poster-like artifact: which parts it clearly shows. Older readings may lack it. */
   artifactShows?: ArtifactPart[];
   /** Vague style words the user leaned on, e.g. ["premium"]. */

@@ -7,9 +7,25 @@ export interface PixelBox { x1: number; y1: number; x2: number; y2: number; w: n
 
 /** Which poster parts the person's request asked for: a price, their real photo, the product itself. */
 export const PART_ASKED: Record<ArtifactPart, (i: Ingredients) => boolean> = { price: i => i.price, photo: i => i.realPhoto, title: i => i.productDetail };
-/** SAM noun phrases, tried in order until one gives a box inside the poster. */
-export const PART_PHRASES: Record<ArtifactPart, string[]> = { price: ['price text', 'price'], photo: ['product photo', 'food'], title: ['headline text', 'title'] };
-export const POSTER_PHRASES = ['poster', 'image'];
+/**
+ * SAM noun phrases, tried in order until one gives a box inside the poster. Live check (Oct 31): on
+ * a real Meta AI screenshot SAM found "price" (on the poster and in the chat above it) and the depicted
+ * product ("cake", "cheesecake"), but nothing for "poster", "image", "picture", "price text" or "text".
+ */
+export const PART_PHRASES: Record<ArtifactPart, string[]> = { price: ['price'], photo: ['food'], title: ['title'] };
+export const POSTER_PHRASES = ['poster'];
+
+/** Phrases for a part, the reading's concrete subject first for the photo ("cheesecake"). */
+export function partPhrases(part: ArtifactPart, subject: string | null | undefined): string[] {
+  const s = subject?.toLowerCase().trim();
+  return part === 'photo' && s && /^[a-z][a-z ]{1,38}$/.test(s) ? [s, ...PART_PHRASES.photo] : PART_PHRASES[part];
+}
+
+/** Muse Spark's estimate of the poster outline (fractions) as a pixel box in the frame's size. */
+export function estimatedPoster(box: { x: number; y: number; w: number; h: number } | null | undefined, width: number, height: number): PixelBox | null {
+  if (!box || !width || !height) return null;
+  return { x1: Math.round(box.x * width), y1: Math.round(box.y * height), x2: Math.round((box.x + box.w) * width) - 1, y2: Math.round((box.y + box.h) * height) - 1, w: width, h: height, c: null };
+}
 /** At most this many SAM calls per checked moment ($0.0025 each). */
 export const MAX_SAM_CALLS = 5;
 const MISSING: Record<ArtifactPart, string> = { price: 'The price isn’t visible.', photo: 'Your product photo isn’t on it.', title: 'The product name isn’t on it.' };
@@ -40,13 +56,13 @@ export function insidePoster(part: PixelBox, poster: PixelBox): boolean {
  * Build the pointers. Missing parts (by the reading) box the whole poster with what is missing.
  * Present parts get their own box only when SAM found one inside the poster; otherwise nothing is claimed.
  */
-export function choosePointers(asked: ArtifactPart[], shows: ArtifactPart[], poster: PixelBox | null, partBoxes: Partial<Record<ArtifactPart, PixelBox[]>>): Pointer[] {
+export function choosePointers(asked: ArtifactPart[], shows: ArtifactPart[], poster: PixelBox | null, partBoxes: Partial<Record<ArtifactPart, PixelBox[]>>, posterSource: 'sam-3.1' | 'muse-spark' = 'sam-3.1'): Pointer[] {
   if (!poster) return [];
   const out: Pointer[] = [];
   for (const p of asked) {
-    if (!shows.includes(p)) { out.push({ part: p, found: false, box: norm(poster), confidence: poster.c, text: MISSING[p] }); continue; }
+    if (!shows.includes(p)) { out.push({ part: p, found: false, box: norm(poster), confidence: poster.c, text: MISSING[p], source: posterSource }); continue; }
     const inside = (partBoxes[p] ?? []).filter(b => insidePoster(b, poster)).sort((a, b) => (b.c ?? 0) - (a.c ?? 0))[0];
-    if (inside) out.push({ part: p, found: true, box: norm(inside), confidence: inside.c, text: FOUND[p] });
+    if (inside) out.push({ part: p, found: true, box: norm(inside), confidence: inside.c, text: FOUND[p], source: 'sam-3.1' });
   }
   return out;
 }

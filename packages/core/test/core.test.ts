@@ -8,7 +8,7 @@ import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, ME
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
 import { applyHint, asksFromText, cardObserved } from '../src/cards.ts';
-import { choosePointers, insidePoster } from '../src/pointers.ts';
+import { choosePointers, estimatedPoster, insidePoster, partPhrases } from '../src/pointers.ts';
 import { decisionTask, readingTask, shortTask, podcastTask, manualTask, turnTask } from '../src/prompts.ts';
 import type { CaddieCard, Moment, Reading } from '../../contracts/index.ts';
 
@@ -359,4 +359,23 @@ test('practice input origin is separate from model origin', () => {
   assert.equal(skillFixture(false, 'fixture'), true, 'test model');
   assert.equal(skillFixture(null, 'live-model'), true, 'unknown origin is never counted as a real person');
   assert.equal(skillFixture(undefined, 'live-model'), true);
+});
+
+test('live SAM numbers: the poster price is chosen over the same price in the chat, inside the estimated poster', () => {
+  // Real Meta AI screenshot (820×900). SAM answered "price" with the poster price and the chat price.
+  const W = { w: 820, h: 900 };
+  const poster = estimatedPoster({ x: 0.03, y: 0.37, w: 0.39, h: 0.45 }, 820, 900)!; // a Muse Spark-style estimate
+  const ps = choosePointers(['price', 'photo'], ['price', 'photo'], poster, {
+    price: [{ x1: 120, y1: 459, x2: 244, y2: 492, ...W, c: 0.72 }, { x1: 292, y1: 92, x2: 337, y2: 107, ...W, c: 0.56 }],
+    photo: [{ x1: 116, y1: 513, x2: 256, y2: 620, ...W, c: 0.9 }],
+  }, 'muse-spark');
+  const price = ps.find(p => p.part === 'price')!;
+  assert.equal(price.source, 'sam-3.1');
+  assert.ok(Math.abs(price.box.x - 120 / 820) < 1e-9 && Math.abs(price.box.y - 459 / 900) < 1e-9);
+  assert.equal(ps.find(p => p.part === 'photo')?.found, true);
+  assert.deepEqual(partPhrases('photo', 'Cheesecake'), ['cheesecake', 'food']);
+  assert.deepEqual(partPhrases('photo', 'a cake; drop table'), ['food'], 'only plain words go to SAM');
+  assert.equal(estimatedPoster(null, 820, 900), null);
+  const missing = choosePointers(['price'], [], poster, {}, 'muse-spark')[0];
+  assert.equal(missing.source, 'muse-spark');
 });

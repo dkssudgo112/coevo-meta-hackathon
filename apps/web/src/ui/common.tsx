@@ -80,7 +80,7 @@ export function PointerFrame({ creds, moment, compact }: { creds: Creds | null; 
       <figcaption className="stack" style={{ gap: 2 }}>
         {missing.map(p => <strong key={p.part}>{p.text}</strong>)}
         {found.length > 0 && <span>{`On it: ${found.map(p => PART_LABEL[p.part].toLowerCase()).join(', ')}.`}</span>}
-        <span className="faint">Marked by Meta’s SAM 3.1 on the screen photo kept for this moment{moment.frame.fixture ? ' (sample)' : ''}. It can miss small text. You can delete kept photos in Privacy.</span>
+        <span className="faint">Marked by Meta’s SAM 3.1 on the screen photo kept for this moment{moment.frame.fixture ? ' (sample)' : ''}{ps.some(p => p.source === 'muse-spark') ? '; the poster outline is Muse Spark’s estimate' : ''}. It can miss small text. You can delete kept photos in Privacy.</span>
       </figcaption>
     </figure>
   );
