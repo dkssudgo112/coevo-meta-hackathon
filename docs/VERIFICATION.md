@@ -103,7 +103,7 @@ Last updated: 2026-10-30 (late night KST).
 | G1 | Scenario written by the live model; viewing the hint marks the attempt coached | ☑ | ◐ | ☐ | live: 4 scenarios generated; unit + fake e2e: hint → coached | |
 | G2 | Spoken brief → transcript | ☑ | ◐ | ☐ | live Voice Transcribe on synthetic speech (macOS voice): 31 and 19 words; word-set similarity 0.86 to the script | Real human voice pending |
 | G3 | Muse Image renders the user's own words | ☑ | ◐ | ☐ | live: 3 portrait images (1024×1536) from spoken briefs, ~16 s per attempt incl. transcription and check | |
-| G4 | Ingredient check + exact label | ☑ | ◐ | ☐ | live: ingredient check + "independent · practice" label; unit/fake: coached after hint | |
+| G4 | Ingredient check + exact label | ☑ | ◐ | ☐ | live: ingredient check + "independent · practice" label; unit/fake: coached after hint; input origin stored apart from model origin (live: a scripted synthetic-voice attempt in a fixture session stored as sample input with live-model output, its habit note not counted as real-user evidence, shown with a Sample tag) | Older records with no recorded origin show "origin not recorded" |
 | G5 | Practice recovery and scope: 30 s cap, typed fallback marked typed, image-only redraw, session-scoped attempts deleted with their session | ☑ | ◐ | ☐ | fake e2e: 35 s recording refused (413), typed brief checked and marked typed, session deletion removes attempts/images/skill notes, practice opened from a finished session stays with it (browser); a real local process restart (fake providers) during each of the four in-flight states recovered with Retry and kept a finished check and label (independently re-run by the reviewer) | Live check pending |
 
 ## H. Deployment and judging
