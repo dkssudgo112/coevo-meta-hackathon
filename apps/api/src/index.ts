@@ -27,6 +27,16 @@ function withHeaders(res: Response): Response {
   return out;
 }
 
+/**
+ * Every Meta call is made from the workspace's Durable Object, which stays where it was first created.
+ * Objects placed in Hong Kong (where Meta's API answers 404 model_not_found for every model) could never
+ * work, so new workspaces are created in western North America. The hint only affects creation.
+ */
+function workspaceStub(env: Env, wsId: string) {
+  const hint = (env.COEVO_DO_LOCATION_HINT ?? 'wnam') as DurableObjectLocationHint;
+  return env.WORKSPACE.get(env.WORKSPACE.idFromName(wsId), { locationHint: hint });
+}
+
 async function createWorkspace(req: Request, env: Env, kind: 'user' | 'sample'): Promise<Response> {
   const ip = req.headers.get('cf-connecting-ip') ?? 'local';
   const budget = env.BUDGET.get(env.BUDGET.idFromName('global'));
@@ -34,7 +44,7 @@ async function createWorkspace(req: Request, env: Env, kind: 'user' | 'sample'):
     return error(429, 'rate_limited', 'Too many new workspaces from this network. Try again later.');
   }
   const wsId = id('w');
-  const stub = env.WORKSPACE.get(env.WORKSPACE.idFromName(wsId));
+  const stub = workspaceStub(env, wsId);
   // TEST ONLY: with fake models on 127.0.0.1, a test run may keep its spend on its own fake ledger.
   const testLedger = fakeMeta(env) ? req.headers.get('x-coevo-test-ledger') : null;
   return stub.fetch(new Request(`https://do/api/w/${wsId}/init`, { method: 'POST', body: JSON.stringify({ kind, testLedger }) }));
@@ -93,7 +103,7 @@ async function route(req: Request, env: Env): Promise<Response> {
   const m = path.match(/^\/api\/w\/(w_[a-z0-9]{8,24})(\/.*)?$/);
   if (m) {
     if (m[2] === '/init') return error(404, 'not_found', 'Unknown route.');
-    return env.WORKSPACE.get(env.WORKSPACE.idFromName(m[1])).fetch(req);
+    return workspaceStub(env, m[1]).fetch(req);
   }
   return error(404, 'not_found', 'Unknown route.');
 }
