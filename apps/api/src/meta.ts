@@ -208,9 +208,18 @@ export const INPUT_COUNT_PAD = 64;
 export async function countInputTokens(env: MetaEnv, body: Record<string, unknown>, f: Fetch = fetch): Promise<number> {
   let data: { input_tokens?: unknown };
   try {
-    data = (await post(env, '/responses/input_tokens', JSON.stringify(body), { 'Content-Type': 'application/json' }, f, 20_000)) as { input_tokens?: unknown };
+    try {
+      data = (await post(env, '/responses/input_tokens', JSON.stringify(body), { 'Content-Type': 'application/json' }, f, 20_000)) as { input_tokens?: unknown };
+    } catch (first) {
+      // Counting records no generation usage, so one retry after a transient failure costs nothing.
+      if (first instanceof LiveCallsDisabled || first instanceof RetryLater || (first instanceof MetaError && first.status < 500 && first.status !== 429)) throw first;
+      await sleep(1000);
+      data = (await post(env, '/responses/input_tokens', JSON.stringify(body), { 'Content-Type': 'application/json' }, f, 20_000)) as { input_tokens?: unknown };
+    }
   } catch (e) {
     if (e instanceof LiveCallsDisabled) throw e;
+    const detail = e instanceof MetaError ? { status: e.status, type: e.type, code: e.code, message: e.message.slice(0, 200) } : { name: (e as Error).name };
+    console.error(JSON.stringify({ event: 'count_failed', task: (body.text as { format?: { name?: string } } | undefined)?.format?.name ?? null, ...detail }));
     throw new CostUnverifiable(`Input tokens could not be counted (${e instanceof MetaError ? e.status : (e as Error).name}).`);
   }
   const n = data.input_tokens;

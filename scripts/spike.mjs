@@ -82,6 +82,8 @@ if (which === 's2') {
 
 if (which === 'practice') {
   const n = Number(extra ?? 3);
+  let expectAudio = [];
+  try { expectAudio = JSON.parse(readFileSync(path.join(dir, 'expect.json'), 'utf8')); } catch { /* optional */ }
   const rows = [];
   for (const f of files(dir, /\.wav$/i).slice(0, n)) {
     const p = (await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false }), headers: { 'Content-Type': 'application/json' } })).body;
@@ -96,7 +98,8 @@ if (which === 'practice') {
       const v = new DataView(img.buffer);
       if (img[0] === 0x89) ratio = Number((v.getUint32(16) / v.getUint32(20)).toFixed(3));
     }
-    rows.push({ file: f, status: x?.status, ms: Date.now() - t0, transcriptWords: x?.transcript ? x.transcript.split(/\s+/).length : 0, imageStatus: x?.imageStatus, imageRatio: ratio, assistance: x?.assistance, error: x?.error ?? null });
+    const e = expectAudio.find(y => y.file === f);
+    rows.push({ file: f, status: x?.status, ms: Date.now() - t0, transcriptWords: x?.transcript ? x.transcript.split(/\s+/).length : 0, transcriptSimilarity: e && x?.transcript ? Number(sim(x.transcript, e.text).toFixed(2)) : null, imageStatus: x?.imageStatus, imageRatio: ratio, assistance: x?.assistance, error: x?.error ?? null });
   }
   out.rows = rows;
 }

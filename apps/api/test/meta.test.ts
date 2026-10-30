@@ -269,3 +269,17 @@ test('SAM image count must be a positive integer, otherwise one image stays char
     assert.ok(Math.abs(l.total() - 0.0025) < 1e-12, `images_processed ${String(images_processed)}`);
   }
 });
+
+test('a transient token-count failure is retried once (counting is unbilled)', async () => {
+  let counts = 0;
+  const f = (async (url: string) => {
+    if (url.endsWith('/input_tokens')) { counts++; return counts === 1 ? response({ error: { message: 'oops', type: 'server_error', code: null } }, 500) : response({ object: 'response.input_tokens', input_tokens: 1000 }); }
+    return ok(JSON.stringify(reading));
+  }) as unknown as typeof fetch;
+  await runTask(env, ledger().spender, readingTask, { text: 'x' }, f);
+  assert.equal(counts, 2);
+  let bad = 0;
+  const g = (async (url: string) => { if (url.endsWith('/input_tokens')) { bad++; return response({ error: { message: 'bad', type: 'invalid_request_error', code: null } }, 400); } return ok('{}'); }) as unknown as typeof fetch;
+  await assert.rejects(runTask(env, ledger().spender, readingTask, { text: 'x' }, g), CostUnverifiable);
+  assert.equal(bad, 1, 'a 400 is not retried');
+});
