@@ -5,6 +5,7 @@ import { canvasJpeg, uploadFrame } from '../lib/capture.ts';
 import { errorText, Flag, latestSession, modelSourceLine, sessionMoments, useHealth } from '../ui/common.tsx';
 import { LiveScreen } from '../phone/Live.tsx';
 import { SessionReview } from './Desk.tsx';
+import { RecordedRunView, useRecordedRun } from './Recorded.tsx';
 
 interface Manifest { note: string; frames: { file: string; caption: string; session: number; provenance: 'actual-meta-ai' }[] }
 
@@ -33,7 +34,9 @@ function loadSample(): Creds | null {
 export function SampleApp() {
   const [creds, setCreds] = useState<Creds | null>(loadSample);
   const [err, setErr] = useState('');
+  const [live, setLive] = useState(false);
   const health = useHealth();
+  const recorded = useRecordedRun();
   const start = async () => {
     setErr('');
     try {
@@ -43,13 +46,22 @@ export function SampleApp() {
       setCreds(c);
     } catch (e) { setErr(errorText(e)); }
   };
+  // Default preview: the recorded live run (instant, no model calls). A live run stays one click away.
+  if (!creds && !live && recorded.state === 'ready' && recorded.run && recorded.manifest) {
+    return <RecordedRunView run={recorded.run} manifest={recorded.manifest} onLive={() => setLive(true)} />;
+  }
   if (!creds) {
+    if (recorded.state === 'loading') return <div className="landing"><p className="faint" role="status">Loading the sample…</p></div>;
     return (
       <div className="landing">
-        <div className="row"><Flag state="watching" /><span className="eyebrow">Sample session</span></div>
+        <div className="row"><Flag state="watching" /><span className="eyebrow">Sample session · live</span></div>
         <h1>Watch the Caddie work, without a phone</h1>
         <p className="muted">You’ll replay a café owner’s screens while they make a poster with Meta AI. The café is fictional and the requests are scripted; every Meta AI reply on screen is real. {modelSourceLine(health)}</p>
-        <div className="row"><button className="btn primary" onClick={start}>Start the sample</button></div>
+        <p className="faint">A live run makes real model calls on this demo’s shared budget (about $0.20–0.30 for the full session with its five formats), so it can run out.</p>
+        <div className="row wrap">
+          <button className="btn primary" onClick={start}>Start a live sample</button>
+          {recorded.state === 'ready' && <button className="btn" onClick={() => setLive(false)}>Back to the recorded run</button>}
+        </div>
         {err && <p className="faint" role="alert">{err}</p>}
       </div>
     );

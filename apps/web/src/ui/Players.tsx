@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { CaddieCard, ContentItem, FlashcardsPayload, ManualPayload, NotePayload, PodcastPayload, ShortPayload, Snapshot } from '../../../../packages/contracts/index.ts';
 import { post, postBinary, type Creds } from '../lib/api.ts';
 import { useMedia } from '../lib/media.ts';
 import { VoiceButton } from '../phone/Voice.tsx';
 import { clock, errorText } from './common.tsx';
+
+/** True while replaying a recorded run: players are read-only (nothing is sent to the server). */
+export const ReplayContext = createContext(false);
 
 export const FORMAT_NAME: Record<ContentItem['format'], string> = {
   note: 'Note', manual: 'My playbook', flashcards: 'Flashcards', podcast: 'Podcast', short: 'Short',
@@ -123,11 +126,14 @@ export function FlashcardsView({ item, creds }: { item: ContentItem; creds: Cred
   const [i, setI] = useState(0);
   const [shown, setShown] = useState(false);
   const [err, setErr] = useState('');
+  const replay = useContext(ReplayContext);
   if (!p) return null;
   const c = p.cards[Math.min(i, p.cards.length - 1)];
   const review = async (result: 'applied' | 'unsure') => {
     setErr('');
-    try { await post(creds, `/content/${item.id}/review`, { cardId: c.id, result }); } catch (e) { setErr(errorText(e)); return; }
+    if (!replay) {
+      try { await post(creds, `/content/${item.id}/review`, { cardId: c.id, result }); } catch (e) { setErr(errorText(e)); return; }
+    }
     setShown(false);
     setI(x => (x + 1) % p.cards.length);
   };
@@ -155,6 +161,7 @@ export function PodcastView({ item, creds }: { item: ContentItem; creds: Creds }
   const [asking, setAsking] = useState<{ wasPlaying: boolean; at: number } | null>(null);
   const [answer, setAnswer] = useState<{ question: string; answer: string } | null>(null);
   const [err, setErr] = useState('');
+  const replay = useContext(ReplayContext);
   if (!p) return null;
   const timed = p.lines.some(l => l.end > 0);
   const current = timed ? p.lines.findIndex(l => t >= l.start && t < l.end) : -1;
@@ -190,6 +197,8 @@ export function PodcastView({ item, creds }: { item: ContentItem; creds: Creds }
           {err && <p className="faint" role="alert">{err}</p>}
           <button className="btn" onClick={resume}>Return to listening</button>
         </div>
+      ) : replay ? (
+        <p className="faint">In a live session you can pause here, ask about this part out loud, and resume at the same line.</p>
       ) : (
         <button className="btn" onClick={startAsk}>Ask about this part</button>
       )}

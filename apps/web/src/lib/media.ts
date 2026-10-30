@@ -9,6 +9,8 @@ export function useMedia(creds: Creds | null, key: string | null | undefined): {
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'gone'>(key ? (cache.has(key) ? 'ready' : 'loading') : 'idle');
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    // Published static media (the recorded live run) is a plain public file: no token needed.
+    if (key?.startsWith('static:')) { setUrl(key.slice(7)); setState('ready'); return; }
     if (!creds || !key) { setUrl(null); setState('idle'); return; }
     if (cache.has(key)) { setUrl(cache.get(key)!); setState('ready'); return; }
     let live = true;
