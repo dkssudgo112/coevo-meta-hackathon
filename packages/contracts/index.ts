@@ -241,6 +241,8 @@ export interface PodcastPayload {
   lines: PodcastLine[];
   audioKey: string | null;
   durationSec: number | null;
+  /** Renderer phase timings in seconds (model load, TTS, composition). */
+  renderTiming?: Record<string, number | boolean> | null;
   asks: { question: string; answer: string; atSec: number; at: string; provenance: Provenance }[];
 }
 
@@ -260,7 +262,7 @@ export interface ShortScene {
   end: number;
 }
 
-export interface ShortPayload { title: string; scenes: ShortScene[]; videoKey: string | null; durationSec: number | null }
+export interface ShortPayload { title: string; scenes: ShortScene[]; videoKey: string | null; durationSec: number | null; renderTiming?: Record<string, number | boolean> | null }
 
 export type ContentPayload = NotePayload | ManualPayload | FlashcardsPayload | PodcastPayload | ShortPayload;
 

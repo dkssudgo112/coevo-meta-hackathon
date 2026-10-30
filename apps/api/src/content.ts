@@ -134,7 +134,8 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
       case 'short': {
         const v = (await runTask(ctx.env, ctx.spender, shortTask, { text })).value;
         const total = speechSeconds(v.scenes.map(s => s.narration).join(' '));
-        if (total < 20 || total > 55) throw new Error(`Narration length ${Math.round(total)} s is outside the 30–45 s target.`);
+        // Same policy as the renderer: 30–45 s total; check before spending on images or rendering.
+        if (total < 25 || total > 44) throw new Error(`The short's narration would run about ${Math.round(total)} s; it must fit 30–45 s. Retry to write it again.`);
         const frames = sessionMoments(ctx.store, session.id).filter(m => m.frame?.storedKey && m.reading?.artifactVisible && !m.misread);
         const before = frames[0] ?? null;
         const after = [...frames].reverse().find(m => m.change) ?? frames[frames.length - 1] ?? null;

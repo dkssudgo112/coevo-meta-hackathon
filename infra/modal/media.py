@@ -39,14 +39,27 @@ MAX_REQUEST_BYTES = 12_000_000
 
 # Explicit (request, limit) tuples: Modal bills the higher of requested and actual
 # usage, and a scalar request is NOT a maximum. Hard memory limit, one container,
-# no warm pool, no automatic retries, bounded startup and run time.
-@app.cls(cpu=(1.0, 2.0), memory=(2048, 3072), timeout=300, startup_timeout=180, retries=0, scaledown_window=5, min_containers=0, max_containers=1)
+# no warm pool, no automatic retries, bounded startup and run time. More cores make
+# TTS faster at about the same core-seconds; the memory snapshot skips re-loading
+# Kokoro on cold starts.
+@app.cls(cpu=(2.0, 4.0), memory=(2048, 3072), timeout=300, startup_timeout=180, retries=0, scaledown_window=5, min_containers=0, max_containers=1, enable_memory_snapshot=True)
 class Renderer:
-    @modal.enter()
+    @modal.enter(snap=True)
     def load(self) -> None:
+        import time
+
+        t0 = time.monotonic()
         from kokoro import KPipeline
 
         self.pipe = KPipeline(lang_code="a", device="cpu")
+        self.load_s = round(time.monotonic() - t0, 2)
+        self.first_job = True
+
+    @modal.enter(snap=False)
+    def threads(self) -> None:
+        import torch
+
+        torch.set_num_threads(4)
 
     def speak(self, text: str, voice: str):
         import numpy as np
@@ -62,10 +75,15 @@ class Renderer:
         import compose
 
         if job.get("kind") == "podcast":
-            return compose.render_podcast(job["lines"], job.get("voices", {}), self.speak)
-        if job.get("kind") == "short":
-            return compose.render_short(job.get("title", ""), job.get("voice", "af_heart"), job["scenes"], self.speak)
-        raise ValueError("unknown job kind")
+            out = compose.render_podcast(job["lines"], job.get("voices", {}), self.speak)
+        elif job.get("kind") == "short":
+            out = compose.render_short(job.get("title", ""), job.get("voice", "af_heart"), job["scenes"], self.speak)
+        else:
+            raise ValueError("unknown job kind")
+        # First job on this container also reports how long loading took (0 when restored from a snapshot).
+        out["timing_s"] = {**out.get("timing_s", {}), "model_load": self.load_s if self.first_job else 0.0, "cold": self.first_job}
+        self.first_job = False
+        return out
 
 
 @app.function(secrets=[token_secret], cpu=(0.125, 0.25), memory=(128, 256), timeout=60, startup_timeout=60, scaledown_window=5, min_containers=0, max_containers=1)
@@ -91,16 +109,19 @@ def web():
         job = await req.json()
         if job.get("kind") not in ("podcast", "short"):
             raise HTTPException(status_code=400, detail="kind must be podcast or short")
-        call = Renderer().render.spawn(job)
+        call = await Renderer().render.spawn.aio(job)
         return {"job_id": call.object_id}
 
     @api.get("/jobs/{job_id}")
     async def status(job_id: str, req: Request):
         check(req)
         try:
-            result = modal.FunctionCall.from_id(job_id).get(timeout=0)
+            result = await modal.FunctionCall.from_id(job_id).get.aio(timeout=0)
         except TimeoutError:
             return JSONResponse({"status": "running"}, status_code=202)
+        except ValueError as e:
+            # Our own validation messages (length policy, bad job) are safe to show.
+            return JSONResponse({"status": "failed", "error": str(e)[:200]}, status_code=500)
         except Exception as e:  # noqa: BLE001 — report a clean failure to the caller
             return JSONResponse({"status": "failed", "error": f"Rendering failed: {type(e).__name__}"}, status_code=500)
         return result

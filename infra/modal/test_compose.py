@@ -55,6 +55,26 @@ def main():
     assert any(x["codec_type"] == "audio" for x in info["streams"])
     print(f"short ok: {s['duration']} s, 1080x1920, {os.path.getsize(path) // 1024} KB, scene starts {[t['start'] for t in s['timings']]}")
     os.unlink(path)
+    print(f"timing: podcast {p['timing_s']}, short {s['timing_s']}")
+
+    # Length policy: 25 s of speech becomes a 30 s short with a reflection pause; too long or too short fails.
+    assert compose.short_plan(25.0) == 30.0
+    assert compose.short_plan(40.0) == 40.8
+    for bad in (44.5, 12.0):
+        try:
+            compose.short_plan(bad)
+            raise AssertionError(f"short_plan({bad}) should fail")
+        except ValueError:
+            pass
+    short_scenes = [dict(sc, narration=" ".join(["word"] * 16)) for sc in scenes]  # ≈ 31 s of speech at 155 wpm minus gaps
+    s2 = compose.render_short("Pause test", "af_heart", short_scenes[:4], tone_speak)
+    assert 30.0 <= s2["duration"] <= 45.0, s2["duration"]
+    print(f"length policy ok: {s2['duration']} s, pause {s2['timing_s']['reflection_pause']} s")
+    try:
+        compose.render_podcast(lines[:2], {"caddie": "af_heart", "guest": "am_michael"}, tone_speak)
+        raise AssertionError("a 2-line podcast should be under 60 s and fail")
+    except ValueError as e:
+        print(f"podcast minimum ok: {e}")
 
 
 if __name__ == "__main__":

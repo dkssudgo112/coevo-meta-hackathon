@@ -28,7 +28,7 @@ export type MediaJob = PodcastJob | ShortJob;
 
 export type JobResult =
   | { status: 'running' }
-  | { status: 'done'; bytes: Uint8Array; mime: string; durationSec: number; timings: { index: number; start: number; end: number }[] }
+  | { status: 'done'; bytes: Uint8Array; mime: string; durationSec: number; timings: { index: number; start: number; end: number }[]; renderTiming: Record<string, number | boolean> | null }
   | { status: 'failed'; error: string };
 
 function guard(env: MediaEnv): void {
@@ -57,9 +57,9 @@ export async function pollJob(env: MediaEnv, jobId: string, f: typeof fetch = fe
     signal: AbortSignal.timeout(60_000),
   });
   if (res.status === 202) return { status: 'running' };
-  const data = (await res.json().catch(() => ({}))) as { status?: string; error?: string; mime?: string; data_b64?: string; duration?: number; timings?: { index: number; start: number; end: number }[] };
+  const data = (await res.json().catch(() => ({}))) as { status?: string; error?: string; mime?: string; data_b64?: string; duration?: number; timings?: { index: number; start: number; end: number }[]; timing_s?: Record<string, number | boolean> };
   if (!res.ok || data.status === 'failed') return { status: 'failed', error: data.error ?? `Media job failed (${res.status}).` };
   if (data.status !== 'done' || !data.data_b64) return { status: 'running' };
   const bytes = Uint8Array.from(atob(data.data_b64), c => c.charCodeAt(0));
-  return { status: 'done', bytes, mime: data.mime ?? 'application/octet-stream', durationSec: data.duration ?? 0, timings: data.timings ?? [] };
+  return { status: 'done', bytes, mime: data.mime ?? 'application/octet-stream', durationSec: data.duration ?? 0, timings: data.timings ?? [], renderTiming: data.timing_s ?? null };
 }

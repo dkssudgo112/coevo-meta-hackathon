@@ -212,11 +212,11 @@ export class Workspace extends DurableObject<Env> {
         if (fresh.format === 'podcast') {
           const p = fresh.payload as PodcastPayload;
           const lines = p.lines.map((l, i) => { const t = r.timings.find(x => x.index === i); return t ? { ...l, start: t.start, end: t.end } : l; });
-          await this.store.put('content', { ...fresh, status: 'ready', payload: { ...p, lines, audioKey: key, durationSec: r.durationSec }, updatedAt: now() });
+          await this.store.put('content', { ...fresh, status: 'ready', payload: { ...p, lines, audioKey: key, durationSec: r.durationSec, renderTiming: r.renderTiming }, updatedAt: now() });
         } else {
           const p = fresh.payload as ShortPayload;
           const scenes = p.scenes.map((s, i) => { const t = r.timings.find(x => x.index === i); return t ? { ...s, start: t.start, end: t.end } : s; });
-          await this.store.put('content', { ...fresh, status: 'ready', payload: { ...p, scenes, videoKey: key, durationSec: r.durationSec }, updatedAt: now() });
+          await this.store.put('content', { ...fresh, status: 'ready', payload: { ...p, scenes, videoKey: key, durationSec: r.durationSec, renderTiming: r.renderTiming }, updatedAt: now() });
         }
       } catch (e) {
         if (Date.now() - job.startedAt < JOB_TIMEOUT_MS) remainingJobs.push(job);

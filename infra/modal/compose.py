@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import wave
 from dataclasses import dataclass
 from typing import Callable, Sequence
@@ -31,6 +32,14 @@ SOFT = (223, 233, 226)
 MAX_LINES = 18
 MAX_SCENES = 6
 MAX_TEXT = 600
+
+PODCAST_MIN_S = 60.0
+SHORT_MIN_S = 30.0
+SHORT_MAX_S = 45.0
+# Below this much narration a short would be mostly dwell; regenerate instead of padding.
+SHORT_MIN_SPEECH_S = 22.0
+# Zoom source scale: 1.25x keeps the Ken Burns motion smooth at a fraction of a 2x upscale's cost.
+ZOOM_SCALE = 1.25
 
 
 def _font(size: int, serif: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -98,7 +107,12 @@ def _ffmpeg(args: list[str]) -> None:
 def render_podcast(lines: Sequence[dict], voices: dict, speak: Speak) -> dict:
     if not 1 <= len(lines) <= MAX_LINES:
         raise ValueError("podcast needs 1–18 lines")
+    t0 = time.monotonic()
     tl = build_timeline([(l["text"], voices.get(l["speaker"], voices.get("caddie", ""))) for l in lines], speak)
+    tts_s = time.monotonic() - t0
+    if tl.duration < PODCAST_MIN_S:
+        raise ValueError(f"podcast is {tl.duration:.1f} s; it must be at least {PODCAST_MIN_S:.0f} s")
+    t1 = time.monotonic()
     with tempfile.TemporaryDirectory() as d:
         wav = os.path.join(d, "p.wav")
         m4a = os.path.join(d, "p.m4a")
@@ -106,7 +120,8 @@ def render_podcast(lines: Sequence[dict], voices: dict, speak: Speak) -> dict:
             f.write(_to_wav_bytes(tl.audio, tl.rate))
         _ffmpeg(["-i", wav, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-movflags", "+faststart", m4a])
         data = open(m4a, "rb").read()
-    return {"status": "done", "mime": "audio/mp4", "duration": round(tl.duration, 2), "timings": tl.timings, "data_b64": base64.b64encode(data).decode()}
+    timing = {"tts": round(tts_s, 2), "compose": round(time.monotonic() - t1, 2)}
+    return {"status": "done", "mime": "audio/mp4", "duration": round(tl.duration, 2), "timings": tl.timings, "timing_s": timing, "data_b64": base64.b64encode(data).decode()}
 
 
 def _wrap(draw: ImageDraw.ImageDraw, text: str, font, max_w: int) -> list[str]:
@@ -162,7 +177,7 @@ def scene_background(scene: dict) -> Image.Image:
     return canvas
 
 
-def caption_overlay(text: str, label: str | None, title: str | None, dark: bool) -> Image.Image:
+def caption_overlay(text: str, label: str | None, title: str | None, dark: bool, cue: str | None = None) -> Image.Image:
     layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
     fg = (246, 243, 236) if dark else INK
@@ -173,9 +188,12 @@ def caption_overlay(text: str, label: str | None, title: str | None, dark: bool)
         tw = draw.textlength(label, font=f)
         draw.rounded_rectangle([80, 180, 80 + tw + 60, 250], radius=35, fill=ACCENT)
         draw.text((110, 215), label, font=f, fill=(246, 243, 236), anchor="lm")
+    if cue:
+        cf = _font(42)
+        draw.text((80, H - 120), cue, font=cf, fill=(246, 243, 236) if dark else ACCENT)
     f = _font(60)
     lines = _wrap(draw, text, f, W - 160)
-    y = H - 160 - len(lines) * 78
+    y = H - 200 - len(lines) * 78 if cue else H - 160 - len(lines) * 78
     if not dark:
         draw.rounded_rectangle([50, y - 40, W - 50, H - 120], radius=40, fill=(255, 253, 248, 235))
     for i, ln in enumerate(lines):
@@ -183,24 +201,43 @@ def caption_overlay(text: str, label: str | None, title: str | None, dark: bool)
     return layer
 
 
+def short_plan(speech_end: float) -> float:
+    """Total short length for a given narration end. Raises when the narration cannot make a 30–45 s short."""
+    natural = speech_end + 0.8
+    if natural > SHORT_MAX_S:
+        raise ValueError(f"short narration runs {speech_end:.1f} s; the short must end by {SHORT_MAX_S:.0f} s")
+    if speech_end < SHORT_MIN_SPEECH_S:
+        raise ValueError(f"short narration is only {speech_end:.1f} s; it needs at least {SHORT_MIN_SPEECH_S:.0f} s of speech")
+    # Slightly short: the closing question stays on screen as a reflection pause.
+    return max(SHORT_MIN_S, natural)
+
+
 def render_short(title: str, voice: str, scenes: Sequence[dict], speak: Speak, fps: int = 30) -> dict:
     if not 1 <= len(scenes) <= MAX_SCENES:
         raise ValueError("short needs 1–6 scenes")
+    t0 = time.monotonic()
     tl = build_timeline([(s["narration"], voice) for s in scenes], speak, gap=0.6)
+    tts_s = time.monotonic() - t0
+    total = short_plan(tl.duration)
+    reflect = total - (tl.duration + 0.8)
+    t1 = time.monotonic()
     with tempfile.TemporaryDirectory() as d:
         segs = []
         for i, s in enumerate(scenes):
             start = tl.timings[i]["start"] if i else 0.0
-            end = tl.timings[i + 1]["start"] if i + 1 < len(scenes) else tl.duration + 0.8
+            end = tl.timings[i + 1]["start"] if i + 1 < len(scenes) else total
             dur = max(1.0, end - start)
             bg = scene_background(s)
             dark = bool(s.get("imageB64")) and not s.get("label")
-            frame = Image.alpha_composite(bg.convert("RGBA"), caption_overlay(s["narration"], s.get("label"), title if i == 0 else None, dark)).convert("RGB")
+            last = i == len(scenes) - 1
+            cue = "Pause and think — then try it on your next request." if last and reflect >= 1.5 else None
+            frame = Image.alpha_composite(bg.convert("RGBA"), caption_overlay(s["narration"], s.get("label"), title if i == 0 else None, dark, cue)).convert("RGB")
             png = os.path.join(d, f"s{i}.png")
             frame.save(png)
             seg = os.path.join(d, f"s{i}.mp4")
-            n = int(dur * fps)
-            _ffmpeg(["-loop", "1", "-i", png, "-vf", f"scale={W * 2}:{H * 2},zoompan=z='1+0.04*on/{n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={n}:s={W}x{H}:fps={fps},format=yuv420p", "-frames:v", str(n), "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", seg])
+            n = int(round(dur * fps))
+            zw, zh = int(W * ZOOM_SCALE) // 2 * 2, int(H * ZOOM_SCALE) // 2 * 2
+            _ffmpeg(["-loop", "1", "-i", png, "-vf", f"scale={zw}:{zh},zoompan=z='1+0.04*on/{n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={n}:s={W}x{H}:fps={fps},format=yuv420p", "-frames:v", str(n), "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", seg])
             segs.append(seg)
         lst = os.path.join(d, "list.txt")
         with open(lst, "w") as f:
@@ -208,15 +245,15 @@ def render_short(title: str, voice: str, scenes: Sequence[dict], speak: Speak, f
         video = os.path.join(d, "v.mp4")
         _ffmpeg(["-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", video])
         wav = os.path.join(d, "a.wav")
-        audio = np.concatenate([tl.audio, np.zeros(int(0.8 * tl.rate), np.float32)])
+        audio = np.concatenate([tl.audio, np.zeros(int((total - tl.duration) * tl.rate) + 1, np.float32)])
         with open(wav, "wb") as f:
             f.write(_to_wav_bytes(audio, tl.rate))
         out = os.path.join(d, "short.mp4")
-        total = len(audio) / tl.rate
         _ffmpeg(["-i", video, "-i", wav, "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-profile:v", "high", "-level:v", "4.1", "-pix_fmt", "yuv420p", "-r", str(fps), "-c:a", "aac", "-ar", "48000", "-b:a", "128k", "-t", f"{total:.2f}", "-movflags", "+faststart", out])
         data = open(out, "rb").read()
     timings = [{"index": i, "start": (tl.timings[i]["start"] if i else 0.0), "end": (tl.timings[i + 1]["start"] if i + 1 < len(scenes) else round(total, 3))} for i in range(len(scenes))]
-    return {"status": "done", "mime": "video/mp4", "duration": round(total, 2), "timings": timings, "data_b64": base64.b64encode(data).decode()}
+    timing = {"tts": round(tts_s, 2), "compose": round(time.monotonic() - t1, 2), "reflection_pause": round(max(0.0, reflect), 2)}
+    return {"status": "done", "mime": "video/mp4", "duration": round(total, 2), "timings": timings, "timing_s": timing, "data_b64": base64.b64encode(data).decode()}
 
 
 def probe(path: str) -> dict:
