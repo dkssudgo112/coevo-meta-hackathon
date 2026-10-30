@@ -32,19 +32,19 @@ Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-develope
 
 ## Three-minute storyboard
 
-Composition: a real desk shot first (phone propped beside the monitor), then a split screen — PC capture on the left, phone mirror on the right. Every Caddie line on screen is live model output; the persona and screens are labeled sample data; the "next week" scene is a second recorded session and says so.
+Composition: a real desk shot first (phone propped beside the monitor), then a split screen — PC capture on the left, phone mirror on the right. Every Caddie line on screen is real model output; the café owner is a scripted, fictional persona and says so; the follow-up chat is a separate recorded session that began with the card, not an elapsed week. Lines below are quoted from verified runs.
 
-| Time | Scene | Shows |
+| Time | Scene | Shows (source) |
 | --- | --- | --- |
-| 0:00–0:12 | Desk shot | Café owner, AI tool, phone beside the monitor. "Built during the hackathon, from my earlier Coevo concept." |
-| 0:12–0:40 | Split screen | "more premium" again and again; the flow shows *Quiet — on track*; then the buzz and the NOW card: "You've asked for 'more premium' 4×. Who is this dessert for?" |
-| 0:40–1:05 | Voice answer | Owner speaks, then types it in their own words; the poster changes; Desk row labeled *with the Caddie*. |
-| 1:05–1:30 | Wrap | Note quoting the owner; My playbook split; Caddie card approved → Desk inbox → sent as the first message of a dedicated, pinned poster chat. |
-| 1:30–1:55 | Five moments | Flashcard, podcast (two voices, pause-to-ask), short built on the owner's own screens — each with "why now". |
-| 1:55–2:15 | Practice Range | Spoken brief → Muse Image → ingredient check → *on your own (practice)*. |
-| 2:15–2:45 | **Climax** | A week later, in the pinned poster chat that starts with the card: "Make a poster for our new drink." The AI asks first. Phone: "Your AI asked first. I'll stay quiet." "You learned. Your AI learned. Your Caddie stepped back." |
-| 2:45–2:55 | Cameo | A cover letter in another AI tool: "Smooth, but anyone could write this. What's one thing only you did?" |
-| 2:55–3:00 | Close | The four Meta models and their roles; live output; one-line limitation. |
+| 0:00–0:12 | Desk shot | Phone propped beside a monitor showing Meta AI. "Built during the hackathon, from my earlier Coevo concept." (needs the physical recording) |
+| 0:12–0:40 | Split screen | Three vague requests ("Make it more premium." · "Still not premium enough. Make it more premium."); quiet notes such as "Saw premium revision with poster; holding quiet."; then the question card: "What is your new dessert — flavor, size, what makes it different?" (recorded live run) |
+| 0:40–1:05 | The owner's brief | The specific brief appears in Meta AI; the Caddie: "You added who it's for, a concrete number, a concrete feeling, specific details." labeled *with the Caddie*. (A spoken answer and its transcribed reply exist from another live run.) |
+| 1:05–1:30 | Wrap | "You repeated 'more premium' three times before giving audience, product, price, and mood." Note and My playbook; the proposed card. |
+| 1:30–1:55 | Formats | Flashcard, the 141 s two-voice podcast (guest objection, advice narrowed), the 44 s short with the owner's before and after screens — each with its "why now"; the podcast is marked as made on request. |
+| 1:55–2:15 | Practice Range | Spoken brief → Muse Image → ingredient check (live run). |
+| 2:15–2:45 | **Climax** | A separate pinned Meta AI chat that starts with the app's card: "Make a poster for our new drink." Meta AI asks five questions first. Phone: "AI asked first as card says, staying quiet." The card turns *observed working*. |
+| 2:45–2:55 | Cameo | Another task in another AI tool (to be recorded; no claim until it runs live). |
+| 2:55–3:00 | Close | The four Meta models and their roles; live output on a scripted persona; one-line limitation (the rule works inside one pinned chat). |
 
 ## Draft texts (finalize only with verified numbers)
 
