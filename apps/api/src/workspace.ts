@@ -101,7 +101,7 @@ export class Workspace extends DurableObject<Env> {
         const st = await this.budgetState();
         // Sample workspaces have a lifetime cap, user workspaces a daily cap (both inside the global lifetime cap).
         const left = this.meta?.kind === 'sample' ? Math.max(0, this.cap() - st.spentUsd) : remaining(st, this.cap(), Date.now());
-        if (left < usd) throw new BudgetExceeded('workspace');
+        if (left < usd) throw new BudgetExceeded(this.meta?.kind === 'sample' ? 'sample' : 'workspace');
         const ticket = await authority().reserve(usd, ledgerScope(this.env, kind), `${this.meta?.id}:${label}`);
         if (!ticket) throw new BudgetExceeded(kind === 'meta' ? 'global' : 'modal');
         await this.ctx.storage.put({

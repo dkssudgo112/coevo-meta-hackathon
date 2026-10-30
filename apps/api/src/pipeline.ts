@@ -30,7 +30,7 @@ export interface Ctx {
 
 export function failureStatus(e: unknown): { status: Moment['readingStatus']; message: string } {
   if (e instanceof LiveCallsDisabled) return { status: 'disabled', message: 'Live model calls are off on this server, so the Caddie cannot read the screen yet.' };
-  if (e instanceof BudgetExceeded) return { status: 'budget', message: e.scope === 'workspace' ? 'This workspace reached its spending limit for today. The Caddie will stay quiet.' : 'The project’s model budget is used up. The Caddie will stay quiet.' };
+  if (e instanceof BudgetExceeded) return { status: 'budget', message: e.scope === 'sample' ? 'This sample used its whole budget, so nothing more is made here. Start a new sample to try again.' : e.scope === 'workspace' ? 'This workspace reached its spending limit for today. The Caddie will stay quiet.' : 'The project’s model budget is used up. The Caddie will stay quiet.' };
   if (e instanceof ModelNotAllowed) return { status: 'disabled', message: 'This server is configured with a model that has no verified price, so the Caddie will not call it.' };
   if (e instanceof InvalidAudio) return { status: 'error', message: 'The recording could not be read. Try again.' };
   if (e instanceof CostUnverifiable) return { status: 'error', message: 'The Caddie could not verify what this call would cost, so it did not make it.' };

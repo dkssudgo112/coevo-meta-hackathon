@@ -239,3 +239,13 @@ test('a card counts as working only when applied, for the same tool and task, an
   assert.equal(cardObserved(card({ asks: undefined }), asked({ aiAskedFor: ['audience', 'price'] })).ok, true, 'older card without asks: two asked details');
   assert.equal(cardObserved(card({ status: 'observed-working' }), asked()).ok, true);
 });
+
+test('podcast reader keeps a usable paid script despite cosmetic overruns, but not a wrong speaker', () => {
+  const line = (i: number) => ({ speaker: i % 2 ? 'guest' : 'caddie', text: `Line ${i} with a few spoken words that run a little long. `.repeat(8).trim() });
+  const v = podcastTask.read({ title: 'T'.repeat(10) + ' ' + 'word '.repeat(30), guest: 'Mina, owner of a small café near Seongsu station who bakes daily', lines: Array.from({ length: 22 }, (_, i) => line(i)) });
+  assert.ok(v.title.length <= 80 && v.title.endsWith('…'));
+  assert.ok(v.guest.length <= 40 && v.guest.endsWith('…'));
+  assert.equal(v.lines.length, 22);
+  assert.throws(() => podcastTask.read({ title: 't', guest: 'g', lines: Array.from({ length: 8 }, (_, i) => ({ ...line(i), speaker: i === 3 ? 'narrator' : line(i).speaker })) }));
+  assert.throws(() => podcastTask.read({ title: 't', guest: 'g', lines: [line(0), line(1)] }), 'too few lines for a conversation');
+});

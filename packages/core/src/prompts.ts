@@ -22,6 +22,13 @@ export interface ModelTask<T> {
   read: (json: unknown) => T;
 }
 
+/** Shorten a display string at a word boundary. */
+function clip(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), max / 2)).trimEnd()}…`;
+}
+
 const STYLE = `Write plain, specific English. No praise, greetings, cheerleading, filler or closing summaries. Never say "great", "awesome", "perfect", "well done". Address the person as "you". Quote the person's own words exactly when you quote, at most 15 words at a time (use … to skip words). Prefer what they typed to the AI over voice transcripts: transcripts can contain recognition errors and repeated words, so never quote those parts. Never mention clock times; refer to a moment by what happened in it.`;
 
 const ingredientsSchema = S.obj({
@@ -270,19 +277,21 @@ export const flashcardsTask: ModelTask<Omit<Flashcard, 'id' | 'dueAt' | 'interva
 export const podcastTask: ModelTask<{ title: string; guest: string; lines: Omit<PodcastLine, 'start' | 'end'>[] }> = {
   name: 'podcast',
   effort: 'medium',
-  maxOutputTokens: 2200,
+  maxOutputTokens: 3000,
   instructions: `Write a two-person podcast script (8–18 lines, 300–480 words in total, about 2–3 minutes spoken; never under 60 seconds). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). The caddie speaks in the first person about its own questions ("when I asked …"). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
   schema: S.obj({
     title: S.str('Episode title.', 80),
     guest: S.str('Guest display name with their situation, e.g. "Jun, bakery owner".', 40),
-    lines: S.arr(S.obj({ speaker: S.enumOf(['caddie', 'guest'], 'Speaker.'), text: S.str('Spoken line.', 500) }), 'Lines.', 8, 18),
+    lines: S.arr(S.obj({ speaker: S.enumOf(['caddie', 'guest'], 'Speaker.'), text: S.str('Spoken line, at most 3 sentences.', 500) }), 'Lines.', 8, 18),
   }),
+  // Display fields are clipped and a few extra or longer lines are accepted, so a usable
+  // paid script is never thrown away for a cosmetic overrun; speaker and structure stay strict.
   read(json) {
     const o = R.obj(json, 'podcast');
     return {
-      title: R.str(o.title, 'title', 80),
-      guest: R.str(o.guest, 'guest', 40),
-      lines: R.arr(o.lines, 'lines', (x, p) => { const l = R.obj(x, p); return { speaker: R.oneOf(l.speaker, ['caddie', 'guest'] as const, `${p}.speaker`), text: R.str(l.text, `${p}.text`, 500) }; }, 8, 18),
+      title: clip(R.str(o.title, 'title', 400), 80),
+      guest: clip(R.str(o.guest, 'guest', 200), 40),
+      lines: R.arr(o.lines, 'lines', (x, p) => { const l = R.obj(x, p); return { speaker: R.oneOf(l.speaker, ['caddie', 'guest'] as const, `${p}.speaker`), text: R.str(l.text, `${p}.text`, 900) }; }, 6, 26),
     };
   },
 };
