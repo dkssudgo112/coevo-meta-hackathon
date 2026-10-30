@@ -4,6 +4,7 @@ import { INGREDIENT_KEYS } from '../../../../packages/contracts/index.ts';
 import { post, postBinary, type Creds } from '../lib/api.ts';
 import { AssistLabel, errorText, FixtureTag, INGREDIENT_TEXT, MediaImage } from '../ui/common.tsx';
 import { VoiceButton } from './Voice.tsx';
+import { practiceSampleLine } from '../../../../packages/core/src/labels.ts';
 
 /** The drill's own scope: attempts opened during a session belong to it; others stand alone. */
 export function PracticeRange({ creds, state, attemptId, sessionId, onStart, onOpen }: { creds: Creds; state: Snapshot; attemptId: string | null; sessionId: string | null; onStart: (id: string) => void; onOpen?: (id: string) => void }) {
@@ -71,7 +72,7 @@ export function PracticeRange({ creds, state, attemptId, sessionId, onStart, onO
           </ul>
           <p>{p.checkNote}</p>
           <div className="row wrap">{p.assistance && <AssistLabel value={p.assistance} extra="practice" />}{p.fixture ? <FixtureTag /> : p.fixture === null ? <span className="faint">Origin not recorded</span> : null}{p.autoOpened && <span className="faint">Opened by the Caddie</span>}</div>
-          {p.fixture && <p className="faint">Sample: a scripted practice brief, not a real person’s attempt. The scenario, transcript, image and check are {p.provenance === 'fixture' ? 'from the test model' : 'real model output'}.</p>}
+          {p.fixture && <p className="faint">{practiceSampleLine(p.briefSource, p.provenance)}</p>}
           <button className="btn" onClick={start}>Another request</button>
         </div>
       )}

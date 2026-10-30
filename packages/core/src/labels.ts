@@ -76,6 +76,17 @@ export function skillFixture(inputFixture: boolean | null | undefined, modelProv
   return inputFixture !== false || modelProvenance === 'fixture';
 }
 
+/**
+ * The line under a sample practice attempt. A typed brief is scripted input, not model output; a
+ * spoken one is a scripted voice whose transcript the speech model wrote.
+ */
+export function practiceSampleLine(briefSource: 'spoken' | 'typed' | undefined, modelProvenance: string): string {
+  const by = modelProvenance === 'fixture' ? 'from the test model' : 'real model output';
+  return briefSource === 'typed'
+    ? `Sample: a scripted practice brief, not a real person’s attempt. The typed brief is scripted input; the scenario, image and check are ${by}.`
+    : `Sample: a scripted practice brief, not a real person’s attempt. The scenario, transcript, image and check are ${by}.`;
+}
+
 export function strengthFor(assistance: Assistance, opts: { practice?: boolean; transfer?: boolean }): EvidenceStrength | null {
   if (assistance !== 'independent') return null;
   if (opts.practice) return 'practice';

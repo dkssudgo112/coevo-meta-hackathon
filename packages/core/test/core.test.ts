@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ChangeDetector, meanAbsDiff } from '../src/change.ts';
 import { allowedStep, applyGuardrails, type Proposal } from '../src/ladder.ts';
-import { dimensionFor, labelPractice, observeChange, practiceInputFixture, skillFixture } from '../src/labels.ts';
+import { dimensionFor, labelPractice, observeChange, practiceInputFixture, practiceSampleLine, skillFixture } from '../src/labels.ts';
 import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
 import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
@@ -393,4 +393,14 @@ test('a small real chat change (1.6% at 64 px) is sent once settled; 0.8% noise 
   const change = shifted(0.016);
   const verdicts = [6, 7, 8, 9].map(i => d.sample(change, i * 700).kind);
   assert.ok(verdicts.includes('send'), `change not sent: ${verdicts}`);
+});
+
+test('a typed sample brief is called scripted input, never model output', () => {
+  const typed = practiceSampleLine('typed', 'live-model');
+  assert.match(typed, /typed brief is scripted input/);
+  assert.match(typed, /scenario, image and check are real model output/);
+  assert.doesNotMatch(typed, /transcript/);
+  assert.match(practiceSampleLine('spoken', 'live-model'), /scenario, transcript, image and check are real model output/);
+  assert.match(practiceSampleLine(undefined, 'live-model'), /transcript/, 'older attempts were spoken');
+  assert.match(practiceSampleLine('typed', 'fixture'), /from the test model/);
 });
