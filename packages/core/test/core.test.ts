@@ -7,9 +7,9 @@ import { firstDue, nextDue, INTERVALS_MS } from '../src/spaced.ts';
 import { CAPS, charge, emptyLedger, ledgerAdjust, ledgerReserve, lifetimeCap, META_ABSOLUTE_MAX_USD, META_OPERATING_CEILING_USD, modalCap, remaining, sparkCost } from '../src/budget.ts';
 import { encodeWav, parseWav, resample, wavDurationSeconds } from '../src/wav.ts';
 import { containsBanned, isGroundedQuote, similarity, speechSeconds, stripBanned } from '../src/text.ts';
-import { applyHint } from '../src/cards.ts';
+import { applyHint, cardObserved } from '../src/cards.ts';
 import { decisionTask, readingTask, shortTask, podcastTask, manualTask, turnTask } from '../src/prompts.ts';
-import type { Moment, Reading } from '../../contracts/index.ts';
+import type { CaddieCard, Moment, Reading } from '../../contracts/index.ts';
 
 const thumb = (v: number, n = 64) => new Uint8Array(n).fill(v);
 
@@ -78,6 +78,14 @@ test('guardrails stay quiet when the AI asked first under an active card, keepin
   assert.equal(r.action, 'stay-quiet');
   assert.equal(r.guardrail, 'ai-asked-first');
   assert.equal(r.note, 'Your AI asked first, so I will stay quiet.');
+});
+
+test('a matched card explains itself even when the model chose a generic first-sighting note', () => {
+  const r = applyGuardrails(proposal({ action: 'stay-quiet', step: 'watch', message: null, note: 'See Meta AI drink poster task, will speak only when helpful' }), { reading: reading({ aiAskedClarifyingQuestion: true }), history: [], nowMs: 0, activeCard: true });
+  assert.equal(r.guardrail, 'ai-asked-first');
+  assert.equal(r.note, 'Your AI asked first, as your card says, so I am staying quiet.');
+  const quietNoCard = applyGuardrails(proposal({ action: 'stay-quiet', step: 'watch', message: null, note: 'See Meta AI drink poster task' }), { reading: reading({ aiAskedClarifyingQuestion: true }), history: [], nowMs: 0, activeCard: false });
+  assert.equal(quietNoCard.guardrail, null, 'no applied, matching card: no card claim');
 });
 
 test('labels: coached after an intervention, independent without, ai-produced when copying the example', () => {
@@ -167,7 +175,7 @@ test('apply hints: Meta AI uses a first-message rule (Memory did not persist in 
 });
 
 test('model readers accept valid output and reject malformed output', () => {
-  const r = readingTask.read({ legible: true, tool: 'Meta AI', task: 'poster', userRequest: 'more premium', userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, artifactVisible: true, vagueTerms: ['Premium'], ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false }, confidence: 2 });
+  const r = readingTask.read({ legible: true, tool: 'Meta AI', task: 'poster', userRequest: 'more premium', userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, aiAskedFor: [], artifactVisible: true, vagueTerms: ['Premium'], ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false }, confidence: 2 });
   assert.equal(r.confidence, 1);
   assert.deepEqual(r.vagueTerms, ['premium']);
   assert.throws(() => readingTask.read({ legible: 'yes' }));
@@ -205,11 +213,29 @@ test('lifetime ledger: never resets, never exceeds the cap under many concurrent
 });
 
 test('combined turn reuses the strict reading and decision readers', () => {
-  const r = { legible: true, tool: 'Meta AI', task: 'poster', userRequest: 'more premium', userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, artifactVisible: true, vagueTerms: ['premium'], ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false }, confidence: 0.9 };
+  const r = { legible: true, tool: 'Meta AI', task: 'poster', userRequest: 'more premium', userTyping: false, aiResponseSummary: null, aiAskedClarifyingQuestion: false, aiAskedFor: [], artifactVisible: true, vagueTerms: ['premium'], ingredients: { audience: false, price: false, mood: false, realPhoto: false, productDetail: false }, confidence: 0.9 };
   const d = { action: 'intervene', step: 'question', reason: 'r', quote: 'more premium', message: 'Who is it for?', note: null, missingIngredients: ['audience'], exampleBrief: null };
   const out = turnTask.read({ reading: r, decision: d });
   assert.equal(out.reading.userRequest, 'more premium');
   assert.equal(out.proposal.step, 'question');
   assert.throws(() => turnTask.read({ reading: r }));
   assert.equal(turnTask.schema.additionalProperties, false);
+});
+
+test('a card counts as working only when applied, for the same tool and task, and the AI asked for its details', () => {
+  const card = (over: Partial<CaddieCard> = {}): CaddieCard => ({ id: 'c', sessionId: 's1', text: 'Before you make a poster, ask me who it is for, the price and one feeling.', scope: 'Tasks like: premium dessert poster for Morning Table', targetTool: 'Meta AI', asks: ['audience', 'price', 'mood'], status: 'applied', history: [], sourceMomentIds: [], provenance: 'live-model', ...over });
+  const asked = (over: Partial<Reading> = {}) => reading({ tool: 'Meta AI', task: 'poster for a new drink', aiAskedClarifyingQuestion: true, aiAskedFor: ['audience', 'price', 'mood', 'productDetail'], ...over });
+  const yes = cardObserved(card(), asked());
+  assert.equal(yes.ok, true);
+  assert.deepEqual(yes.asked, ['audience', 'price', 'mood']);
+  assert.equal(cardObserved(card({ status: 'approved' }), asked()).ok, false, 'approved but never applied');
+  assert.equal(cardObserved(card({ status: 'proposed' }), asked()).ok, false);
+  assert.equal(cardObserved(card({ status: 'revoked' }), asked()).ok, false);
+  assert.equal(cardObserved(card(), asked({ tool: 'ChatGPT' })).ok, false, 'another AI tool');
+  assert.equal(cardObserved(card(), asked({ task: 'cover letter for a barista job' })).ok, false, 'another kind of task');
+  assert.equal(cardObserved(card(), asked({ aiAskedFor: ['realPhoto'] })).ok, false, 'unrelated questions');
+  assert.equal(cardObserved(card(), asked({ aiAskedClarifyingQuestion: false, aiAskedFor: [] })).ok, false, 'the AI did not ask');
+  assert.equal(cardObserved(card({ targetTool: 'your AI' }), asked()).ok, false, 'unknown target tool');
+  assert.equal(cardObserved(card({ asks: undefined }), asked({ aiAskedFor: ['audience', 'price'] })).ok, true, 'older card without asks: two asked details');
+  assert.equal(cardObserved(card({ status: 'observed-working' }), asked()).ok, true);
 });

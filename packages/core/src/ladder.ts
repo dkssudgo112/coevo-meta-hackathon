@@ -35,7 +35,7 @@ export interface LadderContext {
   /** Earlier moments in the same session, oldest first. */
   history: Moment[];
   nowMs: number;
-  /** An approved/applied Caddie card exists for this kind of task. */
+  /** An applied Caddie card matches this reading (same tool and task, AI asked for its details). */
   activeCard: boolean;
   policy?: LadderPolicy;
 }
@@ -58,12 +58,14 @@ export function applyGuardrails(p: Proposal, ctx: LadderContext): Proposal & { g
   const r = ctx.reading;
   if (!r || !r.legible) return quiet('The screen was not readable, so the Caddie stays quiet.', 'illegible');
   if (r.userTyping) return quiet('You were typing. The Caddie does not interrupt input.', 'typing');
-  if (p.action === 'stay-quiet') return { ...p, step: 'watch', message: null, note: cleanNote(p.note), exampleBrief: null, guardrail: null };
-
   if (ctx.activeCard && r.aiAskedClarifyingQuestion) {
-    // Keep the model's own wording for the flow line; only the action is forced.
-    return quiet('Your AI asked the clarifying questions first, so the Caddie stays quiet.', 'ai-asked-first', cleanNote(p.note));
+    // An applied card is visibly working: this explanation beats a generic note (e.g. first sighting).
+    // Keep the model's own wording only when it already says the AI asked first.
+    const own = cleanNote(p.note);
+    const note = own && /\bask/i.test(own) ? own : 'Your AI asked first, as your card says, so I am staying quiet.';
+    return quiet('Your AI asked the questions your card asks for, so the Caddie stays quiet.', 'ai-asked-first', note);
   }
+  if (p.action === 'stay-quiet') return { ...p, step: 'watch', message: null, note: cleanNote(p.note), exampleBrief: null, guardrail: null };
 
   const interventions = ctx.history.filter(m => m.decision?.action === 'intervene');
   if (interventions.length >= policy.maxInterventionsPerSession) {

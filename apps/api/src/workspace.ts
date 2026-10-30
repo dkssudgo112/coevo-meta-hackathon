@@ -127,14 +127,41 @@ export class Workspace extends DurableObject<Env> {
     };
   }
 
+  private contentAlive(contentId: string): boolean {
+    const c = this.store.get('content', contentId);
+    return !!c && this.store.alive('content', contentId) && this.store.alive('session', c.sessionId);
+  }
+
+  /** TEST ONLY (local fake models): delay the next object writes so tests can race deletion against them. */
+  private testR2 = { delayMs: 0, count: 0, keys: [] as string[] };
+
+  private bucket(): R2Bucket {
+    const b = this.env.MEDIA;
+    if (!fakeMeta(this.env) || this.testR2.count <= 0) return b;
+    const t = this.testR2;
+    return new Proxy(b, {
+      get: (target, prop) => {
+        if (prop === 'put') {
+          return async (key: string, ...rest: unknown[]) => {
+            if (t.count > 0) { t.count--; t.keys.push(key); await new Promise(r => setTimeout(r, t.delayMs)); }
+            return (target.put as (...a: unknown[]) => Promise<R2Object | null>).call(target, key, ...rest);
+          };
+        }
+        const v = Reflect.get(target, prop);
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+  }
+
   private context(): Ctx {
+    const self = this;
     return {
       env: this.env,
       wsId: this.meta!.id,
       store: this.store,
       spender: this.spender('meta'),
       mediaSpender: this.spender('modal'),
-      r2: this.env.MEDIA,
+      get r2() { return self.bucket(); },
       memory: async () => (await this.ctx.storage.get<string[]>('memory')) ?? [],
       remember: async fact => {
         const mem = (await this.ctx.storage.get<string[]>('memory')) ?? [];
@@ -201,7 +228,7 @@ export class Workspace extends DurableObject<Env> {
     const current = async (jobId: string) => ((await this.ctx.storage.get<Job[]>('jobs')) ?? []).some(j => j.jobId === jobId);
     for (const job of jobs) {
       const item = this.store.get('content', job.contentId);
-      if (!item || !this.store.alive('content', job.contentId)) { settled.add(job.jobId); continue; } // deleted: drop the job, store nothing
+      if (!item || !this.contentAlive(job.contentId)) { settled.add(job.jobId); continue; } // deleted: drop the job, store nothing
       if (Date.now() - job.startedAt > JOB_TIMEOUT_MS) {
         settled.add(job.jobId);
         await this.store.put('content', { ...item, status: 'failed', error: 'Rendering took too long. Retry to render again.', updatedAt: now() });
@@ -213,10 +240,12 @@ export class Workspace extends DurableObject<Env> {
         settled.add(job.jobId);
         if (!(await current(job.jobId))) continue; // replaced by a retry while polling: the newer job decides
         if (r.status === 'failed') { await this.store.put('content', { ...item, status: 'failed', error: r.error, updatedAt: now() }); continue; }
-        if (!this.store.alive('content', item.id)) continue;
+        if (!this.contentAlive(item.id)) continue;
         const ext = item.format === 'podcast' ? 'm4a' : 'mp4';
         const key = `w/${this.meta!.id}/media/${item.id}-${item.attempts}.${ext}`;
-        await this.env.MEDIA.put(key, r.bytes, { httpMetadata: { contentType: r.mime } });
+        await this.bucket().put(key, r.bytes, { httpMetadata: { contentType: r.mime } });
+        // Deleted while the file was being written: remove it so nothing is left behind.
+        if (!this.contentAlive(item.id)) { await this.bucket().delete(key); continue; }
         const fresh = this.store.get('content', item.id)!;
         if (fresh.format === 'podcast') {
           const p = fresh.payload as PodcastPayload;
@@ -280,6 +309,14 @@ export class Workspace extends DurableObject<Env> {
       if (path === '/state' && method === 'GET') return json(await this.snapshot());
       if (path === '/repair' && method === 'POST' && role === 'desk') return this.repair();
       if (seg[0] === 'media' && method === 'GET') return this.media(seg.slice(1).join('/'));
+      if (seg[0] === 'test' && seg[1] === 'r2-delay' && fakeMeta(this.env)) {
+        if (method === 'POST') {
+          const b = (await req.json().catch(() => ({}))) as { ms?: number; count?: number };
+          this.testR2 = { delayMs: Math.min(20_000, Math.max(0, Number(b.ms) || 0)), count: Math.min(5, Math.max(0, Number(b.count) || 0)), keys: [] };
+          return json({ ok: true });
+        }
+        return json({ keys: this.testR2.keys });
+      }
 
       if (seg[0] === 'sessions') {
         if (seg.length === 1 && method === 'POST') return json(await this.startSession(req));
@@ -441,6 +478,8 @@ export class Workspace extends DurableObject<Env> {
   }
 
   private async deleteSession(s: Session): Promise<void> {
+    // Mark it deleted before the first await, so in-flight work stops creating things during cleanup.
+    await this.store.markRemoved('session', s.id);
     const keys: string[] = [];
     for (const m of sessionMoments(this.store, s.id)) {
       if (m.frame?.storedKey) keys.push(m.frame.storedKey);
@@ -449,12 +488,12 @@ export class Workspace extends DurableObject<Env> {
     for (const c of this.store.list('content').filter(c => c.sessionId === s.id)) await this.store.remove('content', c.id);
     for (const c of this.store.list('card').filter(c => c.sessionId === s.id && c.status === 'proposed')) await this.store.remove('card', c.id);
     for (const sk of this.store.list('skill')) if (sk.momentId && !this.store.get('moment', sk.momentId)) await this.store.remove('skill', sk.id);
-    const listed = await this.env.MEDIA.list({ prefix: `w/${this.meta!.id}/` });
+    const listed = await this.bucket().list({ prefix: `w/${this.meta!.id}/` });
     for (const o of listed.objects) if (o.key.includes(`/short/`) || o.key.includes('/media/')) {
       const owner = this.store.list('content').some(c => o.key.includes(c.id));
       if (!owner) keys.push(o.key);
     }
-    if (keys.length) await this.env.MEDIA.delete(keys);
+    if (keys.length) await this.bucket().delete(keys);
     const jobs = (await this.ctx.storage.get<Job[]>('jobs')) ?? [];
     await this.ctx.storage.put('jobs', jobs.filter(j => this.store.alive('content', j.contentId)));
     await this.store.remove('session', s.id);
@@ -493,14 +532,18 @@ export class Workspace extends DurableObject<Env> {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const size = imageSize(bytes);
     if (!size) return error(415, 'unsupported', 'Send a JPEG or PNG frame.');
-    let session = this.store.list('session').find(s => s.status === 'live');
+    let session = this.store.list('session').find(s => s.status === 'live' && this.store.alive('session', s.id));
     if (!session) {
       if (this.store.list('session').some(s => s.status === 'paused')) return error(409, 'paused', 'Watching is paused.');
       session = await this.startSession(new Request('http://x', { method: 'POST', body: JSON.stringify({ fixture: source === 'sample' }) }));
     }
     const frameId = id('f');
     const key = `w/${this.meta!.id}/frames/${frameId}.${size.mime === 'image/png' ? 'png' : 'jpg'}`;
-    await this.env.MEDIA.put(key, bytes, { httpMetadata: { contentType: size.mime } });
+    await this.bucket().put(key, bytes, { httpMetadata: { contentType: size.mime } });
+    if (!this.store.alive('session', session.id)) {
+      await this.bucket().delete(key); // the session was deleted during the upload
+      return error(409, 'session_deleted', 'That session was deleted. Start watching again.');
+    }
     const frame: FrameRef = {
       id: frameId, capturedAt: (form.get('capturedAt') as string) || now(), source, storedKey: key, deleted: false,
       width: size.width, height: size.height, deviceCropped: form.get('deviceCropped') === 'true' || source === 'screen-share', fixture: source === 'sample',

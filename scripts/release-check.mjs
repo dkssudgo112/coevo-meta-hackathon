@@ -16,10 +16,18 @@ function git(args, encoding) {
   return result.stdout;
 }
 // Binaries are allowed only when their exact bytes were reviewed (path + SHA-256).
-// A missing list means no binary is allowed.
+// The list is read from the same source as the files: the Git index under --staged,
+// so an unstaged edit can never approve staged bytes. A missing list allows no binary.
+const REVIEWED = 'scripts/reviewed-assets.json';
 function loadReviewed() {
   let raw;
-  try { raw = readFileSync(path.join(root, 'scripts/reviewed-assets.json'), 'utf8'); } catch (error) { if (error.code === 'ENOENT') return new Map(); throw error; }
+  if (staged) {
+    const r = spawnSync('git', ['show', `:${REVIEWED}`], { cwd: root, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    if (r.status !== 0) return new Map();
+    raw = r.stdout;
+  } else {
+    try { raw = readFileSync(path.join(root, REVIEWED), 'utf8'); } catch (error) { if (error.code === 'ENOENT') return new Map(); throw error; }
+  }
   return new Map(JSON.parse(raw).assets.map(a => [a.path, a.sha256]));
 }
 const reviewed = loadReviewed();

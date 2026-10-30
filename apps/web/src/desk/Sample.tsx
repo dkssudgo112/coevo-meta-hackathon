@@ -6,11 +6,10 @@ import { errorText, Flag, latestSession, modelSourceLine, sessionMoments, useHea
 import { LiveScreen } from '../phone/Live.tsx';
 import { SessionReview } from './Desk.tsx';
 
-interface Manifest { note: string; frames: { file: string; caption: string; session: number; provenance: 'actual-meta-ai' | 'mock-up' }[] }
+interface Manifest { note: string; frames: { file: string; caption: string; session: number; provenance: 'actual-meta-ai' }[] }
 
 const SOURCE: Record<Manifest['frames'][number]['provenance'], string> = {
   'actual-meta-ai': 'Actual Meta AI reply · scripted, fictional café',
-  'mock-up': 'Mock-up screen · generic AI chat',
 };
 
 /** Rasterize a sample screen (JPEG or SVG) to JPEG, the same format the phone sends. */
@@ -49,7 +48,7 @@ export function SampleApp() {
       <div className="landing">
         <div className="row"><Flag state="watching" /><span className="eyebrow">Sample session</span></div>
         <h1>Watch the Caddie work, without a phone</h1>
-        <p className="muted">You’ll replay a café owner’s screens while they make a poster with Meta AI. The café is fictional and the requests are scripted; the first session’s Meta AI replies are real, the follow-up screen is a mock-up. {modelSourceLine(health)}</p>
+        <p className="muted">You’ll replay a café owner’s screens while they make a poster with Meta AI. The café is fictional and the requests are scripted; every Meta AI reply on screen is real. {modelSourceLine(health)}</p>
         <div className="row"><button className="btn primary" onClick={start}>Start the sample</button></div>
         {err && <p className="faint" role="alert">{err}</p>}
       </div>
@@ -115,7 +114,7 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
         const crossing = prev && prev.session !== manifest.frames[n].session;
         if (crossing && current && current.status !== 'ended') {
           await post(creds, `/sessions/${current.id}/end`);
-          setMsg('Session 1 ended. Review the wrap-up below, approve the Caddie card, then press Continue for the next session a week later.');
+          setMsg('Session 1 ended. Review the wrap-up below and the Caddie card it proposes. Continue shows a separate recorded Meta AI chat that began with a Coevo card from an earlier run; your own card here is not in any AI, so the Caddie will not count it as working.');
           setI(n);
           return;
         }
@@ -143,7 +142,7 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
     <div className="desk">
       <header className="desk-top">
         <Flag state="watching" />
-        <div className="grow"><h2>Sample session</h2><p className="faint">Scripted, fictional café. Session 1 shows actual Meta AI replies; the follow-up screen is a mock-up. {state ? modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels }) : ''}</p></div>
+        <div className="grow"><h2>Sample session</h2><p className="faint">Scripted, fictional café; every screen is an actual Meta AI reply. {state ? modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels }) : ''}</p></div>
         <button className="btn small" onClick={onRestart}>New sample</button>
       </header>
       {state && (state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}

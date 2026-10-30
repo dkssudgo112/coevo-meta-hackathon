@@ -5,6 +5,8 @@
 // request Meta AI asked for audience, price, mood and a photo first. So for Meta
 // AI the card starts a dedicated, pinned chat.
 
+import type { CaddieCard, Ingredients, Reading } from '../../contracts/index.ts';
+
 export interface ApplyHint { tool: string; text: string; how: string }
 
 export function applyHint(tool: string | null, rule: string): ApplyHint {
@@ -37,4 +39,37 @@ export function applyHint(tool: string | null, rule: string): ApplyHint {
 
 function lowerFirst(s: string): string {
   return s ? s[0].toLowerCase() + s.slice(1) : s;
+}
+
+// ---------------------------------------------------------------- observation
+
+
+const STOP = new Set(['make', 'making', 'made', 'with', 'from', 'that', 'this', 'your', 'their', 'about', 'tasks', 'like', 'kind', 'some', 'more', 'very', 'into', 'task']);
+
+function words(s: string | null | undefined): Set<string> {
+  return new Set((s ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !STOP.has(w)).map(w => (w.endsWith('s') ? w.slice(0, -1) : w)));
+}
+
+function toolKey(t: string | null | undefined): string {
+  return (t ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Whether a reading shows THIS card working: the card was applied (not merely approved),
+ * the screen shows the same AI tool and the same kind of task, and the AI asked first for
+ * the details the card names. Anything less is not counted as the card working.
+ */
+export function cardObserved(card: CaddieCard, reading: Reading | null): { ok: boolean; asked: (keyof Ingredients)[] } {
+  const no = { ok: false, asked: [] as (keyof Ingredients)[] };
+  if (!reading?.legible || !reading.aiAskedClarifyingQuestion) return no;
+  if (card.status !== 'applied' && card.status !== 'observed-working') return no;
+  const tool = toolKey(card.targetTool);
+  if (!tool || tool === 'yourai' || tool !== toolKey(reading.tool)) return no;
+  const scopeTask = card.scope.replace(/^Tasks like:\s*/i, '');
+  const cardWords = words(scopeTask);
+  if (cardWords.size && ![...words(reading.task)].some(w => cardWords.has(w))) return no;
+  const asked = reading.aiAskedFor ?? [];
+  const want = card.asks?.length ? card.asks : null;
+  const hits = want ? asked.filter(k => want.includes(k)) : asked;
+  return hits.length >= Math.min(2, want?.length ?? 2) ? { ok: true, asked: hits } : no;
 }

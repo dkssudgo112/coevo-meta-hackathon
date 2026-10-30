@@ -73,6 +73,8 @@ export interface Reading {
   aiResponseSummary: string | null;
   /** True when the AI's latest turn asks the user clarifying questions before producing. */
   aiAskedClarifyingQuestion: boolean;
+  /** Which details the AI asked for before producing (empty when it did not ask). Older readings may lack it. */
+  aiAskedFor?: (keyof Ingredients)[];
   artifactVisible: boolean;
   /** Vague style words the user leaned on, e.g. ["premium"]. */
   vagueTerms: string[];
@@ -195,6 +197,8 @@ export interface CaddieCard {
   /** Where the rule applies, e.g. "Posters and menu visuals". */
   scope: string;
   targetTool: string;
+  /** Details the card tells the AI to ask for; used to check that an observed question matches the card. */
+  asks?: (keyof Ingredients)[];
   status: CardStatus;
   history: CardEvent[];
   sourceMomentIds: string[];
@@ -225,8 +229,10 @@ export interface ManualPayload {
   pitfalls: string[];
   forYourAI: string[];
   youDecide: string[];
-  /** One imperative rule for the user's AI; becomes the proposed Caddie card. */
+  /** One rule for the user's AI, in their voice; becomes the proposed Caddie card. */
   cardRule: string;
+  /** Details the card rule tells the AI to ask for. */
+  cardAsks: (keyof Ingredients)[];
 }
 
 export interface Flashcard { id: string; prompt: string; answer: string; scenario: string; dueAt: string; interval: number; reviews: { at: string; result: 'applied' | 'unsure' }[] }

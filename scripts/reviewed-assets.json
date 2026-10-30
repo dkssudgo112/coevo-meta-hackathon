@@ -30,6 +30,12 @@
       "sha256": "b49f646e3cebf679b416687ba20b152fc7a94e06dba74e1e6be410e4b17cf84b",
       "review": "Cropped to the fictional café conversation only; no account area, sidebar or conversation URL; zero EXIF entries (JFIF + ICC profile only). Reviewed visually by Codex and Claude, 2026-10-30.",
       "provenance": "Actual Meta AI (consumer web) replies to a scripted, fictional café scenario. Not a real user and not learning evidence."
+    },
+    {
+      "path": "apps/web/public/samples/meta-ai-6.jpg",
+      "sha256": "acb1278b80ee777b6a616e5924efc936fa7d6bb83459790621b705dbb1370e86",
+      "review": "Cropped to the fictional conversation only; no account area, sidebar or conversation URL; zero EXIF entries. Reviewed visually by Codex and Claude, 2026-10-30.",
+      "provenance": "Actual Meta AI (consumer web) reply in a separate recorded chat that began with a Coevo-generated card from an earlier run; scripted fictional persona. Not an elapsed week, not learning evidence."
     }
   ]
 }

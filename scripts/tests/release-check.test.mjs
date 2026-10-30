@@ -68,6 +68,19 @@ test('accepts a binary only when its path and exact bytes were reviewed', () => 
   assert.match(changed.stderr, /bytes changed since review/);
 }));
 
+test('under --staged, an unstaged allowlist edit cannot approve a staged binary', () => scenario(({cwd, git, check}) => {
+  const bytes = Buffer.from([0xff, 0xd8, 0, 7, 7]);
+  mkdirSync(join(cwd, 'scripts'));
+  writeFileSync(join(cwd, 'shot.jpg'), bytes);
+  writeFileSync(join(cwd, 'scripts', 'reviewed-assets.json'), JSON.stringify({ assets: [] }));
+  git('add', 'shot.jpg', 'scripts/reviewed-assets.json');
+  // Approve the bytes only in the working tree.
+  writeFileSync(join(cwd, 'scripts', 'reviewed-assets.json'), JSON.stringify({ assets: [{ path: 'shot.jpg', sha256: createHash('sha256').update(bytes).digest('hex') }] }));
+  const result = check('--staged');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /binary content requires manual review/);
+}));
+
 test('fails closed on an empty index', () => scenario(({check}) => {
   assert.equal(check('--staged').status, 1);
 }));

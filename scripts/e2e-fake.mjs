@@ -216,6 +216,22 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
   check('no further generations ran after deletion (manual, flashcards, short)', ['manual', 'flashcards', 'short'].every(n => (after.calls[n] ?? 0) === (before.calls[n] ?? 0)));
 }
 
+// Deletion during a slow object write (TEST hook): nothing stays behind in storage.
+{
+  await fetch(`${fake}/reset`);
+  const sess = (await call('/sessions', { method: 'POST', body: '{}' })).body;
+  await sleep(2600);
+  for (const seed of [0, 1]) await frame(seed);
+  await call('/test/r2-delay', { method: 'POST', body: JSON.stringify({ ms: 6000, count: 1 }) });
+  await call(`/sessions/${sess.id}/end`, { method: 'POST' });
+  let keys = [];
+  for (let i = 0; i < 60 && !keys.length; i++) { keys = (await call('/test/r2-delay')).body.keys; if (!keys.length) await sleep(500); }
+  await call(`/sessions/${sess.id}`, { method: 'DELETE' });
+  await sleep(9000); // the delayed write finishes after the deletion
+  const left = keys.length ? await call(`/media/${keys[0]}`) : null;
+  const st = await state();
+  check('deleting during a slow storage write leaves no object behind', keys.length === 1 && left?.res.status === 404 && !st.content.some(c => c.sessionId === sess.id), `${keys[0]?.split('/').slice(2, 3)[0] ?? 'no write'} → ${left?.res.status}`);
+}
 // Media race: a job dispatched while the alarm is busy polling another must not be lost.
 {
   await fetch(`${fake}/reset`);

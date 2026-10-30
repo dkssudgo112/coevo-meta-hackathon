@@ -61,8 +61,13 @@ class Gone extends Error {
   constructor() { super('deleted'); this.name = 'Gone'; }
 }
 
+function contentAlive(ctx: Ctx, contentId: string): boolean {
+  const c = ctx.store.get('content', contentId);
+  return !!c && ctx.store.alive('content', contentId) && ctx.store.alive('session', c.sessionId);
+}
+
 function ensureAlive(ctx: Ctx, contentId: string): void {
-  if (!ctx.store.alive('content', contentId)) throw new Gone();
+  if (!contentAlive(ctx, contentId)) throw new Gone();
 }
 
 async function setItem(ctx: Ctx, item: ContentItem, patch: Partial<ContentItem>): Promise<ContentItem> {
@@ -132,7 +137,7 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
       case 'manual': {
         const v = (await runTask(ctx.env, ctx.spender, manualTask, { text })).value;
         await setItem(ctx, base, { status: 'ready', payload: v satisfies ManualPayload });
-        if (ctx.store.alive('session', session.id)) await proposeCard(ctx, session, v.cardRule, item.sourceMomentIds);
+        if (ctx.store.alive('session', session.id)) await proposeCard(ctx, session, v.cardRule, v.cardAsks, item.sourceMomentIds);
         break;
       }
       case 'flashcards': {
@@ -176,6 +181,8 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
             ensureAlive(ctx, base.id); // deleted while the image was being made: do not store it
             const key = `w/${ctx.wsId}/short/${base.id}/${i}.png`;
             await ctx.r2.put(key, img.bytes, { httpMetadata: { contentType: img.mime } });
+            // Deleted while the object was being written: remove it so nothing is left behind.
+            if (!contentAlive(ctx, base.id)) { await ctx.r2.delete(key); throw new Gone(); }
             scenes[i] = { ...s, imageKey: key };
             bytes = img.bytes;
           }
@@ -188,7 +195,7 @@ export async function generate(ctx: Ctx, contentId: string): Promise<void> {
       }
     }
   } catch (e) {
-    if (e instanceof Gone || !ctx.store.alive('content', base.id)) return; // deleted: nothing to record
+    if (e instanceof Gone || !contentAlive(ctx, base.id)) return; // deleted: nothing to record
     const message = e instanceof MediaUnavailable ? e.message : e instanceof Error && !(e.name === 'MetaError' || e.name === 'LiveCallsDisabled' || e.name === 'BudgetExceeded' || e.name === 'InvalidOutput') ? e.message : failureStatus(e).message;
     await setItem(ctx, base, { status: 'failed', error: message });
   }
@@ -215,11 +222,11 @@ async function startMedia(ctx: Ctx, contentId: string, job: Parameters<typeof st
   await ctx.trackJob(contentId, jobId);
 }
 
-async function proposeCard(ctx: Ctx, session: Session, rule: string, sourceMomentIds: string[]): Promise<void> {
+async function proposeCard(ctx: Ctx, session: Session, rule: string, asks: ManualPayload['cardAsks'], sourceMomentIds: string[]): Promise<void> {
   const existing = ctx.store.list('card').find(c => c.sessionId === session.id && c.status === 'proposed');
   const card: CaddieCard = {
     id: existing?.id ?? id('card'), sessionId: session.id, text: rule,
-    scope: session.task ? `Tasks like: ${session.task}` : 'This kind of task', targetTool: session.tool ?? 'your AI',
+    scope: session.task ? `Tasks like: ${session.task}` : 'This kind of task', targetTool: session.tool ?? 'your AI', asks,
     status: 'proposed', history: [{ status: 'proposed', at: now(), by: 'caddie', note: null }], sourceMomentIds, provenance: modelProvenance(ctx.env),
   };
   await ctx.store.put('card', card);
@@ -320,6 +327,7 @@ export async function practiceAttempt(ctx: Ctx, practiceId: string, wav: Uint8Ar
     if (image.status === 'fulfilled') {
       imageKey = `w/${ctx.wsId}/practice/${practiceId}.png`;
       await ctx.r2.put(imageKey, image.value.bytes, { httpMetadata: { contentType: image.value.mime } });
+      if (!ctx.store.alive('practice', practiceId)) { await ctx.r2.delete(imageKey); return; }
     }
     if (check.status === 'rejected') throw check.reason;
     const assistance = labelPractice({ autoOpened: p.autoOpened, hintViewed: p.hintViewed, transcript }, examples);

@@ -2,6 +2,7 @@
 
 import type { CaddieCard, Decision, Moment, MomentTiming, Reading, Session, SkillObservation } from '../../../packages/contracts/index.ts';
 import { applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
+import { cardObserved } from '../../../packages/core/src/cards.ts';
 import { dimensionFor, observeChange, presentIngredients, strengthFor } from '../../../packages/core/src/labels.ts';
 import { decisionTask, readingTask, turnTask, type DecisionInput, type TurnContext } from '../../../packages/core/src/prompts.ts';
 import { BudgetExceeded, CostUnverifiable, InvalidAudio, InvalidOutput, LiveCallsDisabled, MetaError, modelProvenance, ModelNotAllowed, RetryLater, runTask, type Spender } from './meta.ts';
@@ -41,8 +42,18 @@ export function sessionMoments(store: Store, sessionId: string): Moment[] {
   return store.list('moment').filter(m => m.work.sessionId === sessionId).sort((a, b) => a.index - b.index);
 }
 
-export function activeCards(store: Store): CaddieCard[] {
-  return store.list('card').filter(c => c.status === 'approved' || c.status === 'applied' || c.status === 'observed-working');
+/** Cards the person has put into their AI (applied), which can change what the AI does. */
+export function appliedCards(store: Store): CaddieCard[] {
+  return store.list('card').filter(c => c.status === 'applied' || c.status === 'observed-working');
+}
+
+/** The applied card this reading shows working, if any (same tool and task, AI asked for its details). */
+export function matchedCard(store: Store, reading: Reading | null): { card: CaddieCard; asked: string[] } | null {
+  for (const card of appliedCards(store)) {
+    const m = cardObserved(card, reading);
+    if (m.ok) return { card, asked: m.asked };
+  }
+  return null;
 }
 
 function repeatedVague(history: Moment[], reading: Reading): DecisionInput['repeatedVagueTerm'] {
@@ -77,7 +88,7 @@ export async function buildDecisionInput(ctx: Ctx, reading: Reading, history: Mo
     recentRequests: recentRequests.slice(-6),
     repeatedVagueTerm: repeatedVague(history, reading),
     interventions: interventions.slice(-4).map(m => ({ at: m.decision!.decidedAt, step: m.decision!.step, message: m.decision!.message ?? '', response: m.response ? `${m.response.kind}${m.response.transcript ? `: ${m.response.transcript}` : ''}` : null })),
-    activeCards: activeCards(ctx.store).map(c => c.text),
+    activeCards: appliedCards(ctx.store).map(c => `${c.text} [applied in ${c.targetTool}; ${c.scope}]`),
     memory: (await ctx.memory()).slice(-8),
     secondsSinceLastIntervention: last?.decision ? Math.round((Date.now() - Date.parse(last.decision.decidedAt)) / 1000) : null,
   };
@@ -94,7 +105,7 @@ export async function decide(ctx: Ctx, reading: Reading, history: Moment[], extr
 }
 
 function guard(ctx: Ctx, proposal: Proposal, reading: Reading, history: Moment[], model: string): Decision {
-  const guarded = applyGuardrails(proposal, { reading, history, nowMs: Date.now(), activeCard: activeCards(ctx.store).length > 0 });
+  const guarded = applyGuardrails(proposal, { reading, history, nowMs: Date.now(), activeCard: matchedCard(ctx.store, reading) !== null });
   return toDecision(guarded, model, now(), modelProvenance(ctx.env));
 }
 
@@ -128,13 +139,17 @@ async function recordSkills(ctx: Ctx, moment: Moment, session: Session): Promise
   }
 }
 
+const INGREDIENT_LABEL: Record<string, string> = { audience: 'who it is for', price: 'the price', mood: 'the feeling', realPhoto: 'a real photo', productDetail: 'what exactly it is' };
+
 async function observeCards(ctx: Ctx, moment: Moment): Promise<void> {
   if (!moment.reading?.aiAskedClarifyingQuestion) return;
-  for (const card of activeCards(ctx.store)) {
-    if (card.status === 'observed-working' || card.sessionId === moment.work.sessionId) continue;
+  for (const card of appliedCards(ctx.store)) {
+    if (card.status !== 'applied' || card.sessionId === moment.work.sessionId) continue;
+    const m = cardObserved(card, moment.reading);
+    if (!m.ok) continue;
     await ctx.store.update('card', card.id, c => ({
       ...c, status: 'observed-working',
-      history: [...c.history, { status: 'observed-working', at: now(), by: 'observation', note: `The AI asked clarifying questions first (moment ${moment.index + 1}).` }],
+      history: [...c.history, { status: 'observed-working', at: now(), by: 'observation', note: `${moment.reading?.tool ?? 'The AI'} asked for ${m.asked.map(k => INGREDIENT_LABEL[k]).join(', ')} before making it (moment ${moment.index + 1}).` }],
     }));
   }
 }

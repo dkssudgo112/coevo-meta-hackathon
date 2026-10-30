@@ -55,6 +55,7 @@ Report only what is visible. Never guess text you cannot read. If the conversati
 - userRequest: the person's most recent message to the AI, copied exactly as shown (keep their wording and typos).
 - userTyping: true only if there is unsent text in the input box.
 - aiAskedClarifyingQuestion: true only if the AI's most recent turn asks the person questions before producing the result.
+- aiAskedFor: when it asked, which details its questions ask for (audience = who it is for; price = a price or number; mood = a feeling or tone; realPhoto = whether the person has a real photo or own material; productDetail = what exactly it is). Empty when it did not ask.
 - vagueTerms: style words in the latest request that carry no concrete instruction, lowercased (e.g. "premium", "luxurious", "better", "modern", "cute").
 - ingredients: judge only the latest user request.`,
   schema: S.obj({
@@ -65,6 +66,7 @@ Report only what is visible. Never guess text you cannot read. If the conversati
     userTyping: S.bool('Unsent text in the input box.'),
     aiResponseSummary: S.nstr('What the AI did in its latest turn, at most one sentence.', 200),
     aiAskedClarifyingQuestion: S.bool('The AI asked questions before producing.'),
+    aiAskedFor: S.arr(S.enumOf(INGREDIENT_KEYS, 'detail'), 'Details the AI asked for before producing; empty if it did not ask.', 0, 5),
     artifactVisible: S.bool('An image, poster, draft or document produced by the AI is visible.'),
     vagueTerms: S.arr(S.str('vague word', 30), 'Vague style words in the latest request.', 0, 6),
     ingredients: ingredientsSchema,
@@ -81,6 +83,7 @@ Report only what is visible. Never guess text you cannot read. If the conversati
       userTyping: R.bool(o.userTyping, 'userTyping'),
       aiResponseSummary: R.nstr(o.aiResponseSummary, 'aiResponseSummary', 200),
       aiAskedClarifyingQuestion: R.bool(o.aiAskedClarifyingQuestion, 'aiAskedClarifyingQuestion'),
+      aiAskedFor: R.arr(o.aiAskedFor, 'aiAskedFor', (x, p) => R.oneOf(x, INGREDIENT_KEYS, p), 0, 5),
       artifactVisible: R.bool(o.artifactVisible, 'artifactVisible'),
       vagueTerms: R.arr(o.vagueTerms, 'vagueTerms', (x, p) => R.str(x, p, 30).toLowerCase(), 0, 6),
       ingredients: readIngredients(o.ingredients, 'ingredients'),
@@ -118,7 +121,7 @@ Ladder (use the lowest step that can work, one step at a time):
 Never repeat a question the AI already asked. One improvement at a time. Message at most 2 sentences and 160 characters. ${STYLE}
 Special cases:
 - firstSighting=true: stay quiet; in "note" say in at most 90 characters which tool and task you can see and that you will only speak when it helps.
-- If there is an active Caddie card and the AI asked the clarifying questions first: stay quiet; in "note" say briefly that their AI asked first, so you are staying quiet.
+- If an applied Caddie card in activeCards covers this tool and task and the AI asked the clarifying questions first: stay quiet; in "note" say that their AI asked first, as their card says, so you are staying quiet. This takes priority over firstSighting.
 - "note" is one short flow line (at most 60 characters, 90 for firstSighting) describing what you saw or why you stayed quiet.`,
   schema: S.obj({
     action: S.enumOf(['stay-quiet', 'intervene'], 'Intervene or stay quiet.'),
@@ -228,6 +231,7 @@ export const manualTask: ModelTask<ManualPayload> = {
     forYourAI: S.arr(S.str('Instruction for the AI.', 200), 'For your AI.', 1, 5),
     youDecide: S.arr(S.str('Decision for the person.', 160), 'You decide.', 1, 5),
     cardRule: S.str('One rule in the person\'s voice to their AI ("Before you make …, ask me …"), general to this kind of task.', 200),
+    cardAsks: S.arr(S.enumOf(INGREDIENT_KEYS, 'detail'), 'Details the card rule tells the AI to ask for.', 1, 5),
   }),
   read(json) {
     const o = R.obj(json, 'manual');
@@ -240,6 +244,7 @@ export const manualTask: ModelTask<ManualPayload> = {
       forYourAI: R.arr(o.forYourAI, 'forYourAI', (x, p) => R.str(x, p, 200), 1, 5),
       youDecide: R.arr(o.youDecide, 'youDecide', (x, p) => R.str(x, p, 160), 1, 5),
       cardRule: R.str(o.cardRule, 'cardRule', 200),
+      cardAsks: R.arr(o.cardAsks, 'cardAsks', (x, p) => R.oneOf(x, INGREDIENT_KEYS, p), 1, 5),
     };
   },
 };
@@ -266,7 +271,7 @@ export const podcastTask: ModelTask<{ title: string; guest: string; lines: Omit<
   name: 'podcast',
   effort: 'medium',
   maxOutputTokens: 2200,
-  instructions: `Write a two-person podcast script (8–14 lines, 200–280 words in total, about 80–110 seconds spoken). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). The caddie speaks in the first person about its own questions ("when I asked …"). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
+  instructions: `Write a two-person podcast script (8–18 lines, 300–480 words in total, about 2–3 minutes spoken; never under 60 seconds). Speakers: "caddie" (the coach) and "guest", a skeptical friend in a similar situation (another small-business owner for a menu poster, another job seeker for a cover letter) who raises real objections (time, cost, "why not just say premium?"). The caddie may narrow or withdraw advice when an objection holds; the ending must reflect conditions that changed. Use this session's real moments and the person's own words (quote exactly). The caddie speaks in the first person about its own questions ("when I asked …"). Spoken style, short sentences, no stage directions, no sound effects. ${STYLE}`,
   schema: S.obj({
     title: S.str('Episode title.', 80),
     guest: S.str('Guest display name with their situation, e.g. "Jun, bakery owner".', 40),

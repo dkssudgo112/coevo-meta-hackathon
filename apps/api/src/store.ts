@@ -59,13 +59,23 @@ export class Store {
 
   private refused(entity: EntityName, data: Record<string, unknown> & { id: string }): boolean {
     if (this.tombs.has(`${entity}:${data.id}`)) return true;
-    // Entities deliberately kept after a session is deleted (an approved card) can still be
-    // updated (revoked, edited); only new entities for a removed session or moment are refused.
-    if (this.maps.get(entity)!.has(data.id)) return false;
     const sid = sessionOf(entity, data);
-    if (sid && this.tombs.has(`session:${sid}`)) return true;
+    if (sid && this.tombs.has(`session:${sid}`)) {
+      // A card approved before its session was deleted is kept on purpose and can still be
+      // revoked or edited; anything else for a removed session is refused.
+      return !(entity === 'card' && this.maps.get('card')!.has(data.id));
+    }
     if (entity === 'skill' && typeof data.momentId === 'string' && this.tombs.has(`moment:${data.momentId}`)) return true;
     return false;
+  }
+
+  /**
+   * Mark an entity removed right away (its tombstone takes effect before the first await),
+   * while its cleanup runs; remove() finishes the job.
+   */
+  async markRemoved(entity: EntityName, id: string): Promise<void> {
+    this.tombs.add(`${entity}:${id}`);
+    await this.storage.put(`tomb:${entity}:${id}`, Date.now());
   }
 
   get<K extends EntityName>(entity: K, id: string): EntityMap[K] | undefined {
