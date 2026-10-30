@@ -4,6 +4,7 @@ import { usWorkspaces } from './jurisdiction.ts';
 import { mediaConfigured } from './media.ts';
 import type { Env } from './env.ts';
 import { error, id, json, sha256 } from './util.ts';
+import { serveAsset } from './assets.ts';
 
 import { ledgerName, ledgerScope } from './workspace.ts';
 export { Workspace } from './workspace.ts';
@@ -92,7 +93,7 @@ async function admin(req: Request, env: Env, path: string): Promise<Response> {
 async function route(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
-  if (!path.startsWith('/api/')) return env.ASSETS.fetch(req);
+  if (!path.startsWith('/api/')) return serveAsset(req, env.ASSETS);
 
   if (path === '/api/health' && req.method === 'GET') {
     const global = await env.BUDGET.get(env.BUDGET.idFromName(ledgerName(env, 'meta'))).status(ledgerScope(env, 'meta'));
