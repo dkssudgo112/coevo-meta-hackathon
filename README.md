@@ -20,7 +20,7 @@ They answer out loud — office workers near the station, 6,500 won, a calm morn
 | --- | --- |
 | **Phone · Caddie** (`/caddie`) | Points its camera at your monitor. On-device change detection sends a frame only when the screen changed and settled. Only the boxed screen area is uploaded (plus one disclosed setup photo if you ask it to find the screen). A NOW card and haptic nudge when the Caddie steps in; you answer by voice or type. |
 | **PC · Desk** (`/desk`) | A thin tab: QR pairing, a copy inbox for what the Caddie sends, and evidence rows per moment (frame · what you said · what the Caddie did · what changed). |
-| **Sample** (`/sample`) | No phone needed. A scripted, fictional café scenario on screenshots of actual Meta AI replies. By default it replays a labeled recorded live run (once its files are published): the Caddie's real output, five formats, podcast and short, with no new model calls. "Run it live" makes fresh model calls on the shared demo budget. |
+| **Sample** (`/sample`) | No phone needed. A scripted, fictional café scenario on screenshots of actual Meta AI replies. By default it replays a labeled recorded live run: the Caddie's real output, five formats, podcast and short, with no new model calls. "Run it live" makes fresh model calls on the shared demo budget. |
 
 **Meta models in the product**
 

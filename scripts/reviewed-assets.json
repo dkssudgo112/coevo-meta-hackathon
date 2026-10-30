@@ -36,6 +36,18 @@
       "sha256": "acb1278b80ee777b6a616e5924efc936fa7d6bb83459790621b705dbb1370e86",
       "review": "Cropped to the fictional conversation only; no account area, sidebar or conversation URL; zero EXIF entries. Reviewed visually by Codex and Claude, 2026-10-30.",
       "provenance": "Actual Meta AI (consumer web) reply in a separate recorded chat that began with a Coevo-generated card from an earlier run; scripted fictional persona. Not an elapsed week, not learning evidence."
+    },
+    {
+      "path": "apps/web/public/samples/recorded/podcast.m4a",
+      "sha256": "17730f3507f72808c6a7787acc56365fe85d6f2a99023ab5d60ae8e0fd7fb6a4",
+      "review": "Exact bytes approved for publication by Codex on 2026-10-30 (ffprobe-checked; only standard codec/encoder metadata).",
+      "provenance": "Two-voice podcast (Kokoro-82M on Modal) from one recorded live run of the public sample; made on request after the Caddie skipped it. Scripted fictional persona."
+    },
+    {
+      "path": "apps/web/public/samples/recorded/short.mp4",
+      "sha256": "2cce42325f8e86aa9de3f71356a9e00123721839bbd52b7bbe51456818e01766",
+      "review": "Exact bytes approved for publication by Codex on 2026-10-30 (ffprobe-checked; only standard codec/encoder metadata).",
+      "provenance": "9:16 short (Kokoro-82M + composition on Modal, Muse Image backgrounds, the run's own before/after Meta AI screens) from one recorded live run of the public sample. Scripted fictional persona."
     }
   ]
 }

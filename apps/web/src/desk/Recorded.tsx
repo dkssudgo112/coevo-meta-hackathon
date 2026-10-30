@@ -28,6 +28,19 @@ interface RecordedRun {
 }
 interface Manifest { frames: { file: string; caption: string; session: number }[] }
 
+/**
+ * Reviewer notes shown beside (never inside) the recorded output, which stays exactly as produced.
+ * Keyed by public screen file or content format.
+ */
+const REVIEWER_NOTES: Record<string, string> = {
+  'meta-ai-5.jpg': 'Fact check: this final poster shows opening hours (07:00–11:00) that the owner never gave. Meta AI added them; treat them as unverified.',
+  short: 'The short’s “before” image is the first poster, while its narration describes a later, darker version. It is assembled from this run’s saved outputs, not one continuous capture.',
+};
+
+function ReviewerNote({ text }: { text: string }) {
+  return <div className="notice warn" role="note"><strong>Reviewer note, not model output.</strong> {text}</div>;
+}
+
 /** Load the recorded run if this build publishes one. */
 export function useRecordedRun(): { run: RecordedRun | null; manifest: Manifest | null; state: 'loading' | 'ready' | 'none' } {
   const [run, setRun] = useState<RecordedRun | null>(null);
@@ -146,6 +159,7 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
             {step.kind === 'moment' && step.m.screen && <div className="screen-sim"><img src={`/samples/${step.m.screen}`} alt={caption(step.m.screen)} /></div>}
             {step.kind === 'moment' && <p className="muted">{caption(step.m.screen)}</p>}
             {step.kind === 'moment' && <p className="faint">Actual Meta AI reply · scripted, fictional café</p>}
+            {step.kind === 'moment' && step.m.screen && REVIEWER_NOTES[step.m.screen] && <ReviewerNote text={REVIEWER_NOTES[step.m.screen]} />}
             {step.kind === 'wrap' && <p className="muted">The session ended. The Caddie planned what was worth making, with a reason for each format. Open any of them on the right.</p>}
             <div className="row wrap">
               <button className="btn" disabled={i === 0} onClick={() => { setPlaying(false); setI(x => x - 1); }}>Back</button>
@@ -185,7 +199,7 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
             </div>
           </section>
         </div>
-        {step.kind === 'wrap' && open && (() => { const c = items.find(x => x.id === open); return c ? <section className="card stack"><h3>{FORMAT_NAME[c.format]}</h3><ContentBody item={c} state={EMPTY} creds={null as never} /></section> : null; })()}
+        {step.kind === 'wrap' && open && (() => { const c = items.find(x => x.id === open); return c ? <section className="card stack"><h3>{FORMAT_NAME[c.format]}</h3>{REVIEWER_NOTES[c.format] && <ReviewerNote text={REVIEWER_NOTES[c.format]} />}<ContentBody item={c} state={EMPTY} creds={null as never} /></section> : null; })()}
         <p className="faint">This run cost ${run.cost.metaUsd.toFixed(4)} in Meta usage plus a ${run.cost.mediaReservationUsd.toFixed(2)} media reservation. {run.cost.note}</p>
         {i === steps.length - 1 && (
           <div className="notice">{run.notes[2]} <button className="btn small" onClick={onLive}>Run it live yourself</button> <a className="btn small" href="/desk">Use it with your phone</a></div>

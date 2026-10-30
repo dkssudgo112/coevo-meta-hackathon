@@ -1,0 +1,497 @@
+{
+  "kind": "coevo-recorded-run",
+  "label": "Recorded live run",
+  "recordedOn": "2026-10-30",
+  "scenario": "Scripted, fictional café owner. Every screen is an actual Meta AI reply; the owner’s requests are scripted. Not a real user and not learning evidence.",
+  "models": {
+    "reading_and_decisions": "Muse Spark 1.3",
+    "content": "Muse Spark 1.3",
+    "images": "Muse Image 1.0",
+    "speech": "Kokoro-82M on Modal (Apache-2.0)"
+  },
+  "notes": [
+    "Everything the Caddie says here is the model output recorded from one live run through the deployed app, replayed without new model calls.",
+    "The podcast was first skipped by the Caddie and then made on request.",
+    "Session 2 is a separate recorded Meta AI chat that began with a card from an earlier run; this run’s own card was never applied, so it is not counted as working."
+  ],
+  "design": {
+    "habit": "You repeated 'more premium' three times before giving audience, product, price, and mood.",
+    "turningPoint": {
+      "quote": "The new dessert is matcha basque cheesecake, priced at KRW 6,500."
+    },
+    "remainingConditions": [
+      "You still use a concept illustration because you have no real product photo yet."
+    ],
+    "counterpoint": "You can test directions faster by saying 'more premium' than by writing a full brief first.",
+    "formats": {
+      "note": {
+        "make": true,
+        "why": "You switched from vague premium requests to a full brief with audience and price."
+      },
+      "manual": {
+        "make": true,
+        "why": "You repeated 'more premium' three times, so a reusable brief checklist would help you next time."
+      },
+      "flashcards": {
+        "make": true,
+        "why": "You supplied product details only after the Caddie asked what your dessert is."
+      },
+      "podcast": {
+        "make": false,
+        "why": "You raised no objection or trade-off to argue after the final poster matched your brief."
+      },
+      "short": {
+        "make": true,
+        "why": "You have early premium drafts to compare with your final matcha poster showing price."
+      }
+    }
+  },
+  "moments": [
+    {
+      "screen": "meta-ai-1.jpg",
+      "atSec": 1,
+      "session": 1,
+      "reading": {
+        "tool": "Meta AI",
+        "task": "poster for a new dessert",
+        "userRequest": "Create a portrait poster for a fictional café called Morning Table. We have a new dessert. Make it look premium. This is a synthetic product-demo scenario; use no real brand logos or people.",
+        "aiAskedClarifyingQuestion": false,
+        "aiResponseSummary": "Created a premium portrait poster for Morning Table with berry mille-feuille.",
+        "vagueTerms": [
+          "premium"
+        ]
+      },
+      "decision": {
+        "action": "stay-quiet",
+        "step": "watch",
+        "message": null,
+        "note": "See Meta AI poster task, will speak only when helpful.",
+        "reason": "First legible sighting of this task, so staying quiet to observe.",
+        "quote": null,
+        "missingIngredients": [],
+        "guardrail": null
+      },
+      "response": null,
+      "change": null,
+      "timing": {
+        "mode": "combined",
+        "totalMs": 6537
+      }
+    },
+    {
+      "screen": "meta-ai-2.jpg",
+      "atSec": 12,
+      "session": 1,
+      "reading": {
+        "tool": "Meta AI",
+        "task": "poster for a new dessert",
+        "userRequest": "Make it more premium.",
+        "aiAskedClarifyingQuestion": false,
+        "aiResponseSummary": "AI produced an elevated luxury version of the Morning Table poster.",
+        "vagueTerms": [
+          "premium"
+        ]
+      },
+      "decision": {
+        "action": "stay-quiet",
+        "step": "watch",
+        "message": null,
+        "note": "Saw premium revision with poster; holding quiet.",
+        "reason": "Only second vague 'premium' request, not yet at intervention threshold.",
+        "quote": null,
+        "missingIngredients": [],
+        "guardrail": null
+      },
+      "response": null,
+      "change": null,
+      "timing": {
+        "mode": "combined",
+        "totalMs": 5991
+      }
+    },
+    {
+      "screen": "meta-ai-3.jpg",
+      "atSec": 22,
+      "session": 1,
+      "reading": {
+        "tool": "Meta AI",
+        "task": "poster for fictional café dessert",
+        "userRequest": "Still not premium enough. Make it more premium.",
+        "aiAskedClarifyingQuestion": false,
+        "aiResponseSummary": "AI generated a couture-style poster draft and explained premium changes.",
+        "vagueTerms": [
+          "premium"
+        ]
+      },
+      "decision": {
+        "action": "intervene",
+        "step": "question",
+        "message": "What is your new dessert — flavor, size, what makes it different?",
+        "note": "Third 'premium' request with no new details.",
+        "reason": "Same vague 'premium' asked 3 times with no new details and results not converging.",
+        "quote": "Still not premium enough. Make it more premium.",
+        "missingIngredients": [
+          "productDetail"
+        ],
+        "guardrail": null
+      },
+      "response": null,
+      "change": null,
+      "timing": {
+        "mode": "combined",
+        "totalMs": 8408
+      }
+    },
+    {
+      "screen": "meta-ai-4.jpg",
+      "atSec": 34,
+      "session": 1,
+      "reading": {
+        "tool": "Meta AI",
+        "task": "poster for a new dessert",
+        "userRequest": "Even more premium, please.",
+        "aiAskedClarifyingQuestion": false,
+        "aiResponseSummary": "AI produced a night-luxe poster version and explained luxury codes.",
+        "vagueTerms": [
+          "premium"
+        ]
+      },
+      "decision": {
+        "action": "stay-quiet",
+        "step": "watch",
+        "message": null,
+        "note": null,
+        "reason": "The Caddie spoke recently and is giving you room.",
+        "quote": null,
+        "missingIngredients": [],
+        "guardrail": "cooldown"
+      },
+      "response": null,
+      "change": null,
+      "timing": {
+        "mode": "combined",
+        "totalMs": 6171
+      }
+    },
+    {
+      "screen": "meta-ai-5.jpg",
+      "atSec": 45,
+      "session": 1,
+      "reading": {
+        "tool": "Meta AI",
+        "task": "poster for fictional café dessert",
+        "userRequest": "Here is the actual brief for this fictional café demo: the audience is office workers picking up breakfast near Seongsu station. The new dessert is matcha basque cheesecake, priced at KRW 6,500. The feeling is a calm, warm morning, with soft cream and muted green. I do not have a real product photo yet: use a concept illustration for now and clearly label it \"CONCEPT IMAGE\". Make the product name and price easy to read.",
+        "aiAskedClarifyingQuestion": false,
+        "aiResponseSummary": "Produced final demo poster with matcha cheesecake, price, and concept label.",
+        "vagueTerms": []
+      },
+      "decision": {
+        "action": "stay-quiet",
+        "step": "watch",
+        "message": null,
+        "note": "Brief complete, poster matches — staying quiet.",
+        "reason": "Latest brief supplies all ingredients and AI built a matching poster.",
+        "quote": null,
+        "missingIngredients": [],
+        "guardrail": null
+      },
+      "response": null,
+      "change": {
+        "summary": "added audience, price, mood, productDetail",
+        "assistance": "coached",
+        "addedIngredients": [
+          "audience",
+          "price",
+          "mood",
+          "productDetail"
+        ]
+      },
+      "timing": {
+        "mode": "combined",
+        "totalMs": 5719
+      }
+    },
+    {
+      "screen": "meta-ai-6.jpg",
+      "atSec": 207,
+      "session": 2,
+      "reading": {
+        "tool": "Meta AI",
+        "task": "poster for a new drink",
+        "userRequest": "Make a poster for our new drink.",
+        "aiAskedClarifyingQuestion": true,
+        "aiResponseSummary": "AI asked for audience, product, price, and mood before generating.",
+        "vagueTerms": []
+      },
+      "decision": {
+        "action": "stay-quiet",
+        "step": "watch",
+        "message": null,
+        "note": "See Meta AI drink poster task, will speak only when it helps.",
+        "reason": "First sighting of this task and AI already asked for details, so staying quiet.",
+        "quote": null,
+        "missingIngredients": [],
+        "guardrail": null
+      },
+      "response": null,
+      "change": {
+        "summary": "the AI asked clarifying questions first",
+        "assistance": "coached",
+        "addedIngredients": []
+      },
+      "timing": {
+        "mode": "combined",
+        "totalMs": 6095
+      }
+    }
+  ],
+  "content": {
+    "note": {
+      "status": "ready",
+      "whyNow": "You switched from vague premium requests to a full brief with audience and price.",
+      "title": "You replaced vague premium with a full brief",
+      "body": "\"The new dessert is matcha basque cheesecake, priced at KRW 6,500.\" You wrote this after the Caddie's question about what your dessert is. You decided audience, product detail, price, and mood. The AI wrote the final poster with readable name and price and CONCEPT IMAGE label. Before that you repeated vague premium requests three times.",
+      "quotes": [
+        {
+          "text": "The new dessert is matcha basque cheesecake, priced at KRW 6,500."
+        },
+        {
+          "text": "Make it more premium."
+        }
+      ],
+      "remaining": [
+        "You still use a concept illustration because you have no real product photo yet."
+      ]
+    },
+    "flashcards": {
+      "status": "ready",
+      "whyNow": "You supplied product details only after the Caddie asked what your dessert is.",
+      "cards": [
+        {
+          "scenario": "You need a poster for Morning Table soybean latte for office workers near Seongsu station at KRW 5,000 in calm warm morning style. You have no photo, only illustration.",
+          "prompt": "What do you type to the AI in your first message?",
+          "answer": "You list product, price, audience, mood, and labeled concept illustration at once because \"Make it more premium.\" took three tries. Use vague tweak only to test directions faster."
+        },
+        {
+          "scenario": "You already gave the AI audience, matcha basque cheesecake at KRW 6,500, calm warm mood, and concept illustration. The new draft still looks cheap.",
+          "prompt": "The draft looks cheap after your full brief. What do you tell the AI next?",
+          "answer": "You name the exact fix in product detail, price readability, or mood colors because repeating premium wording hid the brief. Use \"more premium\" only when you want fast direction tests."
+        }
+      ]
+    },
+    "podcast": {
+      "status": "ready",
+      "whyNow": "You raised no objection or trade-off to argue after the final poster matched your brief.",
+      "requestedByUser": true,
+      "title": "More Premium Isn't a Brief",
+      "speakers": {
+        "caddie": "Caddie",
+        "guest": "Mina, bakery owner near Seongsu"
+      },
+      "words": 381,
+      "durationSec": 140.88,
+      "lines": [
+        {
+          "speaker": "caddie",
+          "text": "You started with Morning Table and told the AI to make it look premium. You said it three more times after that. When I asked you, \"What is your new dessert — flavor, size, what makes it different?\" you changed course.",
+          "start": 0.25,
+          "end": 13.475
+        },
+        {
+          "speaker": "guest",
+          "text": "I run a bakery too and I do not have time to write briefs. Why not just say premium? It is faster and costs me nothing to try.",
+          "start": 13.825,
+          "end": 23.05
+        },
+        {
+          "speaker": "caddie",
+          "text": "You tried that with \"Make it more premium.\" and \"Still not premium enough. Make it more premium.\" You got darker backgrounds and fancier fonts, but you still had no product, no price, no reader.",
+          "start": 23.4,
+          "end": 35.35
+        },
+        {
+          "speaker": "guest",
+          "text": "But those drafts helped me see what I do not want. Is that not useful? Writing audience and price up front feels slow when I am still testing.",
+          "start": 35.7,
+          "end": 45.425
+        },
+        {
+          "speaker": "caddie",
+          "text": "That objection holds for early testing, and saying \"Even more premium, please.\" is cheap for direction. I withdraw the full brief for that stage. Use it only when you need a poster customers can act on.",
+          "start": 45.775,
+          "end": 58.95
+        },
+        {
+          "speaker": "guest",
+          "text": "So when did it stop working for you? My supplier keeps telling me premium means gold and black. My customers just want breakfast.",
+          "start": 59.3,
+          "end": 68.025
+        },
+        {
+          "speaker": "caddie",
+          "text": "It stopped when you needed office workers to buy. You wrote the brief for this fictional café demo with audience, mood, and price. When I stayed quiet after that, it was because the poster matched.",
+          "start": 68.375,
+          "end": 80.125
+        },
+        {
+          "speaker": "guest",
+          "text": "What did you actually write? Give me the exact line, not theory.",
+          "start": 80.475,
+          "end": 85.075
+        },
+        {
+          "speaker": "caddie",
+          "text": "You wrote, \"The new dessert is matcha basque cheesecake, priced at KRW 6,500.\" You added office workers near Seongsu station. You named calm, warm morning with soft cream and muted green.",
+          "start": 85.425,
+          "end": 99.175
+        },
+        {
+          "speaker": "guest",
+          "text": "I still have no real photo. A photographer costs money I do not have. Does that kill the brief?",
+          "start": 99.525,
+          "end": 106.825
+        },
+        {
+          "speaker": "caddie",
+          "text": "No, you kept the condition clear. You said you have no real product photo yet and to use a concept illustration. You told it to label it \"CONCEPT IMAGE\" and make name and price easy to read.",
+          "start": 107.175,
+          "end": 119.8
+        },
+        {
+          "speaker": "guest",
+          "text": "So I can say premium to explore, then I must name product, price, audience, mood to sell? And I admit the photo gap?",
+          "start": 120.15,
+          "end": 128.75
+        },
+        {
+          "speaker": "caddie",
+          "text": "Yes, you use vague words to test speed. You switch to audience, price, mood, and product detail when money is on the line. You keep the concept label until you have a real photo.",
+          "start": 129.1,
+          "end": 140.525
+        }
+      ],
+      "audio": "recorded/podcast.m4a"
+    },
+    "manual": {
+      "status": "ready",
+      "whyNow": "You repeated 'more premium' three times, so a reusable brief checklist would help you next time.",
+      "title": "Poster Brief First for Cafe Desserts",
+      "whenToUse": "When you ask AI to make a poster for a fictional cafe dessert.",
+      "whenNotToUse": "When you are only testing art styles with no fixed product or price.",
+      "steps": [
+        {
+          "text": "State who the poster is for and where they will see it.",
+          "check": "Checks audience is specific, not a vague style word.",
+          "owner": "you"
+        },
+        {
+          "text": "Give dessert name and difference, price, and one feeling with colors.",
+          "check": "Checks product, price, and mood are all present.",
+          "owner": "you"
+        },
+        {
+          "text": "Say if you have a real photo or need labeled concept illustration.",
+          "check": "Checks image source and label rule are clear.",
+          "owner": "you"
+        },
+        {
+          "text": "Make one draft with readable name and price, then wait for revision.",
+          "check": "Checks name, price, and label match your brief.",
+          "owner": "ai"
+        }
+      ],
+      "pitfalls": [
+        "Starting with \"Make it look premium.\" with no audience or product.",
+        "Repeating \"Make it more premium.\" without adding details.",
+        "Giving product details only after you are asked what it is.",
+        "Approving style drafts before price and readability are set."
+      ],
+      "forYourAI": [
+        "Ask for audience, product detail, price, mood, and photo status before you design.",
+        "Do not revise on vague words alone; ask for missing brief details.",
+        "If no real photo exists, use concept illustration labeled CONCEPT IMAGE.",
+        "Keep product name and price easy to read in the layout."
+      ],
+      "youDecide": [
+        "Who the poster is for and where they see it.",
+        "Exact dessert name, flavor, and what makes it different.",
+        "Price to show and one feeling with colors.",
+        "Whether you have a real photo or use labeled concept image."
+      ],
+      "cardRule": "Before you make a café poster, ask me audience, product detail, price, mood, and if I have a real photo."
+    },
+    "short": {
+      "status": "ready",
+      "whyNow": "You have early premium drafts to compare with your final matcha poster showing price.",
+      "title": "Why 'More Premium' Did Not Work",
+      "durationSec": 44.32,
+      "scenes": [
+        {
+          "role": "hook",
+          "narration": "What happens when you ask for premium three times without a brief?",
+          "evidence": null,
+          "diagram": null,
+          "start": 0,
+          "end": 4.775
+        },
+        {
+          "role": "evidence",
+          "narration": "You told the AI to make it more premium, and you got another luxury poster with no dessert name or price.",
+          "evidence": "before",
+          "diagram": null,
+          "start": 4.775,
+          "end": 12.325
+        },
+        {
+          "role": "evidence",
+          "narration": "Then you wrote, \"The new dessert is matcha basque cheesecake, priced at KRW 6,500.\" The poster changed to show that product and price.",
+          "evidence": "after",
+          "diagram": null,
+          "start": 12.325,
+          "end": 22.85
+        },
+        {
+          "role": "cause",
+          "narration": "Premium gave the AI no target, so it repeated luxury styles until you named audience, product, and price.",
+          "evidence": null,
+          "diagram": {
+            "nodes": [
+              "vague 'more premium'",
+              "AI repeats luxury look",
+              "audience, price, mood fix it"
+            ]
+          },
+          "start": 22.85,
+          "end": 30.7
+        },
+        {
+          "role": "rule",
+          "narration": "When you want a poster that sells, name audience, product, price, and mood, and label it concept if you have no photo.",
+          "evidence": null,
+          "diagram": null,
+          "start": 30.7,
+          "end": 38.8
+        },
+        {
+          "role": "question",
+          "narration": "Next time you want something premium, what brief will you write first?",
+          "evidence": null,
+          "diagram": null,
+          "start": 38.8,
+          "end": 44.325
+        }
+      ],
+      "video": "recorded/short.mp4"
+    }
+  },
+  "card": {
+    "text": "Before you make a café poster, ask me audience, product detail, price, mood, and if I have a real photo.",
+    "targetTool": "Meta AI",
+    "status": "proposed"
+  },
+  "cost": {
+    "metaUsd": 0.2034,
+    "mediaReservationUsd": 0.08,
+    "note": "Meta usage of this run (5 screens, 5 formats incl. 3 images and one podcast request) from the deployment ledger; media is a conservative reservation."
+  }
+}
