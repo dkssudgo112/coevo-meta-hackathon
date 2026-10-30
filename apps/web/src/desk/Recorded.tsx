@@ -127,7 +127,12 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
   const [open, setOpen] = useState<string | null>(null);
   const items = useMemo(() => toItems(run), [run]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const player = useRef<HTMLElement>(null);
+  const wrapList = useRef<HTMLDivElement>(null);
   const step = steps[i];
+  // Opening a format brings its player into view; "Back to the wrap" returns to the list.
+  useEffect(() => { if (open) player.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [open]);
+  const backToWrap = () => { setOpen(null); wrapList.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
 
   useEffect(() => {
     if (!playing) return;
@@ -181,7 +186,7 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
                         <p className="faint">In the app you approve, edit or reject it; approved cards go to the Desk to copy into your AI.</p>
                       </div>
                     )}
-                    <div className="stack" style={{ gap: 6 }}>
+                    <div className="stack" style={{ gap: 6 }} ref={wrapList}>
                       {items.map(c => <button key={c.id} className={`btn ${open === c.id ? 'primary' : ''}`} style={{ justifyContent: 'space-between' }} onClick={() => setOpen(open === c.id ? null : c.id)}><span>{FORMAT_NAME[c.format]}</span><span className="faint">{c.requestedByUser ? 'made on request' : c.status}</span></button>)}
                     </div>
                   </section>
@@ -199,7 +204,14 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
             </div>
           </section>
         </div>
-        {step.kind === 'wrap' && open && (() => { const c = items.find(x => x.id === open); return c ? <section className="card stack"><h3>{FORMAT_NAME[c.format]}</h3>{REVIEWER_NOTES[c.format] && <ReviewerNote text={REVIEWER_NOTES[c.format]} />}<ContentBody item={c} state={EMPTY} creds={null as never} /></section> : null; })()}
+        {step.kind === 'wrap' && open && (() => { const c = items.find(x => x.id === open); return c ? (
+          <section className="card stack" ref={player} aria-label={`${FORMAT_NAME[c.format]} player`}>
+            <div className="row"><h3 className="grow">{FORMAT_NAME[c.format]}</h3><button className="btn small" onClick={backToWrap}>Back to the wrap</button></div>
+            {REVIEWER_NOTES[c.format] && <ReviewerNote text={REVIEWER_NOTES[c.format]} />}
+            <ContentBody item={c} state={EMPTY} creds={null as never} />
+            <button className="btn" onClick={backToWrap}>Back to the wrap</button>
+          </section>
+        ) : null; })()}
         <p className="faint">This run cost ${run.cost.metaUsd.toFixed(4)} in Meta usage plus a ${run.cost.mediaReservationUsd.toFixed(2)} media reservation. {run.cost.note}</p>
         {i === steps.length - 1 && (
           <div className="notice">{run.notes[2]} <button className="btn small" onClick={onLive}>Run it live yourself</button> <a className="btn small" href="/desk">Use it with your phone</a></div>

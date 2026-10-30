@@ -31,3 +31,6 @@ service-account*.json
 *.key
 *.p12
 *.pfx
+
+# Playwright CLI working files (local only)
+.playwright-cli/

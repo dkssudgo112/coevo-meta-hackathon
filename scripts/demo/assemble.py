@@ -9,6 +9,8 @@ edl.json:
     {"src": "clips/desk.mov", "in": 2.0, "out": 10.0, "caption": "A café owner makes a poster with Meta AI. The phone beside the monitor is the Caddie."}
   ]
 }
+Still segments hold an image, optionally over an audio excerpt:
+    {"still": "frames/reply.jpg", "duration": 8, "audio": "podcast.m4a", "audio_in": 12.0, "caption": "..."}
 Split segments put a PC recording (left) beside a phone recording (right):
     {"split": {"left": "clips/pc.mov", "left_in": 12.0, "right": "clips/phone.mov", "right_in": 3.5}, "duration": 20, "caption": "..."}
 Clips are letterboxed into 1920x1080. Audio from clips is kept (split: left audio); cards are silent.
@@ -105,6 +107,17 @@ def main(edl_path):
                 extra = [] if has_audio(left) else ["-f", "lavfi", "-t", str(dur), "-i", "anullsrc=r=48000:cl=stereo"]
                 run(["-ss", str(sp.get("left_in", 0)), "-t", str(dur), "-i", left, "-ss", str(sp.get("right_in", 0)), "-t", str(dur), "-i", right, "-i", cap, *extra,
                      "-filter_complex", vf, "-map", "[v]", *audio, "-t", str(dur), "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", part])
+            elif "still" in seg:
+                # An image held on screen, optionally over an audio excerpt (e.g. the podcast).
+                img = os.path.join(base, seg["still"])
+                dur = seg.get("duration", 5)
+                vf = f"[0:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x141917,fps={FPS}[b];[b][1:v]overlay=0:0,format=yuv420p[v]"
+                if seg.get("audio"):
+                    aud = ["-ss", str(seg.get("audio_in", 0)), "-t", str(dur), "-i", os.path.join(base, seg["audio"])]
+                else:
+                    aud = ["-f", "lavfi", "-t", str(dur), "-i", "anullsrc=r=48000:cl=stereo"]
+                run(["-loop", "1", "-t", str(dur), "-i", img, "-i", cap, *aud, "-filter_complex", vf, "-map", "[v]", "-map", "2:a",
+                     "-r", str(FPS), "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-t", str(dur), part])
             elif "card" in seg:
                 bg = os.path.join(d, f"card{i}.png")
                 card_png(seg["card"], bg)
