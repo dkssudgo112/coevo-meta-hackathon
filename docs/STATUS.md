@@ -22,6 +22,10 @@ These runs use screenshots of **actual Meta AI replies** to a scripted café-own
 
 Live runs and reviews found problems that mocks had not: a lost media job when two renders overlapped, a coached change mislabeled as independent, a voice-answer rejection caused by multi-word keyword hints, a podcast script cut off by the output limit, work lost when the server restarted, UTC clock times in generated text, a card written in the wrong voice, a short title running off the frame, deletion races, answers from a deleted session reaching later prompts, a player crash when content arrived while it was open, and a rule parser that read "do not ask" backwards. Each fix has a regression test; the local fake-model journey passes 57/57 (test mode only). A real local process restart (fake models) recovered interrupted items with a retry.
 
+## Known issues
+
+- **Provider token-count outages.** Several times on October 30 (once for 15+ minutes), Meta's `input_tokens` endpoint answered 404 `model_not_found` for Muse Spark 1.3 while the model list still showed it. The app counts tokens before every call and refuses when it cannot (no spend, a visible "could not verify what this call would cost" note); it now retries this case briefly. The recorded sample is unaffected because it makes no model calls.
+
 ## Not yet verified
 
 - **Real phone camera:** the 20-frame benchmark (reading accuracy on camera frames, latency, SAM screen detection), haptics, and the camera-off indicator on pause.
