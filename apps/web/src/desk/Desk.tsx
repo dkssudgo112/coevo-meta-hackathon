@@ -73,7 +73,7 @@ function DeskWorkspace({ creds, pair, setPair, onReset }: { creds: Creds; pair: 
               </select>
             </div>
           )}
-          {session ? <SessionReview creds={creds} state={state} sessionId={session.id} /> : state.workspace.paired && <Empty>Your phone is connected. Start working with your AI tool — moments will appear here.</Empty>}
+          {session ? <SessionReview creds={creds} state={state} sessionId={session.id} /> : state.workspace.paired && <ReadyPanel />}
         </main>
         <aside className="stack-lg">
           {state.moments.some(m => m.benchmark) && <BenchmarkPanel creds={creds} state={state} />}
@@ -87,6 +87,27 @@ function DeskWorkspace({ creds, pair, setPair, onReset }: { creds: Creds; pair: 
   );
 }
 
+/** The four first-use steps, with the ones already done ticked. */
+function SetupSteps({ done }: { done: number }) {
+  const steps = ['Open the Desk on this computer', 'Scan the code with your phone', 'Aim the phone at your screen', 'Tap Start watching, then keep working'];
+  return (
+    <ol className="setup-steps" aria-label="Setup steps">
+      {steps.map((t, i) => <li key={t} className={i < done ? 'done' : i === done ? 'current' : ''} aria-current={i === done ? 'step' : undefined}><span className="dot" aria-hidden="true">{i < done ? '✓' : i + 1}</span>{t}</li>)}
+    </ol>
+  );
+}
+
+function ReadyPanel() {
+  return (
+    <section className="card stack ready">
+      <SetupSteps done={2} />
+      <h1>Your phone is connected</h1>
+      <p className="muted">On the phone, stand it beside this monitor, drag the box around your AI tool’s window and tap <strong>Start watching</strong>. Then switch to your AI tool — ChatGPT, Gemini, Meta AI or Claude — and work as usual.</p>
+      <p className="faint">When your screen changes, the Caddie looks at the boxed area. Its notes and questions appear here and on the phone.</p>
+    </section>
+  );
+}
+
 function PairPanel({ creds, pair, setPair }: { creds: Creds; pair: PairInfo | null; setPair: (p: PairInfo | null) => void }) {
   const expired = !pair || Date.parse(pair.expiresAt) < Date.now();
   const [busy, setBusy] = useState(false);
@@ -96,14 +117,17 @@ function PairPanel({ creds, pair, setPair }: { creds: Creds; pair: PairInfo | nu
   };
   useEffect(() => { if (expired) void renew(); }, [expired]);
   return (
-    <section className="card row wrap" style={{ gap: 24, alignItems: 'center' }}>
+    <section className="card stack" style={{ gap: 20 }}>
+      <SetupSteps done={1} />
+      <div className="row wrap" style={{ gap: 24, alignItems: 'center' }}>
       {pair && !expired ? <QR text={pairLink(creds.workspaceId, pair.secret)} label="QR code to pair your phone" /> : <div className="qr" aria-busy="true" />}
       <div className="stack grow" style={{ minWidth: 240 }}>
-        <h1>Point your phone here</h1>
-        <p className="muted">Open <strong>{location.host}/caddie</strong> on your phone and aim it at this code, or scan it with the phone’s camera app. Then prop the phone beside your monitor.</p>
+        <h1>Scan this with your phone</h1>
+        <p className="muted">Use the phone’s camera app, or open <strong>{location.host}/caddie</strong> on the phone and aim it here. Keep your AI tool open in another tab or window; the Caddie will watch that.</p>
         <p className="faint">The code works once and expires in 15 minutes.</p>
         <p className="faint">{PROVIDER_DATA_NOTICE}</p>
         <button className="btn small" style={{ justifySelf: 'start' }} disabled={busy} onClick={renew}>Show a new code</button>
+      </div>
       </div>
     </section>
   );

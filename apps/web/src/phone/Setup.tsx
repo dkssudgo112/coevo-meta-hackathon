@@ -76,8 +76,9 @@ export function PairScreen({ onPaired }: { onPaired: (c: Creds) => void }) {
       <div className="statusbar"><Flag state="off" /><div className="grow"><div className="title">Coevo Caddie</div><div className="sub">Not connected</div></div></div>
       <main>
         <div className="stack">
-          <h2>Stand your phone next to your screen</h2>
-          <p className="muted">On your computer, open this same site and choose <strong>Open the Desk</strong>. Then point this camera at the code it shows.</p>
+          <span className="eyebrow">Step 2 of 4</span>
+          <h2>Scan the code on your computer</h2>
+          <p className="muted">On your computer, open {location.host} and choose <strong>Start on this computer</strong>. Then point this camera at the code the Desk shows.</p>
           <p className="faint">The Desk address is {location.host}/desk.</p>
         </div>
         <div className="viewfinder" aria-label="Camera view for scanning the Desk QR code">
@@ -159,7 +160,8 @@ export function AimScreen({ creds, initial, onDone, onPhotos }: { creds: Creds; 
     <div className="phone">
       <div className="statusbar"><Flag state="watching" /><div className="grow"><div className="title">Aim at your screen</div><div className="sub">Connected to Desk</div></div></div>
       <main>
-        <p className="muted">Prop the phone 50–70 cm from your monitor. Drag the corners so the box covers only your screen. <strong>Only what’s inside the box is sent.</strong></p>
+        <span className="eyebrow">Step 3 of 4 · then Start watching</span>
+        <p className="muted">Stand the phone 50–70 cm from your monitor, aimed at your AI tool. Drag the corners so the box covers only your screen. <strong>Only what’s inside the box is sent.</strong></p>
         <CropEditor aspect={aspect} media={<video ref={video} playsInline muted onLoadedMetadata={e => setAspect(e.currentTarget.videoWidth / e.currentTarget.videoHeight || null)} />} crop={crop} onChange={setCrop} />
         {camera === 'denied' && <div className="notice warn" role="alert">Camera access was denied. You can still use the Caddie with photos.</div>}
         <div className="card soft stack">
