@@ -62,9 +62,21 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
   const busy = useRef(false);
 
   useEffect(() => { fetch('/samples/manifest.json').then(r => r.json()).then(setManifest).catch(() => setMsg('Sample frames are missing from this build.')); }, []);
+  // Resume where this sample left off (e.g. after a reload).
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current || !manifest || !state) return;
+    resumed.current = true;
+    const sent = state.moments.filter(m => m.frame?.source === 'sample').length;
+    setI(Math.min(sent, manifest.frames.length - 1));
+  }, [manifest, state]);
 
   const session = latestSession(state);
   const moments = sessionMoments(state, session?.id);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const lastRef = useRef(moments[moments.length - 1]);
+  lastRef.current = moments[moments.length - 1];
 
   const sendFrame = async (n: number) => {
     if (!manifest) return;
@@ -92,22 +104,25 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
     try {
       for (let n = i; n < manifest.frames.length && !stop.current; n++) {
         const prev = n > 0 ? manifest.frames[n - 1] : null;
-        if (prev && prev.session !== manifest.frames[n].session && session && session.status !== 'ended' && n === i) {
-          await post(creds, `/sessions/${session.id}/end`);
+        const current = sessionRef.current;
+        const crossing = prev && prev.session !== manifest.frames[n].session;
+        if (crossing && current && current.status !== 'ended') {
+          await post(creds, `/sessions/${current.id}/end`);
           setMsg('Session 1 ended. Review the wrap-up below, approve the Caddie card, then press Continue for the next session a week later.');
           setI(n);
           return;
         }
-        if (prev && prev.session !== manifest.frames[n].session && n !== i) {
-          if (session) await post(creds, `/sessions/${session.id}/end`);
-          setMsg('Session 1 ended. Review the wrap-up below, approve the Caddie card, then press Continue for the next session a week later.');
-          setI(n);
-          return;
-        }
+        if (crossing && current?.status === 'ended') await post(creds, '/sessions', {});
         setI(n);
         await sendFrame(n);
         await new Promise(r => setTimeout(r, 2600));
         await waitIdle();
+        const last = lastRef.current;
+        if (last?.decision?.action === 'intervene' && !last.response) {
+          setI(Math.min(n + 1, manifest.frames.length - 1));
+          setMsg('The Caddie stepped in. Answer by voice on the phone (your computer’s microphone), or press Continue to see what the owner typed next.');
+          return;
+        }
       }
     } catch (e) {
       setMsg(errorText(e));
@@ -124,6 +139,7 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
         <div className="grow"><h2>Sample session</h2><p className="faint">{manifest?.note ?? 'Loading sample…'}</p></div>
         <button className="btn small" onClick={onRestart}>New sample</button>
       </header>
+      {state?.workspace.testFakeModels && <div className="notice warn" role="status"><strong>Test mode:</strong> a scripted fake model is answering. Nothing here is real model output.</div>}
       {state && !state.workspace.liveCalls && <div className="notice warn" role="status">Live model calls are off on this server, so the Caddie cannot read the sample screens right now. Nothing here is simulated.</div>}
       <div className="split">
         <section className="stack">

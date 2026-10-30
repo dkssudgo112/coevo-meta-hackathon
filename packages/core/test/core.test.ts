@@ -90,6 +90,9 @@ test('labels: coached after an intervention, independent without, ai-produced wh
   const exHistory = [before, moment({ id: 'c', decision: { action: 'intervene', step: 'example', reason: '', quote: null, message: 'Example', note: null, missingIngredients: [], exampleBrief: example, guardrail: null, provenance: 'live-model', model: null, decidedAt: '' } })];
   assert.equal(observeChange(reading({ userRequest: example, ingredients: { audience: true, price: true, mood: true, realPhoto: false, productDetail: true } }), exHistory)?.assistance, 'ai-produced');
   assert.equal(observeChange(reading(), [before]), null);
+  const asked = observeChange(reading({ aiAskedClarifyingQuestion: true }), [before]);
+  assert.equal(asked?.aiAskedFirst, true);
+  assert.equal(asked?.assistance, 'coached', 'the AI asking first comes from the Caddie card, not the person');
 });
 
 test('practice labels exclude auto-opened and hinted attempts from independent', () => {

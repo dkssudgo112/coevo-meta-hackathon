@@ -27,7 +27,8 @@
     "test": "node --test 'packages/core/test/*.test.ts' 'apps/api/test/*.test.ts'",
     "test:media": "python3 infra/modal/test_compose.py",
     "test:integration": "node scripts/integration.mjs",
-    "samples": "node scripts/make-samples.mjs"
+    "samples": "node scripts/make-samples.mjs",
+    "test:e2e-fake": "node scripts/e2e-fake.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261023.1",

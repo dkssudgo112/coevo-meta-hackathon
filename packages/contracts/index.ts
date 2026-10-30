@@ -337,6 +337,8 @@ export interface WorkspaceSummary {
   kind: 'user' | 'sample';
   paired: boolean;
   liveCalls: boolean;
+  /** Local test runs only: a scripted fake model answers, and everything it makes is fixture. */
+  testFakeModels: boolean;
   budget: { spentUsd: number; capUsd: number };
 }
 
@@ -368,6 +370,7 @@ export interface Readiness {
   metaKeyConfigured: boolean;
   liveCallsEnabled: boolean;
   mediaServiceConfigured: boolean;
+  testFakeModels: boolean;
   model: string;
   implementation: 'caddie';
 }

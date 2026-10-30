@@ -1,5 +1,5 @@
 import type { Readiness } from '../../../packages/contracts/index.ts';
-import { liveEnabled, models } from './meta.ts';
+import { fakeMeta, liveEnabled, models } from './meta.ts';
 import { mediaConfigured } from './media.ts';
 import type { Env } from './env.ts';
 import { error, id, json, sha256 } from './util.ts';
@@ -46,7 +46,7 @@ async function route(req: Request, env: Env): Promise<Response> {
     const global = await env.BUDGET.get(env.BUDGET.idFromName('global')).status();
     const payload: Readiness & { budget: typeof global } = {
       service: 'coevo', mode: liveEnabled(env) ? 'live' : 'mock', metaKeyConfigured: Boolean(env.MODEL_API_KEY?.trim()),
-      liveCallsEnabled: liveEnabled(env), mediaServiceConfigured: mediaConfigured(env), model: models(env).text, implementation: 'caddie', budget: global,
+      liveCallsEnabled: liveEnabled(env), mediaServiceConfigured: mediaConfigured(env), testFakeModels: fakeMeta(env), model: models(env).text, implementation: 'caddie', budget: global,
     };
     return json(payload);
   }

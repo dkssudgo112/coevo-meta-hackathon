@@ -13,6 +13,18 @@ export interface MetaEnv {
   META_TRANSCRIBE_MODEL?: string;
   META_SEGMENT_MODEL?: string;
   COEVO_ALLOW_LIVE_CALLS?: string;
+  /** Local development only: route calls to a scripted fake server on 127.0.0.1. Output is labeled fixture. */
+  COEVO_TEST_FAKE_META?: string;
+}
+
+/** True only for local test runs against the scripted fake model server. */
+export function fakeMeta(env: MetaEnv): boolean {
+  return env.COEVO_TEST_FAKE_META === 'true' && (env.META_API_BASE_URL ?? '').startsWith('http://127.0.0.1:');
+}
+
+/** Provenance for model output: fixture under the fake server, live-model otherwise. */
+export function modelProvenance(env: MetaEnv): 'live-model' | 'fixture' {
+  return fakeMeta(env) ? 'fixture' : 'live-model';
 }
 
 export interface Spender {
@@ -51,7 +63,12 @@ export class InvalidOutput extends Error {
 const FORBIDDEN = /-contributor$/;
 
 export function liveEnabled(env: MetaEnv): boolean {
-  return env.COEVO_ALLOW_LIVE_CALLS === 'true' && Boolean(env.MODEL_API_KEY?.trim());
+  return env.COEVO_ALLOW_LIVE_CALLS === 'true' && (fakeMeta(env) || Boolean(env.MODEL_API_KEY?.trim()));
+}
+
+/** The real key never leaves for the local fake server. */
+function authKey(env: MetaEnv): string {
+  return fakeMeta(env) ? 'fake-test-key' : env.MODEL_API_KEY!;
 }
 
 function model(name: string | undefined, fallback: string): string {
@@ -69,6 +86,7 @@ export const models = (env: MetaEnv) => ({
 
 function base(env: MetaEnv): string {
   const b = env.META_API_BASE_URL ?? 'https://api.meta.ai/v1';
+  if (fakeMeta(env)) return b.replace(/\/$/, '');
   if (b !== 'https://api.meta.ai/v1') throw new Error('Only the verified Meta endpoint is allowed.');
   return b;
 }
@@ -83,7 +101,7 @@ async function post(env: MetaEnv, path: string, body: BodyInit, headers: Record<
   for (;;) {
     const res = await f(`${base(env)}${path}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${env.MODEL_API_KEY}`, Accept: 'application/json', ...headers },
+      headers: { Authorization: `Bearer ${authKey(env)}`, Accept: 'application/json', ...headers },
       body,
       signal: AbortSignal.timeout(timeoutMs),
     });

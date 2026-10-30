@@ -73,8 +73,18 @@ export function momentLine(m: Moment): { text: string; kind: 'caddie' | 'quiet' 
   if (m.readingStatus === 'disabled' || m.readingStatus === 'error' || m.readingStatus === 'budget') return { text: m.readingError ?? 'The Caddie could not read this frame.', kind: 'status' };
   if (m.readingStatus === 'illegible') return { text: 'Couldn’t read the screen in this frame.', kind: 'status' };
   if (m.decision?.action === 'intervene') return { text: `Caddie: ${m.decision.message}`, kind: 'caddie' };
-  if (m.change) return { text: `Seen: ${m.change.summary}`, kind: 'change' };
+  if (m.change) return { text: changeText(m), kind: 'change' };
   return { text: m.decision?.note ?? (m.decision?.reason ? `Quiet — ${m.decision.reason}` : 'Quiet'), kind: 'quiet' };
+}
+
+/** Human words for an observed change, e.g. "You added who it’s for, price." */
+export function changeText(m: Moment): string {
+  const c = m.change;
+  if (!c) return '';
+  const parts: string[] = [];
+  if (c.addedIngredients.length) parts.push(`You added ${c.addedIngredients.map(k => INGREDIENT_TEXT[k] ?? k).join(', ')}.`);
+  if (c.aiAskedFirst) parts.push('Your AI asked first.');
+  return parts.join(' ');
 }
 
 export function errorText(e: unknown): string {

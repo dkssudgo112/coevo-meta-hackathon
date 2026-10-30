@@ -10,7 +10,7 @@ import { isGroundedQuote, speechSeconds } from '../../../packages/core/src/text.
 import { firstDue, nextDue } from '../../../packages/core/src/spaced.ts';
 import { labelPractice, strengthFor } from '../../../packages/core/src/labels.ts';
 import { applyHint } from '../../../packages/core/src/cards.ts';
-import { generateImage, runTask, transcribe } from './meta.ts';
+import { generateImage, modelProvenance, runTask, transcribe } from './meta.ts';
 import { MediaUnavailable, startJob, type ShortJobScene } from './media.ts';
 import { failureStatus, sessionMoments, type Ctx } from './pipeline.ts';
 import { bytesToDataUrl, id, now } from './util.ts';
@@ -82,7 +82,7 @@ export async function wrapSession(ctx: Ctx, sessionId: string): Promise<void> {
       status: choice.make ? 'queued' : 'skipped', whyNow: choice.why,
       sourceMomentIds: design.turningPoint.momentId ? [design.turningPoint.momentId] : [],
       arriveAt: new Date(format === 'flashcards' ? firstDue(at).dueAt : at).toISOString(),
-      payload: null, error: null, attempts: 0, provenance: 'live-model', updatedAt: now(),
+      payload: null, error: null, attempts: 0, provenance: modelProvenance(ctx.env), updatedAt: now(),
     };
     await ctx.store.put('content', item);
   }
@@ -189,7 +189,7 @@ async function proposeCard(ctx: Ctx, session: Session, rule: string, sourceMomen
   const card: CaddieCard = {
     id: existing?.id ?? id('card'), sessionId: session.id, text: rule,
     scope: session.task ? `Tasks like: ${session.task}` : 'This kind of task', targetTool: session.tool ?? 'your AI',
-    status: 'proposed', history: [{ status: 'proposed', at: now(), by: 'caddie', note: null }], sourceMomentIds, provenance: 'live-model',
+    status: 'proposed', history: [{ status: 'proposed', at: now(), by: 'caddie', note: null }], sourceMomentIds, provenance: modelProvenance(ctx.env),
   };
   await ctx.store.put('card', card);
 }
@@ -243,7 +243,7 @@ export async function podcastAsk(ctx: Ctx, contentId: string, question: string, 
   const heard = p.lines.filter(l => l.end === 0 || l.start <= atSec).map(l => `${l.speaker}: ${l.text}`).join('\n');
   try {
     const { value } = await runTask(ctx.env, ctx.spender, podcastAskTask, { text: `Question: ${question}\n\nEpisode so far:\n${heard}\n\nEvidence:\n${evidenceText(ctx, session)}` });
-    await setItem(ctx, item, { payload: { ...p, asks: [...p.asks, { question, answer: value.answer, atSec, at: now(), provenance: 'live-model' }] } });
+    await setItem(ctx, item, { payload: { ...p, asks: [...p.asks, { question, answer: value.answer, atSec, at: now(), provenance: modelProvenance(ctx.env) }] } });
     return value;
   } catch (e) {
     return { error: failureStatus(e).message };
@@ -255,7 +255,7 @@ export async function podcastAsk(ctx: Ctx, contentId: string, question: string, 
 export async function startPractice(ctx: Ctx, autoOpened: boolean, sessionId: string | null): Promise<PracticeAttempt> {
   const attempt: PracticeAttempt = {
     id: id('pr'), sessionId, scenario: '', hint: null, startedAt: now(), autoOpened, hintViewed: false, transcript: null,
-    imageKey: null, imageStatus: 'none', ingredients: null, checkNote: null, assistance: null, status: 'scenario', error: null, provenance: 'live-model',
+    imageKey: null, imageStatus: 'none', ingredients: null, checkNote: null, assistance: null, status: 'scenario', error: null, provenance: modelProvenance(ctx.env),
   };
   await ctx.store.put('practice', attempt);
   const session = sessionId ? ctx.store.get('session', sessionId) : [...ctx.store.list('session')].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
@@ -296,7 +296,7 @@ export async function practiceAttempt(ctx: Ctx, practiceId: string, wav: Uint8Ar
       ...ctx.store.get('practice', practiceId)!, ingredients: check.value.value.ingredients, checkNote: check.value.value.note, assistance,
       imageKey, imageStatus: image.status === 'fulfilled' ? 'ready' : 'failed', status: 'done',
     });
-    await ctx.store.put('skill', { id: id('sk'), dimension: 'description', assistance, strength: strengthFor(assistance, { practice: true }), momentId: null, practiceId, note: check.value.value.note, at: now(), fixture: false });
+    await ctx.store.put('skill', { id: id('sk'), dimension: 'description', assistance, strength: strengthFor(assistance, { practice: true }), momentId: null, practiceId, note: check.value.value.note, at: now(), fixture: modelProvenance(ctx.env) === 'fixture' });
   } catch (e) {
     const msg = e instanceof Error && e.name === 'Error' ? e.message : failureStatus(e).message;
     await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, status: 'failed', error: msg, imageStatus: ctx.store.get('practice', practiceId)!.imageStatus === 'generating' ? 'failed' : ctx.store.get('practice', practiceId)!.imageStatus });

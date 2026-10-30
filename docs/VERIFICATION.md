@@ -18,6 +18,8 @@ This matrix tracks every approved requirement through three depth levels and rec
 
 **Status:** ☐ not started · ◐ in progress · ☑ done (with evidence) · ⚠ blocked (reason in notes)
 
+**Local fake-model journey** (`npm run test:e2e-fake`, TEST ONLY): with a scripted fake model server on 127.0.0.1 the whole server path passes 35/35 checks — frames → readings → quiet/intervene decisions with grounded quotes → voice answer → frameless reply → coached change → wrap with a reason per format → all five formats ready (123.8 s podcast, 40.8 s short, both downloadable) → card edit/approve/apply → next session "AI asked first" → card observed-working → practice labels (independent; coached after hint) → podcast Ask → flashcard interval → misread → frame deletion → revoke history → spend under cap. All of it is labeled `fixture`; it proves the server logic, not real model quality, camera legibility or deployment.
+
 Last updated: 2026-10-30.
 
 ## A. Observation

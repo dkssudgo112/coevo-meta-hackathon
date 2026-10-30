@@ -5,7 +5,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { CaptureSource, CropRect, FrameRef, Moment, PodcastPayload, ServerEvent, Session, ShortPayload, Snapshot, WorkspaceSummary } from '../../../packages/contracts/index.ts';
 import { CAPS, charge, dayKey, remaining, type BudgetState } from '../../../packages/core/src/budget.ts';
 import { wavDurationSeconds } from '../../../packages/core/src/wav.ts';
-import { BudgetExceeded, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
+import { BudgetExceeded, fakeMeta, liveEnabled, segmentBoxes, transcribe, type Spender } from './meta.ts';
 import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, sessionMoments, type Ctx } from './pipeline.ts';
 import { cardAction, generate, podcastAsk, practiceAttempt, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
@@ -140,6 +140,7 @@ export class Workspace extends DurableObject<Env> {
     return {
       id: this.meta!.id, createdAt: this.meta!.createdAt, kind: this.meta!.kind, paired: this.meta!.paired,
       liveCalls: liveEnabled(this.env),
+      testFakeModels: fakeMeta(this.env),
       budget: { spentUsd: Number((this.meta!.kind === 'sample' || st.day === dayKey(Date.now()) ? st.spentUsd : 0).toFixed(4)), capUsd: this.cap() },
     };
   }

@@ -6,6 +6,7 @@ export interface MediaEnv {
   MODAL_MEDIA_URL?: string;
   MODAL_MEDIA_TOKEN?: string;
   COEVO_ALLOW_LIVE_CALLS?: string;
+  COEVO_TEST_FAKE_META?: string;
 }
 
 export class MediaUnavailable extends Error {
@@ -13,7 +14,8 @@ export class MediaUnavailable extends Error {
 }
 
 export function mediaConfigured(env: MediaEnv): boolean {
-  return Boolean(env.MODAL_MEDIA_URL?.startsWith('https://') && env.MODAL_MEDIA_TOKEN?.trim());
+  const local = env.COEVO_TEST_FAKE_META === 'true' && Boolean(env.MODAL_MEDIA_URL?.startsWith('http://127.0.0.1:'));
+  return Boolean((env.MODAL_MEDIA_URL?.startsWith('https://') || local) && env.MODAL_MEDIA_TOKEN?.trim());
 }
 
 export interface PodcastJob { kind: 'podcast'; lines: { speaker: 'caddie' | 'guest'; text: string }[]; voices: { caddie: string; guest: string } }

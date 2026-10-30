@@ -35,7 +35,10 @@ export function observeChange(current: Reading, history: Moment[], opts: { newSe
   const interventions = since.filter(m => m.decision?.action === 'intervene');
   const example = [...since].reverse().find(m => m.decision?.step === 'example' && m.decision.exampleBrief);
   let assistance: Assistance = 'independent';
-  if (example?.decision?.exampleBrief && current.userRequest && similarity(current.userRequest, example.decision.exampleBrief) >= 0.5) {
+  if (!added.length && aiAskedFirst) {
+    // The AI asking first is the effect of a Caddie card, not the person's own act.
+    assistance = 'coached';
+  } else if (example?.decision?.exampleBrief && current.userRequest && similarity(current.userRequest, example.decision.exampleBrief) >= 0.5) {
     assistance = 'ai-produced';
   } else if (interventions.length) {
     assistance = 'coached';

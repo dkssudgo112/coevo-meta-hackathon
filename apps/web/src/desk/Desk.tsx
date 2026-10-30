@@ -4,7 +4,7 @@ import type { InboxItem, Moment, Snapshot } from '../../../../packages/contracts
 import { api, createWorkspace, loadCreds, pairLink, post, saveCreds, type Creds } from '../lib/api.ts';
 import { useWorkspace } from '../lib/store.ts';
 import { FrameSampler, FULL, uploadFrame } from '../lib/capture.ts';
-import { AssistLabel, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, sessionMoments } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, sessionMoments } from '../ui/common.tsx';
 import { CardControls, ContentBody, FORMAT_NAME } from '../ui/Players.tsx';
 import { Habits } from '../phone/Live.tsx';
 
@@ -60,6 +60,7 @@ function DeskWorkspace({ creds, pair, setPair, onReset }: { creds: Creds; pair: 
         <div className="grow"><h2>Coevo Desk</h2><p className="faint">{state.workspace.paired ? 'Phone connected' : 'Waiting for your phone'} · {conn === 'live' ? 'live' : 'reconnecting…'} · model calls {state.workspace.liveCalls ? 'on' : 'off'}</p></div>
         <span className="faint">Spent today ${state.workspace.budget.spentUsd.toFixed(3)} / ${state.workspace.budget.capUsd.toFixed(2)}</span>
       </header>
+      {state.workspace.testFakeModels && <div className="notice warn" role="status"><strong>Test mode:</strong> a scripted fake model is answering. Nothing here is real model output.</div>}
       {!state.workspace.liveCalls && <div className="notice warn" role="status">Live model calls are off on this server, so the Caddie cannot read screens yet. Nothing is simulated.</div>}
       {notices.map((n, i) => <div key={i} className="notice warn" role="status">{n}</div>)}
       <div className="desk-grid">
@@ -208,9 +209,9 @@ export function EvidenceRows({ creds, state, moments }: { creds: Creds; state: S
                 <span className="faint">{m.decision ? `Quiet — ${m.decision.note ?? m.decision.reason}` : m.readingStatus === 'pending' ? 'Reading…' : ''}</span>
               )}
               {m.decision?.guardrail && <p className="faint">Guardrail: {m.decision.guardrail}</p>}
-              {m.decision && <p className="faint">{m.decision.provenance === 'live-model' ? `Live model · ${m.decision.model}` : 'Rule'}</p>}
+              {m.decision && <p className="faint">{m.decision.provenance === 'live-model' ? `Live model · ${m.decision.model}` : m.decision.provenance === 'fixture' ? 'Test fixture (fake model)' : 'Rule'}</p>}
             </td>
-            <td>{m.change ? <div className="stack" style={{ gap: 4 }}><AssistLabel value={m.change.assistance} /><span>{m.change.summary}</span></div> : <span className="faint">—</span>}</td>
+            <td>{m.change ? <div className="stack" style={{ gap: 4 }}><AssistLabel value={m.change.assistance} /><span>{changeText(m)}</span></div> : <span className="faint">—</span>}</td>
           </tr>
         ))}
       </tbody>

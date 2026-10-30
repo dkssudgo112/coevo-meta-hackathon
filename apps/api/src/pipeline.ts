@@ -4,7 +4,7 @@ import type { CaddieCard, Decision, Moment, Reading, Session, SkillObservation }
 import { applyGuardrails, toDecision, type Proposal } from '../../../packages/core/src/ladder.ts';
 import { dimensionFor, observeChange, presentIngredients, strengthFor } from '../../../packages/core/src/labels.ts';
 import { decisionTask, readingTask, type DecisionInput } from '../../../packages/core/src/prompts.ts';
-import { BudgetExceeded, InvalidOutput, LiveCallsDisabled, MetaError, runTask, type Spender } from './meta.ts';
+import { BudgetExceeded, InvalidOutput, LiveCallsDisabled, MetaError, modelProvenance, runTask, type Spender } from './meta.ts';
 import type { Env } from './env.ts';
 import type { Store } from './store.ts';
 import { id, now } from './util.ts';
@@ -85,7 +85,7 @@ export async function decide(ctx: Ctx, reading: Reading, history: Moment[], extr
   const res = await runTask(ctx.env, ctx.spender, decisionTask, { text: `${extra}${JSON.stringify(input)}` });
   const proposal: Proposal = res.value;
   const guarded = applyGuardrails(proposal, { reading, history, nowMs: Date.now(), activeCard: activeCards(ctx.store).length > 0 });
-  return toDecision(guarded, res.model, now(), 'live-model');
+  return toDecision(guarded, res.model, now(), modelProvenance(ctx.env));
 }
 
 async function recordSkills(ctx: Ctx, moment: Moment, session: Session): Promise<void> {
@@ -184,7 +184,7 @@ export async function followUp(ctx: Ctx, source: Moment, extra: string): Promise
   const reply: Moment = {
     id: id('m'), work: source.work, index: all.length ? all[all.length - 1].index + 1 : 0, at: now(), frame: null,
     readingStatus: 'ok', readingError: null, reading: { ...source.reading, userTyping: false }, misread: false,
-    decision: null, response: null, change: null, provenance: 'live-model',
+    decision: null, response: null, change: null, provenance: modelProvenance(ctx.env),
   };
   await ctx.store.put('moment', reply);
   let decision: Decision;

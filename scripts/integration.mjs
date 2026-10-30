@@ -46,6 +46,7 @@ async function readSnapshot(wsId, token) {
 
 const health = await call('/api/health');
 check('health responds', health.res.ok && health.body.implementation === 'caddie', `mode=${health.body.mode}, live=${health.body.liveCallsEnabled}, media=${health.body.mediaServiceConfigured}`);
+if (!/^http:\/\/(127\.0\.0\.1|localhost)/.test(base)) check('deployed server is NOT in test fake-model mode', health.body.testFakeModels === false);
 check('security headers', Boolean(health.res.headers.get('content-security-policy')?.includes("frame-ancestors 'none'")) && health.res.headers.get('permissions-policy')?.includes('camera=(self)'));
 
 const page = await fetch(`${base}/caddie`);

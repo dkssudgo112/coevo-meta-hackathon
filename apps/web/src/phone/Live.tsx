@@ -3,7 +3,7 @@ import type { ContentItem, Moment, Session, SkillDimension, Snapshot } from '../
 import { post, postBinary, api, type Creds } from '../lib/api.ts';
 import type { ConnState } from '../lib/store.ts';
 import { vibrate } from '../lib/capture.ts';
-import { AssistLabel, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, momentLine, sessionMoments, type FlagState } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, momentLine, sessionMoments, type FlagState } from '../ui/common.tsx';
 import { CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
 import { PracticeRange } from './Practice.tsx';
@@ -36,6 +36,8 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
   const session = latestSession(state);
   const moments = sessionMoments(state, session?.id);
   const asking = useMemo(() => [...moments].reverse().find(m => m.decision?.action === 'intervene' && !m.misread) ?? null, [moments]);
+  // Acting on the question in the work itself (new ingredients observed) also answers it.
+  const resolvedBy = useMemo(() => (asking ? moments.find(m => m.index > asking.index && m.change && !m.misread) ?? null : null), [moments, asking]);
   const seenAsk = useRef<string | null>(null);
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
 
   if (!state) return <div className="phone"><main><p className="faint" role="status">{conn === 'unauthorized' ? 'This phone is no longer paired.' : 'Connecting to your Desk…'}</p>{conn === 'unauthorized' && onUnpair && <button className="btn" onClick={onUnpair}>Pair again</button>}</main></div>;
 
-  const flag: FlagState = !session || session.status === 'paused' ? 'off' : asking && !asking.response ? 'asking' : moments.length ? 'quiet' : 'watching';
+  const flag: FlagState = !session || session.status === 'paused' ? 'off' : asking && !asking.response && !resolvedBy ? 'asking' : moments.length ? 'quiet' : 'watching';
   const toolLine = session ? `${session.status === 'paused' ? 'Paused' : session.status === 'ended' ? 'Session ended' : 'Watching'}${session.tool ? ` · ${session.tool}` : ''}` : 'Ready';
 
   const act = async (fn: () => Promise<unknown>) => { setErr(''); try { await fn(); } catch (e) { setErr(errorText(e)); } };
@@ -67,8 +69,9 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
         </div>
       )}
       <main>
+        {state.workspace.testFakeModels && <div className="notice warn" role="status"><strong>Test mode:</strong> a scripted fake model is answering. Nothing here is real model output.</div>}
         {!state.workspace.liveCalls && <div className="notice warn" role="status">Live model calls are off on this server. The Caddie cannot read your screen until they are turned on. Nothing here is simulated.</div>}
-        <NowCard creds={creds} state={state} session={session} moments={moments} asking={asking} pulse={pulse} onOpen={id => setSheet({ kind: 'content', id })} act={act} />
+        <NowCard creds={creds} state={state} session={session} moments={moments} asking={asking} resolvedBy={resolvedBy} pulse={pulse} onOpen={id => setSheet({ kind: 'content', id })} act={act} />
         {err && <p className="faint" role="alert">{err}</p>}
         <Flow state={state} session={session} moments={moments} onOpen={id => setSheet({ kind: 'content', id })} />
         {session && session.status !== 'ended' && <button className="btn ghost" onClick={() => act(() => post(creds, `/sessions/${session.id}/end`))}>End this session</button>}
@@ -120,13 +123,25 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
   );
 }
 
-function NowCard({ creds, state, session, moments, asking, pulse, onOpen, act }: { creds: Creds; state: Snapshot; session: Session | null; moments: Moment[]; asking: Moment | null; pulse: boolean; onOpen: (id: string) => void; act: (fn: () => Promise<unknown>) => Promise<void> }) {
+function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, onOpen, act }: { creds: Creds; state: Snapshot; session: Session | null; moments: Moment[]; asking: Moment | null; resolvedBy: Moment | null; pulse: boolean; onOpen: (id: string) => void; act: (fn: () => Promise<unknown>) => Promise<void> }) {
   const last = moments[moments.length - 1];
-  const newerThanAsk = (iso: string) => !asking || Date.parse(iso) > Date.parse(asking.at);
 
-  if (session?.status === 'ended' && (!asking || newerThanAsk(session.endedAt ?? session.startedAt))) return <WrapCard creds={creds} state={state} session={session} onOpen={onOpen} />;
+  if (session?.status === 'ended') return <WrapCard creds={creds} state={state} session={session} onOpen={onOpen} />;
 
-  if (asking && !asking.response) {
+  const lastChange = [...moments].reverse().find(m => m.change && !m.misread);
+  if (lastChange && (!asking || lastChange.index > asking.index) && lastChange === [...moments].reverse().find(m => m.readingStatus === 'ok' && !m.misread)) {
+    return (
+      <section className="now" aria-live="polite">
+        <div className="row"><span className="eyebrow grow">Now · Seen</span><span className="faint">{clock(lastChange.at)}</span></div>
+        <p className="message" style={{ fontSize: '1.3rem' }}>{changeText(lastChange)}</p>
+        {lastChange.reading?.userRequest && <p className="quote">{lastChange.reading.userRequest}</p>}
+        <div className="row"><AssistLabel value={lastChange.change!.assistance} /></div>
+        {lastChange.decision?.note && <p className="faint">{lastChange.decision.note}</p>}
+      </section>
+    );
+  }
+
+  if (asking && !asking.response && !resolvedBy) {
     const d = asking.decision!;
     return (
       <section className={`now asking ${pulse ? 'pulse' : ''}`} aria-live="polite">
