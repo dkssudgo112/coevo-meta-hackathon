@@ -58,6 +58,7 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
   const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [msg, setMsg] = useState('');
+  const [picked, setPicked] = useState<string | null>(null);
   const stop = useRef(false);
   const busy = useRef(false);
 
@@ -158,7 +159,14 @@ function SampleRun({ creds, onRestart }: { creds: Creds; onRestart: () => void }
           <div className="phone-frame">{state ? <LiveScreen creds={creds} state={state} conn={conn} embedded /> : <p className="faint">Connecting…</p>}</div>
         </section>
       </div>
-      {state && session && <SessionReview creds={creds} state={state} sessionId={session.id} />}
+      {state && state.sessions.length > 1 && (
+        <div className="row wrap" role="tablist" aria-label="Sessions">
+          {[...state.sessions].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).map((s, n) => (
+            <button key={s.id} role="tab" aria-selected={(picked ?? session?.id) === s.id} className={`btn small ${(picked ?? session?.id) === s.id ? 'primary' : ''}`} onClick={() => setPicked(s.id)}>Session {n + 1}{s.task ? ` · ${s.task}` : ''}</button>
+          ))}
+        </div>
+      )}
+      {state && session && <SessionReview creds={creds} state={state} sessionId={picked && state.sessions.some(s => s.id === picked) ? picked : session.id} />}
     </div>
   );
 }

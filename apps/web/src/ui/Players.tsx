@@ -9,6 +9,13 @@ export const FORMAT_NAME: Record<ContentItem['format'], string> = {
   note: 'Note', manual: 'My playbook', flashcards: 'Flashcards', podcast: 'Podcast', short: 'Short',
 };
 
+const ORDER: ContentItem['format'][] = ['note', 'manual', 'flashcards', 'podcast', 'short'];
+
+/** The five formats always appear in the same order. */
+export function byFormat(a: ContentItem, b: ContentItem): number {
+  return ORDER.indexOf(a.format) - ORDER.indexOf(b.format);
+}
+
 function momentTime(state: Snapshot, momentId: string | null): string | null {
   const m = momentId ? state.moments.find(x => x.id === momentId) : null;
   return m ? clock(m.at) : null;

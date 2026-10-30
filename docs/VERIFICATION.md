@@ -75,7 +75,7 @@ Last updated: 2026-10-30.
 | --- | --- | --- | --- | --- | --- | --- |
 | E1 | Card proposed from the playbook's `cardRule` | ◐ | ☐ | ☐ | prompt schema | |
 | E2 | Approve / edit / reject / revoke with history | ☐ | ☐ | ☐ | | |
-| E3 | Tool-specific apply text (Meta AI: first-message rule) | ◐ | ☐ | ☐ | unit: apply hints | Memory did not persist in the S4 check |
+| E3 | Tool-specific apply text (Meta AI: dedicated pinned chat) | ☑ | ◐ | ☐ | unit: apply hints; S4 fallback observed in real Meta AI | Memory did not persist across new chats |
 | E4 | Next session: "AI asked first" observed → `observed-working` | ◐ | ☐ | ☐ | unit: guardrail | S4 |
 
 ## F. Content (five formats)
@@ -119,7 +119,7 @@ Last updated: 2026-10-30.
 | S1 | Spark reading of 20 real phone-camera frames | ≥ 90% request text, 100% tool | ☐ | Needs R1 + R3 |
 | S2 | SAM 3.1 monitor detection | ≥ 18/20, ≤ 2 s | ☐ | Needs R1 + R3 |
 | S3 | Frame → card latency | p50 ≤ 6 s | ☐ | Needs R1 |
-| S4 | Meta AI (KR): image generation + Memory changes behavior | both reproducible | ◐ | Image: PASS (9:16 poster, private record). Memory: FAIL in a new chat → first-message fallback under test |
+| S4 | Meta AI (KR): image generation + rule changes behavior | both reproducible | ☑ (fallback) | Image: PASS (real 1152×2048 poster, private record). Memory across new chats: FAIL. Approved fallback PASS: rule as first message of a dedicated, pinned chat → Meta AI asked audience, price, mood and photo before generating (manual check by the maintainer's account; private record) |
 | S5 | Modal open TTS, two English voices, 60 s | acceptable quality, ≤ 60 s render, commercial-use license | ☐ | Needs R1 + R6 |
 | S6 | Voice Transcribe on 20 s answers | key words correct | ☐ | Needs R1 |
 | S7 | Muse Image portrait / 9:16 | ratio kept (text rendered in code) | ☐ | Needs R1 |

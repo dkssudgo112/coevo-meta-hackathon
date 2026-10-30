@@ -5,7 +5,7 @@ import { api, createWorkspace, loadCreds, pairLink, post, saveCreds, type Creds 
 import { useWorkspace } from '../lib/store.ts';
 import { FrameSampler, FULL, uploadFrame } from '../lib/capture.ts';
 import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, latestSession, MediaImage, sessionMoments } from '../ui/common.tsx';
-import { CardControls, ContentBody, FORMAT_NAME } from '../ui/Players.tsx';
+import { byFormat, CardControls, ContentBody, FORMAT_NAME } from '../ui/Players.tsx';
 import { Habits } from '../phone/Live.tsx';
 
 const PAIR_KEY = 'coevo.deskPair';
@@ -222,7 +222,7 @@ export function EvidenceRows({ creds, state, moments }: { creds: Creds; state: S
 export function SessionReview({ creds, state, sessionId }: { creds: Creds; state: Snapshot; sessionId: string }) {
   const session = state.sessions.find(s => s.id === sessionId)!;
   const moments = sessionMoments(state, sessionId);
-  const items = state.content.filter(c => c.sessionId === sessionId);
+  const items = state.content.filter(c => c.sessionId === sessionId).sort(byFormat);
   const [open, setOpen] = useState<string | null>(null);
   const cards = state.cards.filter(c => c.sessionId === sessionId && c.status !== 'rejected');
   return (

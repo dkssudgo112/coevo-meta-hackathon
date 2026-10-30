@@ -141,6 +141,7 @@ test('apply hints: Meta AI uses a first-message rule (Memory did not persist in 
   const h = applyHint('Meta AI', 'Before making a poster, ask me who it is for and the price.');
   assert.equal(h.text, 'For this chat: before making a poster, ask me who it is for and the price.');
   assert.match(h.how, /first message/);
+  assert.match(h.how, /pin/i);
   assert.match(applyHint('ChatGPT', 'Ask first.').how, /Custom instructions/);
 });
 

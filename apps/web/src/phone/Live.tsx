@@ -4,7 +4,7 @@ import { post, postBinary, api, type Creds } from '../lib/api.ts';
 import type { ConnState } from '../lib/store.ts';
 import { vibrate } from '../lib/capture.ts';
 import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, momentLine, sessionMoments, type FlagState } from '../ui/common.tsx';
-import { CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
+import { byFormat, CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
 import { PracticeRange } from './Practice.tsx';
 
@@ -190,7 +190,7 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
 }
 
 function WrapCard({ creds, state, session, onOpen }: { creds: Creds; state: Snapshot; session: Session; onOpen: (id: string) => void }) {
-  const items = state.content.filter(c => c.sessionId === session.id);
+  const items = state.content.filter(c => c.sessionId === session.id).sort(byFormat);
   const note = items.find(c => c.format === 'note' && c.status === 'ready');
   const card = state.cards.find(c => c.sessionId === session.id && c.status === 'proposed');
   return (
@@ -318,7 +318,7 @@ function SessionSummary({ creds, state, sessionId, onOpen }: { creds: Creds; sta
     <div className="stack">
       <p className="faint">{s.tool ?? 'Unknown tool'} · {new Date(s.startedAt).toLocaleString()}{s.fixture ? ' · sample data' : ''}</p>
       {ms.map(m => <div key={m.id} className={`flow-item ${m.misread ? 'misread' : ''}`}><time>{clock(m.at)}</time><span>{momentLine(m).text} {m.change && <AssistLabel value={m.change.assistance} />}</span></div>)}
-      {state.content.filter(c => c.sessionId === s.id).map(c => <button key={c.id} className="btn" onClick={() => onOpen(c.id)}>{FORMAT_NAME[c.format]} · {c.status}</button>)}
+      {state.content.filter(c => c.sessionId === s.id).sort(byFormat).map(c => <button key={c.id} className="btn" onClick={() => onOpen(c.id)}>{FORMAT_NAME[c.format]} · {c.status}</button>)}
       {s.status === 'ended' && s.wrapStatus !== 'planned' && <button className="btn" onClick={() => post(creds, `/sessions/${s.id}/wrap`)}>Wrap up this session</button>}
     </div>
   );

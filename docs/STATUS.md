@@ -16,7 +16,8 @@ Updated: October 30, 2026 (evening KST). For per-requirement evidence see [VERIF
 - **Kokoro TTS on Modal** (code written, never run) and the deployed media service.
 - **Real phone camera** legibility, latency and haptics.
 - **Public deployment** (waiting for Cloudflare R2 activation).
-- **Meta AI as the user's tool:** image generation for a poster was confirmed in a Korean account. A "Remember that…" rule was acknowledged but **not** applied in a new chat, so the Caddie card for Meta AI is sent as a chat's first message instead; that fallback is still being checked.
+- **Meta AI as the user's tool:** confirmed in a Korean account — poster image generation works, and a Caddie-style rule sent as the first message of a dedicated (pinned) chat made Meta AI ask for audience, price, mood and a photo before generating. A "Remember that…" rule did **not** carry into other new chats, so the Desk tells Meta AI users to keep one pinned poster chat.
+- **Modal:** a one-call CPU probe succeeded; the media service itself (Kokoro TTS) has not run yet.
 - Demo video, simulated persona tests, submission texts.
 
 ## Publication
