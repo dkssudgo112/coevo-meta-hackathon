@@ -76,7 +76,7 @@ export function applyGuardrails(p: Proposal, ctx: LadderContext): Proposal & { g
   if (last?.decision) {
     const lastMs = Date.parse(last.decision.decidedAt);
     const deferred = last.response?.kind === 'later' || last.response?.kind === 'dismissed';
-    const answered = last.response?.kind === 'voice-answer' || last.response?.kind === 'asked-example';
+    const answered = last.response?.kind === 'voice-answer' || last.response?.kind === 'typed-answer' || last.response?.kind === 'asked-example';
     const cooldown = policy.cooldownMs * (deferred ? policy.laterMultiplier : 1);
     if (!answered && ctx.nowMs - lastMs < cooldown) {
       return quiet('The Caddie spoke recently and is giving you room.', deferred ? 'later-cooldown' : 'cooldown');

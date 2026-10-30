@@ -58,7 +58,7 @@ function DeskWorkspace({ creds, pair, setPair, onReset }: { creds: Creds; pair: 
       <header className="desk-top">
         <Flag state={state.workspace.paired ? 'watching' : 'off'} />
         <div className="grow"><h2>Coevo Desk</h2><p className="faint">{state.workspace.paired ? 'Phone connected' : 'Waiting for your phone'} · {conn === 'live' ? 'live' : 'reconnecting…'} · {state.workspace.testFakeModels ? 'fake test model' : `live model calls ${state.workspace.liveCalls ? 'on' : 'off'}`}</p></div>
-        <span className="faint">Spent today ${state.workspace.budget.spentUsd.toFixed(3)} / ${state.workspace.budget.capUsd.toFixed(2)}</span>
+        <span className="faint" title="Model use is paid by this hackathon deployment, not by you. The cap stops calls for the day.">Model use today (paid by this demo, not you) ${state.workspace.budget.spentUsd.toFixed(3)} / ${state.workspace.budget.capUsd.toFixed(2)}</span>
       </header>
       {(state.workspace.testFakeModels || !state.workspace.liveCalls) && <div className="notice warn" role="status">{modelSourceLine({ liveCallsEnabled: state.workspace.liveCalls, testFakeModels: state.workspace.testFakeModels })}</div>}
       {notices.map((n, i) => <div key={i} className="notice warn" role="status">{n}</div>)}
@@ -217,7 +217,7 @@ export function EvidenceRows({ creds, state, moments }: { creds: Creds; state: S
       <thead><tr><th>Frame</th><th>You said</th><th>Caddie</th><th>Then</th></tr></thead>
       <tbody>
         {moments.map(m => (
-          <tr key={m.id} className={m.misread ? 'misread' : undefined}>
+          <tr key={m.id} id={`row-${m.id}`} className={m.misread ? 'misread' : undefined}>
             <td>
               {m.frame ? (
                 <div className="stack" style={{ gap: 4 }}>
@@ -250,6 +250,15 @@ export function EvidenceRows({ creds, state, moments }: { creds: Creds; state: S
   );
 }
 
+/** Scroll the Desk to a moment's evidence row and flash it. */
+function showRow(momentId: string): void {
+  const row = document.getElementById(`row-${momentId}`);
+  if (!row) return;
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.classList.add('source');
+  setTimeout(() => row.classList.remove('source'), 2400);
+}
+
 export function SessionReview({ creds, state, sessionId }: { creds: Creds; state: Snapshot; sessionId: string }) {
   const session = state.sessions.find(s => s.id === sessionId)!;
   const moments = sessionMoments(state, sessionId);
@@ -274,7 +283,7 @@ export function SessionReview({ creds, state, sessionId }: { creds: Creds; state
               </div>
             ))}
           </div>
-          {open && (() => { const i = items.find(x => x.id === open); return i ? <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16, marginTop: 8 }}><ContentBody item={i} state={state} creds={creds} /></div> : null; })()}
+          {open && (() => { const i = items.find(x => x.id === open); return i ? <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16, marginTop: 8 }}><ContentBody item={i} state={state} creds={creds} onSource={showRow} /></div> : null; })()}
         </div>
       )}
       {session.status === 'ended' && session.wrapStatus === 'failed' && <button className="btn" onClick={() => post(creds, `/sessions/${session.id}/wrap`)}>Retry the wrap-up</button>}

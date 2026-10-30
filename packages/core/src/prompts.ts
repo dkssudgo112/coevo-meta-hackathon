@@ -130,7 +130,8 @@ Never repeat a question the AI already asked. One improvement at a time. Message
 Special cases:
 - firstSighting=true: stay quiet; in "note" say in at most 90 characters which tool and task you can see and that you will only speak when it helps.
 - If an applied Caddie card in activeCards covers this tool and task and the AI asked the clarifying questions first: stay quiet; in "note" say that their AI asked first, as their card says, so you are staying quiet. This takes priority over firstSighting.
-- "note" is one short flow line (at most 60 characters, 90 for firstSighting) describing what you saw or why you stayed quiet.`,
+- "note" is one short flow line (at most 60 characters, 90 for firstSighting) describing what you saw or why you stayed quiet.
+- "reason" is one plain sentence in everyday words (no jargon such as "converging" or "ingredient"); many readers speak English as a second language.`,
   schema: S.obj({
     action: S.enumOf(['stay-quiet', 'intervene'], 'Intervene or stay quiet.'),
     step: S.enumOf(LADDER, 'Ladder step. Use "watch" when quiet.'),

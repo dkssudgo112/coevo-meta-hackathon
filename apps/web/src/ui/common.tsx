@@ -113,4 +113,25 @@ export function modelSourceLine(h: HealthInfo | null): string {
 }
 
 /** Shown wherever screen content is sent. Accurate for this hackathon deployment's billing state. */
+/** What leaves the phone, who receives it, how long Coevo keeps it, and how to delete it. */
+export function DataTable() {
+  const rows: [string, string, string, string][] = [
+    ['Screen frames — only the boxed area, after the screen changed', 'This app’s server, then Meta Muse Spark to read it', 'Discarded after reading unless it is evidence for a moment (a question, a change, the AI’s result); evidence stays in this workspace’s private storage', '“Delete frame” on the Desk, or delete the session'],
+    ['One setup photo, only if you tap “Find my screen”', 'Meta SAM 3.1, to find the monitor', 'Not stored', '—'],
+    ['Spoken answers and practice briefs', 'Meta Muse Voice Transcribe', 'Audio is not stored; the text is kept with the moment', 'Delete the session'],
+    ['Typed answers and briefs', 'This app', 'Kept with the moment', 'Delete the session'],
+    ['Note, playbook, flashcards, podcast, short', 'Written by Muse Spark; podcast and short voices made on Modal; the short shows your before and after screens', 'Kept in this workspace until you delete them', 'Delete the session'],
+  ];
+  return (
+    <details className="data-table">
+      <summary>What leaves this phone, and how long it stays</summary>
+      <table>
+        <thead><tr><th>What</th><th>Sent to</th><th>Kept by Coevo</th><th>Delete</th></tr></thead>
+        <tbody>{rows.map(r => <tr key={r[0]}>{r.map((c, i) => <td key={i}>{c}</td>)}</tr>)}</tbody>
+      </table>
+      <p className="faint">Deleting here removes Coevo’s copies. It cannot delete what Meta or Modal keep under their own terms; see the note on free credits.</p>
+    </details>
+  );
+}
+
 export const PROVIDER_DATA_NOTICE = 'This hackathon deployment runs on Meta’s free developer credits. Meta’s billing page says content sent while free credits are in use may be used to improve its products. Use test content and keep personal information off your screen.';

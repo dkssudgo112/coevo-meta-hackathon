@@ -45,7 +45,7 @@ function decision(input) {
   if (last?.response?.startsWith('asked-example')) {
     return { action: 'intervene', step: 'example', reason: 'The person asked for an example.', quote: null, message: '[test] Here is an example. Change it to your own words.', note: null, missingIngredients: [], exampleBrief: 'A poster for office workers near the station: matcha cheesecake, 6,500 won, warm morning light, my real photo.' };
   }
-  if (last?.response?.startsWith('voice-answer')) {
+  if (last?.response?.startsWith('voice-answer') || last?.response?.startsWith('typed-answer')) {
     return { action: 'intervene', step: 'question', reason: 'They answered with who it is for and the price.', quote: null, message: '[test] That is your brief. Type it in your own words.', note: null, missingIngredients: [], exampleBrief: null };
   }
   const rep = input.repeatedVagueTerm;

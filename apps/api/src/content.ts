@@ -37,7 +37,7 @@ export function evidenceText(ctx: Ctx, session: Session): string {
     const d = m.decision;
     if (d?.action === 'intervene') parts.push(`Caddie (${d.step}): "${d.message}"`);
     else if (d?.note) parts.push(`Caddie stayed quiet: ${d.note}`);
-    if (m.response) parts.push(`person ${m.response.kind}${m.response.transcript ? ` (voice): "${m.response.transcript}"` : ''}`);
+    if (m.response) parts.push(`person ${m.response.kind}${m.response.transcript ? ` (${m.response.kind === 'typed-answer' ? 'typed' : 'voice'}): "${m.response.transcript}"` : ''}`);
     if (m.change) parts.push(`observed change: ${m.change.summary} [${m.change.assistance}]`);
     if (parts.length) lines.push(`[${m.id}] ${elapsed(m.at, session.startedAt)} ${parts.join(' | ')}`);
   }

@@ -14,7 +14,7 @@ const frames = [
   { file: 'meta-ai-3.jpg', session: 1, provenance: ACTUAL, caption: '“Still not premium enough. Make it more premium.”' },
   { file: 'meta-ai-4.jpg', session: 1, provenance: ACTUAL, caption: '“Even more premium, please.” — the fourth vague request.' },
   { file: 'meta-ai-5.jpg', session: 1, provenance: ACTUAL, caption: 'They write a specific brief: who, what, price, feeling, and no real photo yet. Meta AI also added opening hours nobody gave it — unverified.' },
-  { file: 'meta-ai-6.jpg', session: 2, provenance: ACTUAL, caption: 'A separate recorded Meta AI chat that began with a Coevo card from an earlier run. Asked for a new drink poster, Meta AI asks for the four details first.' },
+  { file: 'meta-ai-6.jpg', session: 2, provenance: ACTUAL, caption: 'A separate recorded Meta AI chat that began with a Coevo card from an earlier run (that card named four details: who, what, price, feeling). Asked for a new drink poster, Meta AI asks for those four first.' },
 ];
 writeFileSync(new URL('manifest.json', out), JSON.stringify({
   note: 'Actual Meta AI replies to a scripted, fictional café scenario (not a real user). Session 2 is a separate recorded chat that began with a Coevo card from an earlier run, not an elapsed week.',

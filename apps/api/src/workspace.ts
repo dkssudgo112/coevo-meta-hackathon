@@ -24,13 +24,15 @@ interface Meta {
   pairSecretHash: string | null;
   pairExpiresAt: number;
   paired: boolean;
+  /** TEST ONLY (fake models on 127.0.0.1): this workspace spends on its own fake ledger. */
+  testLedger?: string;
 }
 
 interface Job { contentId: string; jobId: string; startedAt: number }
 
 /** Real paid calls and fake test runs never share a ledger; Meta and Modal are separate budgets. */
-export function ledgerName(env: Env, kind: 'meta' | 'modal' = 'meta'): string {
-  if (fakeMeta(env)) return kind === 'meta' ? 'fake-test-ledger' : 'fake-modal-ledger';
+export function ledgerName(env: Env, kind: 'meta' | 'modal' = 'meta', testLedger?: string): string {
+  if (fakeMeta(env)) return `${kind === 'meta' ? 'fake-test-ledger' : 'fake-modal-ledger'}${testLedger ? `:${testLedger}` : ''}`;
   return kind === 'meta' ? 'global' : 'modal';
 }
 
@@ -122,7 +124,7 @@ export class Workspace extends DurableObject<Env> {
    * workspace, so duplicate or late settlements can never refund other spend.
    */
   private spender(kind: 'meta' | 'modal' = 'meta'): Spender {
-    const authority = () => this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env, kind)));
+    const authority = () => this.env.BUDGET.get(this.env.BUDGET.idFromName(ledgerName(this.env, kind, this.meta?.testLedger)));
     return {
       reserve: async (usd, label) => {
         if (!(usd >= 0) || !Number.isFinite(usd)) throw new BudgetExceeded('invalid-estimate');
@@ -459,13 +461,15 @@ export class Workspace extends DurableObject<Env> {
 
   private async init(req: Request, url: URL): Promise<Response> {
     if (this.meta) return error(409, 'exists', 'Workspace already exists.');
-    const b = (await req.json().catch(() => ({}))) as { kind?: 'user' | 'sample' };
+    const b = (await req.json().catch(() => ({}))) as { kind?: 'user' | 'sample'; testLedger?: string | null };
+    const testLedger = fakeMeta(this.env) && typeof b.testLedger === 'string' && /^[a-z0-9-]{4,40}$/.test(b.testLedger) ? b.testLedger : undefined;
     const deskToken = secret();
     const pairSecret = secret();
     const wsId = url.pathname.split('/')[3];
     this.meta = {
       id: wsId, kind: b.kind === 'sample' ? 'sample' : 'user', createdAt: now(),
       tokens: { [await sha256(deskToken)]: 'desk' }, pairSecretHash: await sha256(pairSecret), pairExpiresAt: Date.now() + 15 * 60_000, paired: false,
+      ...(testLedger ? { testLedger } : {}),
     };
     await this.saveMeta();
     return json({ workspaceId: wsId, deskToken, pairSecret, pairExpiresAt: new Date(this.meta.pairExpiresAt).toISOString() });
@@ -691,7 +695,16 @@ export class Workspace extends DurableObject<Env> {
         return error(f.status === 'budget' ? 429 : 503, f.status, f.message);
       }
     }
-    const b = (await req.json()) as { kind: 'later' | 'dismissed' | 'misread' | 'asked-example' };
+    const b = (await req.json()) as { kind: 'later' | 'dismissed' | 'misread' | 'asked-example' | 'typed-answer'; text?: unknown };
+    if (b.kind === 'typed-answer') {
+      // Typed instead of spoken (e.g. in an open office); treated like a voice answer and marked typed.
+      const text = typeof b.text === 'string' ? b.text.trim() : '';
+      if (text.length < 2 || text.length > 600) return error(400, 'bad_text', 'Type an answer of up to 600 characters.');
+      const updated = await this.store.put('moment', { ...m, response: { kind: 'typed-answer', transcript: text, at: now() } });
+      await ctx.remember(`They wrote: ${text}`);
+      this.enqueue(() => followUp(ctx, updated, 'The person just answered your last card in writing. Reply to their answer. '));
+      return json(updated);
+    }
     if (!['later', 'dismissed', 'misread', 'asked-example'].includes(b.kind)) return error(400, 'bad_kind', 'Unknown response.');
     if (b.kind === 'misread') {
       const updated = await this.store.put('moment', { ...m, misread: true, change: null, response: { kind: 'misread', transcript: null, at: now() } });

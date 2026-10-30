@@ -111,7 +111,7 @@ export interface Decision {
   decidedAt: string;
 }
 
-export type ResponseKind = 'voice-answer' | 'later' | 'dismissed' | 'misread' | 'asked-example';
+export type ResponseKind = 'voice-answer' | 'typed-answer' | 'later' | 'dismissed' | 'misread' | 'asked-example';
 
 export interface UserResponse {
   kind: ResponseKind;

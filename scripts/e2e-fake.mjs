@@ -9,6 +9,8 @@ import { deflateSync } from 'node:zlib';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:8788';
 const fake = 'http://127.0.0.1:8799';
+// Each run spends on its own fake ledger (TEST ONLY), so repeated runs never exhaust a shared one.
+const RUN_LEDGER = `run-${Date.now().toString(36)}`;
 const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? '✔' : '✖'} ${name}${detail ? ` — ${detail}` : ''}`); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -74,7 +76,7 @@ const health = await (await fetch(`${base}/api/health`)).json();
 check('server is in TEST fake-model mode', health.testFakeModels === true && health.liveCallsEnabled === true && health.mediaServiceConfigured === true);
 await fetch(`${fake}/reset`);
 
-const w = await (await fetch(`${base}/api/workspaces`, { method: 'POST' })).json();
+const w = await (await fetch(`${base}/api/workspaces`, { method: 'POST', headers: { 'X-Coevo-Test-Ledger': RUN_LEDGER } })).json();
 const p = await (await fetch(`${base}/api/w/${w.workspaceId}/pair`, { method: 'POST', body: JSON.stringify({ pairSecret: w.pairSecret }), headers: { 'Content-Type': 'application/json' } })).json();
 creds = { ws: w.workspaceId, token: p.phoneToken };
 
@@ -184,9 +186,21 @@ check('benchmark deletion removes frames and moments', del2.body?.deleted === 2 
 // The race and recovery checks below run in a fresh workspace, so the main journey's
 // spend does not push them into the per-workspace daily cap.
 {
-  const fresh = await (await fetch(`${base}/api/workspaces`, { method: 'POST' })).json();
+  const fresh = await (await fetch(`${base}/api/workspaces`, { method: 'POST', headers: { 'X-Coevo-Test-Ledger': RUN_LEDGER } })).json();
   const paired = await (await fetch(`${base}/api/w/${fresh.workspaceId}/pair`, { method: 'POST', body: JSON.stringify({ pairSecret: fresh.pairSecret }), headers: { 'Content-Type': 'application/json' } })).json();
   creds = { ws: fresh.workspaceId, token: paired.phoneToken };
+}
+
+// Typed answer (instead of speaking): the Caddie replies and the answer is marked typed.
+{
+  await fetch(`${fake}/reset`);
+  await call('/sessions', { method: 'POST', body: '{}' });
+  await sleep(2600);
+  let asked = null;
+  for (const seed of [0, 1, 2, 3]) { const r = await frame(seed); if (r.m.decision?.action === 'intervene') asked = r.m; }
+  const ans = asked ? await call(`/moments/${asked.id}/respond`, { method: 'POST', body: JSON.stringify({ kind: 'typed-answer', text: 'Office workers near the station, 6,500 won.' }) }) : null;
+  const reply = asked ? await until(s => s.moments.find(m => m.frame === null && m.work.sessionId === asked.work.sessionId && m.decision), 'reply to typed answer', 30) : null;
+  check('a typed answer is stored as typed and the Caddie replies', ans?.res.ok && ans.body.response?.kind === 'typed-answer' && Boolean(reply?.v), asked ? reply?.v?.decision?.message ?? reply?.v?.decision?.note ?? '' : 'no intervention');
 }
 
 // Deletion races: a late model response must never recreate deleted content.

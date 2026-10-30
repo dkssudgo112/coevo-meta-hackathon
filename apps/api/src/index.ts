@@ -35,7 +35,9 @@ async function createWorkspace(req: Request, env: Env, kind: 'user' | 'sample'):
   }
   const wsId = id('w');
   const stub = env.WORKSPACE.get(env.WORKSPACE.idFromName(wsId));
-  return stub.fetch(new Request(`https://do/api/w/${wsId}/init`, { method: 'POST', body: JSON.stringify({ kind }) }));
+  // TEST ONLY: with fake models on 127.0.0.1, a test run may keep its spend on its own fake ledger.
+  const testLedger = fakeMeta(env) ? req.headers.get('x-coevo-test-ledger') : null;
+  return stub.fetch(new Request(`https://do/api/w/${wsId}/init`, { method: 'POST', body: JSON.stringify({ kind, testLedger }) }));
 }
 
 async function admin(req: Request, env: Env, path: string): Promise<Response> {

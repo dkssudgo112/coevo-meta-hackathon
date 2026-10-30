@@ -3,7 +3,7 @@ import jsQR from 'jsqr';
 import type { CropRect } from '../../../../packages/contracts/index.ts';
 import { pairPhone, parsePair, postBinary, type Creds } from '../lib/api.ts';
 import { canvasJpeg, drawCrop, FULL, startRearCamera, stopStream } from '../lib/capture.ts';
-import { errorText, Flag, PROVIDER_DATA_NOTICE } from '../ui/common.tsx';
+import { DataTable, errorText, Flag, PROVIDER_DATA_NOTICE } from '../ui/common.tsx';
 
 export function PairScreen({ onPaired }: { onPaired: (c: Creds) => void }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -77,7 +77,8 @@ export function PairScreen({ onPaired }: { onPaired: (c: Creds) => void }) {
       <main>
         <div className="stack">
           <h2>Stand your phone next to your screen</h2>
-          <p className="muted">On your computer, open <strong>{location.host}/desk</strong> and point this camera at the QR code.</p>
+          <p className="muted">On your computer, open this same site and choose <strong>Open the Desk</strong>. Then point this camera at the code it shows.</p>
+          <p className="faint">The Desk address is {location.host}/desk.</p>
         </div>
         <div className="viewfinder" aria-label="Camera view for scanning the Desk QR code">
           <video ref={video} playsInline muted />
@@ -169,6 +170,7 @@ export function AimScreen({ creds, initial, onDone, onPhotos }: { creds: Creds; 
           {find.state === 'error' && <p className="faint" role="alert">{find.message ?? 'Screen finding is unavailable.'} Drag the corners by hand.</p>}
         </div>
         <p className="notice">{PROVIDER_DATA_NOTICE}</p>
+        <DataTable />
         <button className="btn primary block" onClick={() => onDone(crop)} disabled={camera !== 'on'}>Start watching</button>
         <button className="linklike" onClick={onPhotos}>Use single photos instead</button>
       </main>

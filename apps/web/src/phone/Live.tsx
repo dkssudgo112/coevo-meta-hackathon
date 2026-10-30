@@ -3,7 +3,7 @@ import type { ContentItem, Moment, Session, SkillDimension, Snapshot } from '../
 import { post, postBinary, api, type Creds } from '../lib/api.ts';
 import type { ConnState } from '../lib/store.ts';
 import { vibrate } from '../lib/capture.ts';
-import { AssistLabel, changeText, clock, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, modelSourceLine, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
+import { AssistLabel, changeText, clock, DataTable, Empty, errorText, Flag, FixtureTag, INGREDIENT_TEXT, latestSession, modelSourceLine, momentLine, PROVIDER_DATA_NOTICE, sessionMoments, type FlagState } from '../ui/common.tsx';
 import { byFormat, CardControls, ContentBody, FORMAT_NAME, NoteView } from '../ui/Players.tsx';
 import { VoiceButton } from './Voice.tsx';
 import { PracticeRange } from './Practice.tsx';
@@ -112,7 +112,7 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
             </section>
             <Privacy creds={creds} state={state} session={session} />
             {!embedded && onUnpair && <button className="btn ghost" onClick={onUnpair}>Unpair this phone</button>}
-            <p className="faint">Spent today: ${state.workspace.budget.spentUsd.toFixed(3)} of ${state.workspace.budget.capUsd.toFixed(2)} cap.</p>
+            <p className="faint">Model use today, paid by this demo (not you): ${state.workspace.budget.spentUsd.toFixed(3)} of ${state.workspace.budget.capUsd.toFixed(2)} cap.</p>
           </aside>
         </>
       )}
@@ -137,6 +137,20 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
         </Sheet>
       )}
     </div>
+  );
+}
+
+/** Answer in writing when speaking is not possible; it is stored and shown as typed. */
+function TypeInstead({ onSend }: { onSend: (text: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  if (!open) return <button className="linklike" onClick={() => setOpen(true)}>Can’t talk right now? Type instead</button>;
+  return (
+    <form className="stack" onSubmit={e => { e.preventDefault(); void onSend(text.trim()); }}>
+      <label className="faint" htmlFor="typed-answer">Your answer, in your own words. It is marked as typed. Only the text is sent.</label>
+      <textarea id="typed-answer" rows={2} maxLength={600} value={text} onChange={e => setText(e.target.value)} />
+      <div className="row"><button className="btn" type="submit" disabled={text.trim().length < 2}>Send answer</button><button className="btn ghost" type="button" onClick={() => setOpen(false)}>Cancel</button></div>
+    </form>
   );
 }
 
@@ -179,16 +193,17 @@ function NowCard({ creds, state, session, moments, asking, resolvedBy, pulse, on
           <VoiceButton label="Answer" onWav={wav => postBinary(creds, `/moments/${asking.id}/respond`, wav, 'audio/wav')} />
           <button className="btn" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'later' }))}>Later</button>
         </div>
+        <TypeInstead onSend={text => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'typed-answer', text }))} />
         <div className="row wrap" style={{ gap: 16 }}>
           {d.step === 'ingredients' && <button className="linklike" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'asked-example' }))}>Show me an example</button>}
-          <button className="linklike" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'misread' }))}>That’s not what I asked</button>
+          <button className="linklike" onClick={() => act(() => post(creds, `/moments/${asking.id}/respond`, { kind: 'misread' }))}>Misread: that’s not what I wrote</button>
         </div>
         <p className="faint">Why: {d.reason}</p>
       </section>
     );
   }
-  if (asking?.response?.kind === 'voice-answer' && !moments.some(m => m.index > asking.index && m.frame === null)) {
-    return <section className="now"><div className="eyebrow">You said</div><p className="quote">{asking.response.transcript}</p><p className="faint" role="status">The Caddie is considering your answer…</p></section>;
+  if ((asking?.response?.kind === 'voice-answer' || asking?.response?.kind === 'typed-answer') && !moments.some(m => m.index > asking.index && m.frame === null)) {
+    return <section className="now"><div className="eyebrow">{asking.response.kind === 'typed-answer' ? 'You wrote' : 'You said'}</div><p className="quote">{asking.response.transcript}</p><p className="faint" role="status">The Caddie is considering your answer…</p></section>;
   }
   if (!last) {
     return <section className="now"><div className="eyebrow">Now</div><p className="message">Work as usual.</p><p className="muted">The Caddie watches your screen and speaks up only when it helps. It never interrupts while you type.</p></section>;
@@ -245,7 +260,7 @@ function Flow({ state, session, moments, onOpen }: { state: Snapshot; session: S
           <time dateTime={m.at}>{clock(m.at)}</time>
           <div className="stack" style={{ gap: 4 }}>
             <span>{m.reading?.userRequest && l.kind !== 'status' ? <><span className="quote">{m.reading.userRequest}</span> · </> : null}{l.text}</span>
-            <span className="row wrap">{m.change && <AssistLabel value={m.change.assistance} />}{m.response?.kind === 'voice-answer' && <span className="faint">You answered: “{m.response.transcript}”</span>}{m.response?.kind === 'later' && <span className="faint">Later</span>}{m.misread && <span className="faint">Marked as misread</span>}</span>
+            <span className="row wrap">{m.change && <AssistLabel value={m.change.assistance} />}{(m.response?.kind === 'voice-answer' || m.response?.kind === 'typed-answer') && <span className="faint">You {m.response.kind === 'typed-answer' ? 'wrote' : 'answered'}: “{m.response.transcript}”</span>}{m.response?.kind === 'later' && <span className="faint">Later</span>}{m.misread && <span className="faint">Marked as misread</span>}</span>
           </div>
         </div>
       ),
@@ -323,6 +338,7 @@ function Privacy({ creds, state, session }: { creds: Creds; state: Snapshot; ses
       <h3>Privacy</h3>
       <p className="faint">Only the boxed screen area is sent. Frames are read, then discarded unless they are evidence for a moment. You can delete kept frames at any time.</p>
       <p className="faint">{PROVIDER_DATA_NOTICE}</p>
+      <DataTable />
       {session && <button className="btn" disabled={busy || !kept.length} onClick={async () => { setBusy(true); try { for (const m of kept) await api(creds, `/frames/${m.frame!.id}`, { method: 'DELETE' }); } finally { setBusy(false); } }}>Delete {kept.length} kept frame{kept.length === 1 ? '' : 's'} from this session</button>}
       {session && <button className="btn ghost" disabled={busy} onClick={async () => { if (!confirm('Delete this session, its frames and its content?')) return; setBusy(true); try { await api(creds, `/sessions/${session.id}`, { method: 'DELETE' }); } finally { setBusy(false); } }}>Delete this session</button>}
     </section>

@@ -4,7 +4,7 @@
 
 Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer / Build for Your World). The product concept continues the author's earlier Coevo work; all code in this repository was written during the event.
 
-> **Status:** deployed at https://coevo-caddie.coevo-meta-hackathon.workers.dev with real Meta model calls behind an application-enforced budget (US$2.50 lifetime ceiling inside an approved US$3 total). Real-screen readings, interventions, Practice Range and Modal speech/video have run live; the real-phone camera benchmark and the full card-in-Meta-AI loop are still open. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). Nothing in the app is simulated: when a model call is off, refused or fails, the app says so instead of inventing output.
+> **Status:** deployed at https://coevo-caddie.coevo-meta-hackathon.workers.dev with real Meta model calls behind an application-enforced budget (US$2.50 lifetime ceiling inside an approved US$3 total). Real-screen readings, interventions, Practice Range and Modal speech/video have run live; the real-phone camera benchmark and the full card-in-Meta-AI loop are still open. See [Current status](docs/STATUS.md) and the [verification matrix](docs/VERIFICATION.md). What the Caddie says is never pre-written: its readings, decisions and content are live model output, and when a model call is off, refused or fails, the app says so instead of inventing output. The sample's screens are a scripted, fictional scenario, and the test build labels its fake model.
 
 ## The idea in one scene
 

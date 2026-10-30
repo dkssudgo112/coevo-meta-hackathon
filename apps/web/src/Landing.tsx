@@ -9,15 +9,15 @@ export function Landing() {
   const health = useHealth();
   const desk = (
     <div className="card choice" key="desk">
-      <h3>On your computer</h3>
-      <p className="muted">Open the Desk. It shows a code for your phone and keeps the evidence of each session.</p>
+      <h3>1 · On your computer</h3>
+      <p className="muted">Open the Desk first. It shows a code for your phone and keeps the evidence of each session.</p>
       <a className={`btn ${phone ? '' : 'primary'}`} href="/desk">Open the Desk</a>
     </div>
   );
   const caddie = (
     <div className="card choice" key="caddie">
-      <h3>On your phone</h3>
-      <p className="muted">Open the Caddie, point it at the Desk code, then prop it next to your monitor.</p>
+      <h3>2 · On your phone</h3>
+      <p className="muted">Scan the Desk code with your phone’s camera (or open the Caddie here), then prop the phone next to your monitor.</p>
       <a className={`btn ${phone ? 'primary' : ''}`} href="/caddie">Open the Caddie</a>
     </div>
   );
@@ -27,9 +27,10 @@ export function Landing() {
       <div className="stack">
         <h1>A caddie on the phone beside your screen.</h1>
         <p className="muted" style={{ fontSize: '1.1rem', maxWidth: 640 }}>It watches how you work with any AI — ChatGPT, Gemini, Meta AI, Claude — steps in only when it matters, and helps both you and your AI get better.</p>
+        <p><a href="/sample">No phone? Watch a sample session →</a></p>
       </div>
       <div className="choices">
-        {phone ? [caddie, desk] : [desk, caddie]}
+        {[desk, caddie]}
         <div className="card choice">
           <h3>No phone handy?</h3>
           <p className="muted">Replay a sample session: a scripted, fictional café using actual Meta AI. {modelSourceLine(health)}</p>
@@ -40,7 +41,7 @@ export function Landing() {
         <h2>How it works</h2>
         <ol className="stack" style={{ paddingLeft: 20 }}>
           <li><strong>It watches quietly.</strong> Your phone’s camera reads your screen only when it changes. Only the boxed screen area is sent, to Meta’s Muse Spark model.</li>
-          <li><strong>It steps in when you’re stuck.</strong> If you keep asking for “more premium”, it asks one question — who it’s for, the price — and you answer out loud. It doesn’t write the brief for you.</li>
+          <li><strong>It steps in when you’re stuck.</strong> If you keep asking for “more premium”, it asks one question — who it’s for, the price — and you answer out loud or type it. It doesn’t write the brief for you.</li>
           <li><strong>You and your AI both improve.</strong> After the session you get a note, a playbook, flashcards, a two-voice podcast and a short video, chosen for when you’ll use them. Approve a Caddie card and your AI starts asking first.</li>
         </ol>
       </section>
