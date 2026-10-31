@@ -35,6 +35,18 @@ function wav(seconds = 2) {
   return b;
 }
 
+/** Opens the live WebSocket (token in the first message, never the URL) and records what arrives. */
+function openLive(wsId, token) {
+  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/api/w/${wsId}/live`);
+  const got = { events: [], texts: [], closeCode: null, ws };
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', token }));
+  ws.onmessage = m => { got.texts.push(m.data); try { got.events.push(JSON.parse(m.data)); } catch { /* pong */ } };
+  ws.onclose = e => { got.closeCode = e.code; };
+  ws.onerror = () => {};
+  got.until = async (pred, waitMs = 8000) => { const t = Date.now() + waitMs; while (Date.now() < t) { if (pred(got)) return true; await sleep(50); } return pred(got); };
+  return got;
+}
+
 let creds;
 async function call(path, init = {}) {
   const headers = { ...(init.headers ?? {}), Authorization: `Bearer ${creds.token}` };
@@ -79,8 +91,12 @@ await fetch(`${fake}/reset`);
 const w = await (await fetch(`${base}/api/workspaces`, { method: 'POST', headers: { 'X-Coevo-Test-Ledger': RUN_LEDGER } })).json();
 const p = await (await fetch(`${base}/api/w/${w.workspaceId}/pair`, { method: 'POST', body: JSON.stringify({ pairSecret: w.pairSecret }), headers: { 'Content-Type': 'application/json' } })).json();
 creds = { ws: w.workspaceId, token: p.phoneToken };
+// The Desk follows the phone's work over the live socket (hibernatable; no timers on the server).
+const deskLive = openLive(w.workspaceId, w.deskToken);
+check('live socket: the Desk gets a snapshot after sending its token', await deskLive.until(g => g.events.some(e => e.type === 'snapshot' && e.snapshot.workspace.paired === true)));
 
 const m0 = await frame(0);
+check('live socket: the phone\'s moment reaches the Desk as it is read and decided', await deskLive.until(g => g.events.some(e => e.type === 'upsert' && e.entity === 'moment' && e.data.id === m0.m.id && e.data.decision)));
 check('first sighting: quiet with a model note, labeled fixture', m0.m.decision.action === 'stay-quiet' && m0.m.decision.note?.includes('[test]') && m0.m.decision.provenance === 'fixture');
 await frame(1);
 await frame(2);
@@ -106,6 +122,7 @@ await fetch(`${fake}/fail`, { method: 'POST', body: JSON.stringify({ name: 'shor
 await fetch(`${fake}/fail`, { method: 'POST', body: JSON.stringify({ name: 'media-podcast' }) });
 await call(`/sessions/${sessionId}/end`, { method: 'POST' });
 const planned = await until(s => s.sessions.find(x => x.id === sessionId)?.wrapStatus === 'planned', 'wrap planned', 30);
+check('live socket: wrap progress from background work reaches the Desk', await deskLive.until(g => g.events.some(e => e.type === 'upsert' && e.entity === 'session' && e.data.id === sessionId && e.data.wrapStatus === 'planned')));
 check('wrap planned with a reason per format', Object.values(planned.s.sessions.find(x => x.id === sessionId).design.formats).every(f => f.why));
 const first = await until(s => { const c = s.content.filter(x => x.sessionId === sessionId); return c.length === 5 && c.every(x => x.status === 'ready' || x.status === 'failed') ? c : null; }, 'five formats (with injected failures)', 180);
 const f1 = Object.fromEntries(first.v.map(c => [c.format, c]));
@@ -493,18 +510,20 @@ check('practice origin: an attempt in a fixture session is stored as sample inpu
   await sleep(2600);
   const kept = await frame(0);
   // A write in flight (a frame still being read) holds the move back; nothing is lost. Four requests
-  // (two roles, one the event stream) arrive together: they wait, then all join one move.
+  // (two roles) arrive together: they wait, then all join one move.
   await fetch(`${fake}/delay`, { method: 'POST', body: JSON.stringify({ name: 'caddie_turn', ms: 5000 }) });
   const fd = new FormData(); fd.append('frame', new File([png(5)], 'f.png', { type: 'image/png' })); fd.append('source', 'camera'); fd.append('deviceCropped', 'true');
   const pending = (await call('/frames', { method: 'POST', body: fd })).body;
   const before = await state();
+  const legacyLive = openLive(legacy.workspaceId, legacy.deskToken);
+  await legacyLive.until(g => g.events.some(e => e.type === 'snapshot'));
   await call('/test/restricted', { method: 'POST' });
   const desk = { Authorization: `Bearer ${legacy.deskToken}` };
   const phone = { Authorization: `Bearer ${lp.phoneToken}` };
   const t0 = Date.now();
   const all = await Promise.all([
     fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: phone }),
-    fetch(`${base}/api/w/${legacy.workspaceId}/events`, { headers: desk }),
+    fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: desk }),
     fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: desk }),
     fetch(`${base}/api/w/${legacy.workspaceId}/state`, { headers: phone }),
   ]);
@@ -521,6 +540,9 @@ check('practice origin: an attempt in a fixture session is stored as sample inpu
   const deskAfter = await (await fetch(`${base}/api/w/${to}/state`, { headers: desk })).json();
   const media = kept.m.frame?.storedKey ? await fetch(`${base}/api/w/${to}/media/${kept.m.frame.storedKey}`, { headers: { Authorization: `Bearer ${lp.phoneToken}` } }) : null;
   check('a restricted-region workspace moves: data and both tokens work there, the in-flight frame was not lost, old media still served', legacy.workspaceId.startsWith('w_') && moved.res.status === 409 && old.status === 409 && after?.workspace?.id === to && after.moments.length === before.moments.length && after.moments.some(m => m.id === pending.momentId && m.decision) && after.sessions.length === before.sessions.length && deskAfter?.workspace?.id === to && (media ? media.status === 200 : true), `${legacy.workspaceId.slice(0, 4)}… → ${to?.slice(0, 5)}… moments ${before.moments.length}/${after?.moments?.length} media ${media?.status}`);
+  check('a live socket on the moved workspace is closed "moved" (its HTTP check then follows the move)', await legacyLive.until(g => g.closeCode === 4409), `close ${legacyLive.closeCode}`);
+  const late = openLive(legacy.workspaceId, legacy.deskToken);
+  check('a new live socket at the old id is turned away until the device follows', await late.until(g => g.closeCode !== null) && late.texts.length === 0, `close ${late.closeCode}`);
   check('the original keeps only its routing record after a verified copy', retired.keys === 1 && retired.movedTo === to, `${retired.keys} record(s) left`);
   const next = await frame(1);
   check('the moved workspace keeps working (a new frame is read there)', next.m.readingStatus === 'ok');
@@ -530,6 +552,7 @@ check('practice origin: an attempt in a fixture session is stored as sample inpu
   check('deleting the session after a move also deletes its media stored under the original id', !!gone && gone.status === 404, `old-prefix frame → ${gone?.status}`);
 }
 
+deskLive.ws.close(1000);
 const fin = await state();
 check('spend recorded under the workspace cap', fin.workspace.budget.spentUsd > 0 && fin.workspace.budget.spentUsd <= fin.workspace.budget.capUsd, `$${fin.workspace.budget.spentUsd}`);
 check('all generated content labeled fixture (never live-model) in test mode', fin.content.every(c => c.provenance === 'fixture') && fin.moments.every(m => m.decision?.provenance !== 'live-model'));

@@ -88,7 +88,7 @@ Send an approved card as the first message of a dedicated chat and pin it. In se
 ## Built on Meta's models
 
 - **Muse Spark 1.3** reads each screen into a structured moment, decides whether to speak (and why it stays quiet), plans one learning design per session and writes the five formats.
-- **SAM 3.1** finds the monitor in one disclosed setup photo, so the phone crops on-device afterwards, and points at a poster's price, title or photo on a kept frame.
+- **SAM 3.1** can suggest the screen area from one disclosed setup photo; you can also drag the corners yourself. Screen finding has not been measured on real phone photos. It also points at a poster's price, title or photo on a kept frame.
 - **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
 - **Muse Image** draws the draft a practice brief produces, and scenes for the short; Muse Spark then reads that draft against the scene's notes.
 
@@ -130,6 +130,6 @@ npm run test:media         # media composition with a synthetic tone (no TTS, no
 | `scripts` | Setup, integration checks, release checks |
 | `docs` | Product, verification, build plan, decisions, submission |
 
-**Documentation:** [Status](docs/STATUS.md) · [Product](docs/PRODUCT.md) · [Verification matrix](docs/VERIFICATION.md) · [Build plan](docs/BUILD-PLAN.md) · [Decisions](docs/DECISIONS.md) · [API setup](docs/API-SETUP.md) · [Hackathon](docs/HACKATHON.md) · [Submission](docs/SUBMISSION.md) · [Sources](docs/SOURCES.md)
+**Documentation:** [Status](docs/STATUS.md) · [Product](docs/PRODUCT.md) · [Verification matrix](docs/VERIFICATION.md) · [Build plan](docs/BUILD-PLAN.md) · [Decisions](docs/DECISIONS.md) · [Operations](docs/OPERATIONS.md) · [API setup](docs/API-SETUP.md) · [Hackathon](docs/HACKATHON.md) · [Submission](docs/SUBMISSION.md) · [Sources](docs/SOURCES.md)
 
 A project license has not been selected yet; public visibility alone does not grant an open-source license.

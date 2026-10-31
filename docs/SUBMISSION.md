@@ -62,7 +62,7 @@ People stuck with an AI tool often repeat vague requests like "make it more prem
 - **It decides when to speak.** Muse Spark decides whether to step in, always with a reason, and staying quiet is a decision too. When it steps in, it asks one question in your own words, and you answer out loud.
 - **It makes only what the session earned.** Afterwards you get a note, a playbook, applied flashcards, a two-voice podcast you can interrupt, and a 9:16 short built on your own before/after screens.
 - **You rehearse the next decision.** A fictional colleague brings a changed request in the Practice Range. You brief the AI, judge its draft before feedback, and revise once. Muse Spark checks the words and reads the image separately; the before-and-after view keeps what you said distinct from what the AI actually drew. The first attempt stays intact and the revision is labeled with the Caddie.
-- **Your AI learns too.** It proposes a Caddie card for your AI. Approve it and start a pinned chat with it, and next time your AI asks the right questions first while the Caddie stays quiet.
+- **Your AI learns too.** It proposes a Caddie card for your AI. Approve it and start a pinned chat with it, and next time in that chat your AI asks the right questions first while the Caddie stays quiet.
 
 Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
 
@@ -79,7 +79,7 @@ Work-session replay: https://coevo-caddie.coevo-meta-hackathon.workers.dev/sampl
 **9 · Use of Meta products**
 
 - **Muse Spark 1.3** reads phone photos of any AI tool's screen into structured moments. It decides each intervention, or each silence, with deterministic guardrails. It writes one learning design per session and the five formats from it. In the Practice Range it writes a scene, checks the person's brief, and separately reads the generated draft against the scene's facts without seeing that brief.
-- **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards. It also points at a poster's price, title or product photo on a kept frame for visual coaching ("The price isn't visible."); on a real Meta AI screenshot it boxed the poster's price and title and ignored the same price in the chat.
+- **SAM 3.1** can suggest the screen area from one disclosed setup photo; manual corners are available too. Screen finding has not been measured on real phone photos. It also points at a poster's price, title or product photo on a kept frame for visual coaching ("The price isn't visible."); on a real Meta AI screenshot it boxed the poster's price and title and ignored the same price in the chat.
 - **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
 - **Muse Image** draws what a spoken or typed practice brief produces, and the background scenes of the short.
 - **Meta AI** (consumer) is the demo's work tool. Its poster image generation and in-chat rule following were checked in a real account.
@@ -99,7 +99,7 @@ Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition 
 - Latency: combined read-and-decide turn, median 5.9 s at the client / 4.9 s on the server on a screen capture (3 runs); 6–9 s per turn in full sessions. Phone screen-change-to-card time (S3) not measured (assumed setup); in the browser a camera frame took about 10 s on the server.
 - S5: a 61.6 s two-voice episode rendered in 58 s end to end (one bounded run); product podcasts 93–141 s; shorts 38.9–44.3 s at 1080×1920.
 - S8: one full session (5 screens, a spoken answer, five formats including 3 images) cost $0.163 in Meta usage plus a $0.08 media reservation.
-- The card in Meta AI: sent as the first message of a pinned chat, it made Meta AI ask for audience, product, price and mood first; memory across new chats did not carry the rule.
+- The card in Meta AI: sent as the first message of a pinned chat, it made Meta AI ask for audience, product, price, mood and whether a real photo exists first; memory across new chats did not carry the rule.
 - Judging and checking habits: on an actual Meta AI screen where the scripted owner rejects invented opening hours and forbids invented claims, the reading recorded the correction and the no-invention request, and both habits were stored ($0.0091).
 - A server restart in the middle of reading, deciding or replying never leaves the phone stuck: the moment is marked interrupted and nothing is invented (checked with a real local process restart, test models).
 - The full flow at phone size (assumed setup: controlled camera on actual Meta AI screens, synthetic voice): quiet twice → a question → the spoken answer transcribed → the ingredients step → the brief labeled with the Caddie, with SAM 3.1's price pointer → a wrap that skipped the podcast for a stated reason; $0.1465.

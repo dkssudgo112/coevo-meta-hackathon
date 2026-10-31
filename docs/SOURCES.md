@@ -20,4 +20,4 @@
 - [Modal Sandboxes](https://modal.com/docs/guide/sandboxes)
 - [Modal Endpoints](https://modal.com/docs/guide/endpoints)
 
-Event information was last checked during setup on October 30, 2026 and may change. Recheck official sources before a deadline or an external action. Participant-only messages, unlisted recording links, application forms, and account-specific evidence are retained only in private local notes.
+The participant guide and official rules were rechecked on October 31, 2026 and may change. Recheck official sources before a deadline or an external action. Participant-only messages, unlisted recording links, application forms, and account-specific evidence are retained only in private local notes.

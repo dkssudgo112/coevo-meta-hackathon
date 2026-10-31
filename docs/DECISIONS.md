@@ -69,3 +69,10 @@ Practice became a four-stage scenario: a fictional colleague’s changed request
 ## October 31, 2026 — A short public Practice walkthrough
 
 The maintainer approved aligning the final video, judge experience and submission material. `/practice-preview` uses a selected, reviewed live sample with scripted input. Visitors can explore choices against the saved reading and see the recorded revision without accounts or new model calls. Their choices are not saved or credited as performance. Only whitelisted fictional content and reviewed image bytes are published, with no workspace identity or credentials. Real service onboarding remains primary; the work-session replay remains available. This finishing pass adds no model, new content format or account requirement.
+
+
+## October 31, 2026 — Idle live connections must allow hibernation
+
+A real Cloudflare Free duration-limit alert exposed that the unbounded SSE stream and its heartbeat interval kept each open workspace awake. Live updates now use the Durable Objects WebSocket Hibernation API, with a token in the first message, authenticated socket attachments and runtime auto-response heartbeats. HTTP checks, connection setup and reconnects are bounded; stopped clients cancel pending work. The legacy stream returns a terminal response without entering a Durable Object. Existing pages need one reload to use the new client; their pairing stays intact. Local tests confirm eviction with an open socket and reconnection after a real process restart. Provider quotas remain finite.
+
+Video range responses now stream the requested bytes and cancel the remaining read, avoiding one whole-file buffer per viewer. Media-only budget errors identify audio/video rendering separately from the Meta model budget. Recorded judging paths continue to use reviewed static assets.

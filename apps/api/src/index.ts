@@ -5,29 +5,11 @@ import { mediaConfigured } from './media.ts';
 import type { Env } from './env.ts';
 import { error, id, json, sha256 } from './util.ts';
 import { serveAsset } from './assets.ts';
+import { withHeaders } from './headers.ts';
 
 import { ledgerName, ledgerScope } from './workspace.ts';
 export { Workspace } from './workspace.ts';
 export { Budget } from './budget-do.ts';
-
-const SECURITY_HEADERS: Record<string, string> = {
-  'Content-Security-Policy': [
-    "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src https://fonts.gstatic.com", "img-src 'self' blob: data:", "media-src 'self' blob:", "connect-src 'self'",
-    "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'", "object-src 'none'",
-  ].join('; '),
-  'Permissions-Policy': 'camera=(self), microphone=(self), display-capture=(self), geolocation=()',
-  'Referrer-Policy': 'no-referrer',
-  'X-Content-Type-Options': 'nosniff',
-  'Strict-Transport-Security': 'max-age=31536000',
-  'Cross-Origin-Opener-Policy': 'same-origin',
-};
-
-function withHeaders(res: Response): Response {
-  const out = new Response(res.body, res);
-  for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
-  return out;
-}
 
 /**
  * Every Meta call is made from the workspace's Durable Object, which stays where it was first created.
@@ -115,6 +97,10 @@ async function route(req: Request, env: Env): Promise<Response> {
   const m = path.match(/^\/api\/w\/(wu?_[a-z0-9]{8,24})(\/.*)?$/);
   if (m) {
     if (m[2] === '/init') return error(404, 'not_found', 'Unknown route.');
+    // The old never-ending event stream kept the workspace object awake while any tab was open.
+    // Pages still running that build stop retrying on 404 (it is answered here, without waking the
+    // object); a reload gets the current page, which uses /live.
+    if (m[2] === '/events') return error(404, 'events_retired', 'This page is out of date. Reload it to reconnect.');
     return workspaceStub(env, m[1]).fetch(req);
   }
   return error(404, 'not_found', 'Unknown route.');
@@ -127,14 +113,15 @@ function safePath(path: string): string {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    const url = new URL(req.url);
     try {
-      return withHeaders(await route(req, env));
+      return withHeaders(await route(req, env), url);
     } catch (e) {
       // Diagnosable 500s: error class, message and a safe path go to Workers Logs. No tokens or bodies.
       const ref = id('err');
       const err = e as Error;
-      console.error(JSON.stringify({ event: 'route_error', ref, method: req.method, path: safePath(new URL(req.url).pathname), name: err?.name ?? 'Error', message: String(err?.message ?? e).slice(0, 300) }));
-      return withHeaders(json({ error: { code: 'server_error', message: 'Something went wrong on the server.', ref } }, 500));
+      console.error(JSON.stringify({ event: 'route_error', ref, method: req.method, path: safePath(url.pathname), name: err?.name ?? 'Error', message: String(err?.message ?? e).slice(0, 300) }));
+      return withHeaders(json({ error: { code: 'server_error', message: 'Something went wrong on the server.', ref } }, 500), url);
     }
   },
 } satisfies ExportedHandler<Env>;

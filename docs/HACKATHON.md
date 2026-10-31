@@ -1,6 +1,6 @@
 # Hackathon requirements and schedule
 
-Event notes recorded during setup on October 30, 2026. Recheck the [official participant guide](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details) before deadlines or submissions. The official rules govern eligibility and judging.
+Event notes rechecked against the [official participant guide](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details) and official rules on October 31, 2026. Recheck before deadlines or submissions. The official rules govern eligibility and judging.
 
 ## Project direction
 
@@ -27,14 +27,14 @@ Event notes recorded during setup on October 30, 2026. Recheck the [official par
 | Kickoff start | October 27, 01:00; development follows the kickoff |
 | Agents 101 | October 28, 01:00–01:30 |
 | Agents 102 | October 29, 01:00–01:30 |
-| Fireworks workshop | October 31, 01:00–01:30 |
+| Fireworks workshop | October 31, 01:00–02:00 |
 | Weekday Discord office hours, 10:00–11:00 ET | 23:00–24:00 KST through October 30; from November 2 ET, 00:00–01:00 KST on the next day |
 | Last full day recommended for submission questions | November 3 in US Eastern time |
 | **Project and Meta credit-claim deadline** | **November 5, 11:00 KST / November 4, 21:00 EST** |
 | Finalist announcement and final judging | November 10, 02:00 KST / November 9, 12:00 EST |
 | Community-vote winner announcement | November 16 in US Eastern time; hour not recorded |
 
-US daylight saving time ends on November 1. The ET-to-KST difference changes from 13 to 14 hours. The guide checked on October 30 lists 30-minute workshops.
+US daylight saving time ends on November 1. The ET-to-KST difference changes from 13 to 14 hours. The October 31 guide lists the Fireworks workshop as one hour; Agents 101 and 102 remain 30 minutes.
 
 ## Judging and awards recorded in the guide
 
@@ -49,7 +49,7 @@ The announced total prize pool is $1M. Indie awards were listed as $150K, $100K,
 | Provider | Offer recorded in the guide | Important distinction |
 | --- | --- | --- |
 | Meta | $150 for approved participants | Claim receipt and applied billing credits are separate |
-| Modal | $100 per team, up to 1,000 teams | Eligibility/selection language varies; rely on the actual award notification |
+| Modal | $100 for the first 1,000 participants | Credits are not guaranteed; rely on the actual award notification and account balance |
 | Baseten | $100 and 2M TPM, up to 2,000 participants | Application and planned-use review may apply |
 | Fireworks | $100 in the October 30 guide | Earlier material listed a different amount; check current terms |
 

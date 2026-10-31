@@ -27,21 +27,21 @@ async function call(path, init = {}, token) {
   return { res, body };
 }
 
-async function readSnapshot(wsId, token) {
-  const ctrl = new AbortController();
-  const res = await fetch(`${base}/api/w/${wsId}/events`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal });
-  const reader = res.body.getReader();
-  let buf = '';
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += new TextDecoder().decode(value);
-    const m = buf.match(/data: (.+)\n\n/);
-    if (m) { ctrl.abort(); return { type: res.headers.get('content-type'), event: JSON.parse(m[1]) }; }
-  }
-  ctrl.abort();
-  return { type: res.headers.get('content-type'), event: null };
+/** Opens the live WebSocket (token in the first message, never the URL) and records what arrives. */
+function openLive(wsId, token, ms = 5000) {
+  const url = `${base.replace(/^http/, 'ws')}/api/w/${wsId}/live`;
+  const ws = new WebSocket(url);
+  const got = { events: [], texts: [], closeCode: null, opened: false };
+  got.done = new Promise(resolve => {
+    const timer = setTimeout(() => resolve(got), ms);
+    ws.onopen = () => { got.opened = true; if (token !== undefined) ws.send(JSON.stringify({ type: 'auth', token })); };
+    ws.onmessage = m => { got.texts.push(m.data); try { got.events.push(JSON.parse(m.data)); } catch { /* pong */ } };
+    ws.onclose = e => { got.closeCode = e.code; clearTimeout(timer); resolve(got); };
+    ws.onerror = () => {};
+  });
+  got.ws = ws;
+  got.until = async (pred, waitMs = 5000) => { const t = Date.now() + waitMs; while (Date.now() < t) { if (pred(got)) return true; await new Promise(r => setTimeout(r, 50)); } return pred(got); };
+  return got;
 }
 
 const health = await call('/api/health');
@@ -57,7 +57,7 @@ const page = await fetch(`${base}/caddie`);
 check('SPA route served with CSP', page.ok && (await page.text()).includes('<div id="root">') && Boolean(page.headers.get('content-security-policy')));
 
 const a = await call('/api/workspaces', { method: 'POST' });
-check('create workspace', a.res.ok && /^w_/.test(a.body.workspaceId) && a.body.deskToken && a.body.pairSecret);
+check('create workspace', a.res.ok && /^wu?_/.test(a.body.workspaceId) && a.body.deskToken && a.body.pairSecret);
 const b = await call('/api/workspaces', { method: 'POST' });
 
 const unauth = await call(`/api/w/${a.body.workspaceId}/state`);
@@ -73,8 +73,32 @@ check('pair secret is one-time', replay.res.status === 403);
 const cross = await call(`/api/w/${b.body.workspaceId}/state`, {}, pair.body.phoneToken);
 check('token from workspace A cannot read workspace B', cross.res.status === 401);
 
-const sse = await readSnapshot(a.body.workspaceId, a.body.deskToken);
-check('SSE delivers a snapshot', sse.type?.startsWith('text/event-stream') && sse.event?.type === 'snapshot' && sse.event.snapshot.workspace.paired === true);
+check('CSP lets the page reach its own WebSocket', (health.res.headers.get('content-security-policy') ?? '').includes(`connect-src 'self' ${base.replace(/^http/, 'ws').replace(/\/$/, '')}`));
+const legacy = await call(`/api/w/${a.body.workspaceId}/events`, {}, a.body.deskToken);
+check('the old never-ending event stream is retired (404 stops old pages retrying)', legacy.res.status === 404 && legacy.body?.error?.code === 'events_retired' && !(legacy.res.headers.get('content-type') ?? '').includes('event-stream'));
+const plain = await call(`/api/w/${a.body.workspaceId}/live`, {}, a.body.deskToken);
+check('the live address only accepts WebSocket upgrades', plain.res.status === 426);
+const stranger = openLive(a.body.workspaceId, 'not-a-token');
+await stranger.done;
+check('a live socket with a wrong token is closed and gets nothing', stranger.opened && stranger.closeCode === 4401 && stranger.texts.length === 0, `close ${stranger.closeCode}`);
+const big = openLive(a.body.workspaceId, undefined);
+await big.until(g => g.opened);
+big.ws.send(JSON.stringify({ type: 'auth', token: 'x'.repeat(4096) }));
+await big.done;
+check('an oversized first message is refused before it is parsed', big.closeCode === 4401 && big.texts.length === 0, `close ${big.closeCode}`);
+const crossLive = openLive(b.body.workspaceId, pair.body.phoneToken);
+await crossLive.done;
+check('a token from workspace A cannot open workspace B live', crossLive.closeCode === 4401 && crossLive.texts.length === 0, `close ${crossLive.closeCode}`);
+const deskLive = openLive(a.body.workspaceId, a.body.deskToken, 15000);
+const snapOk = await deskLive.until(g => g.events.some(e => e.type === 'snapshot'));
+const snap = deskLive.events.find(e => e.type === 'snapshot');
+check('the live socket sends a snapshot after the token', snapOk && snap.snapshot.workspace.paired === true && snap.snapshot.workspace.id === a.body.workspaceId);
+const note = await call(`/api/w/${a.body.workspaceId}/inbox`, { method: 'POST', body: JSON.stringify({ kind: 'note', text: 'integration live check' }), headers: { 'Content-Type': 'application/json' } }, pair.body.phoneToken);
+const pushed = await deskLive.until(g => g.events.some(e => e.type === 'upsert' && e.entity === 'inbox' && e.data.id === note.body?.id));
+check('a change made from the phone reaches the Desk socket', note.res.ok && pushed);
+deskLive.ws.send('ping');
+check('heartbeat: "ping" is answered "pong"', await deskLive.until(g => g.texts.includes('pong')));
+deskLive.ws.close(1000);
 
 const form = new FormData();
 form.append('frame', new File([png(64, 40, [240, 240, 236])], 'frame.png', { type: 'image/png' }));

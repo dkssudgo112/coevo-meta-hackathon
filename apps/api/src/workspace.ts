@@ -62,18 +62,41 @@ const MIN_FRAME_GAP_MS = 2500;
 /** Disclosed benchmark test mode: at most this many kept frames per workspace. */
 export const BENCHMARK_MAX_FRAMES = 20;
 
+/**
+ * Live updates use WebSockets the runtime can hibernate: an open Desk or phone tab no longer keeps
+ * this object awake (and billed) while nothing happens. A socket proves its token in its first
+ * message (never in the URL); until then it gets nothing and is dropped after AUTH_WINDOW_MS.
+ * Heartbeats ("ping" → "pong") are answered by the runtime without waking the object.
+ */
+const AUTH_WINDOW_MS = 20_000;
+const MAX_SOCKETS = 16;
+/** A token message is about 70 bytes; anything far larger is refused before it is parsed. */
+const MAX_SOCKET_MESSAGE = 512;
+/** When the socket limit is reached, a page silent this long (no heartbeat) is treated as gone. */
+const STALE_SOCKET_MS = 120_000;
+const SOCKET_OPEN = 1;
+export const LIVE_CLOSE = { unauthorized: 4401, moved: 4409, tooBig: 1009 } as const;
+
+interface SocketTag { role: Role | null; at: number }
+
+function tagOf(ws: WebSocket): SocketTag | null {
+  try { return (ws.deserializeAttachment() as SocketTag | null) ?? null; } catch { return null; }
+}
+
+function closeSocket(ws: WebSocket, code: number, reason: string): void {
+  try { ws.close(code, reason); } catch { /* already closing */ }
+}
+
 export class Workspace extends DurableObject<Env> {
   private store: Store;
-  private clients = new Set<WritableStreamDefaultWriter<Uint8Array>>();
   private meta: Meta | null = null;
   private queue: Promise<void> = Promise.resolve();
   private lastFrameAt = 0;
-  private encoder = new TextEncoder();
-  private pinger: ReturnType<typeof setInterval> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.store = new Store(ctx.storage, e => this.broadcast(e));
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
   }
 
   // ------------------------------------------------------------ infra
@@ -188,9 +211,13 @@ export class Workspace extends DurableObject<Env> {
     if (this.meta) await this.ctx.storage.put('meta', this.meta);
   }
 
+  /** Sends to every socket that proved a token of this workspace; others get nothing. */
   private broadcast(e: ServerEvent): void {
-    const data = this.encoder.encode(`data: ${JSON.stringify(e)}\n\n`);
-    for (const w of this.clients) w.write(data).catch(() => this.clients.delete(w));
+    const data = JSON.stringify(e);
+    for (const ws of this.ctx.getWebSockets()) {
+      if (!tagOf(ws)?.role) continue;
+      try { ws.send(data); } catch { /* closing */ }
+    }
   }
 
   private notice(level: 'info' | 'warn', code: string, message: string): void {
@@ -322,8 +349,14 @@ export class Workspace extends DurableObject<Env> {
   }
 
   private async snapshot(): Promise<Snapshot> {
+    const workspace = await this.summary();
+    return this.snapshotWith(workspace);
+  }
+
+  /** Synchronous, so a caller can read and send it with no update falling in between. */
+  private snapshotWith(workspace: WorkspaceSummary): Snapshot {
     return {
-      workspace: await this.summary(),
+      workspace,
       sessions: this.store.list('session'), moments: this.store.list('moment'), cards: this.store.list('card'),
       content: this.store.list('content'), practice: this.store.list('practice'), inbox: this.store.list('inbox'), skills: this.store.list('skill'),
     };
@@ -475,6 +508,8 @@ export class Workspace extends DurableObject<Env> {
       return this.moved(meta.movedTo);
     }
     if (path === '/pair' && method === 'POST') return this.pair(req);
+    // Browsers cannot put a header on a WebSocket, so the socket authenticates in its first message.
+    if (path === '/live' && method === 'GET') return this.live(req);
 
     const role = await this.auth(req);
     if (!role) return error(401, 'unauthorized', 'Pair this device first.');
@@ -482,7 +517,6 @@ export class Workspace extends DurableObject<Env> {
     const seg = path.split('/').filter(Boolean);
 
     try {
-      if (path === '/events' && method === 'GET') return this.events();
       if (path === '/state' && method === 'GET') return json(await this.snapshot());
       if (path === '/repair' && method === 'POST' && role === 'desk') return this.repair();
       if (seg[0] === 'media' && method === 'GET') return this.media(seg.slice(1).join('/'));
@@ -502,6 +536,10 @@ export class Workspace extends DurableObject<Env> {
         // TEST ONLY: behave as if this object sat in a region Meta's API does not serve.
         this.forceRestricted = true;
         return json({ ok: true });
+      }
+      if (seg[0] === 'test' && seg[1] === 'instance' && method === 'GET' && fakeMeta(this.env)) {
+        // TEST ONLY: which in-memory instance answers, and how many sockets it holds (shows hibernation).
+        return json({ runner: this.runner, sockets: this.ctx.getWebSockets().length, authenticated: this.ctx.getWebSockets().filter(ws => tagOf(ws)?.role).length });
       }
       if (seg[0] === 'test' && seg[1] === 'restart' && method === 'POST' && fakeMeta(this.env)) {
         // TEST ONLY: behave like a freshly started instance (the old in-memory work is treated as lost).
@@ -742,8 +780,8 @@ export class Workspace extends DurableObject<Env> {
     for (let i = 0; i < rest.length; i += 128) await this.ctx.storage.delete(rest.slice(i, i + 128));
     await this.ctx.storage.deleteAlarm();
     console.log(JSON.stringify({ event: 'workspace_relocated', from, to, colo: this.colo ?? (this.forceRestricted ? 'test' : null), records: entries.length }));
-    for (const w of this.clients) w.close().catch(() => undefined);
-    this.clients.clear();
+    // Open sockets reconnect; their HTTP check is answered "moved" and the device follows.
+    for (const ws of this.ctx.getWebSockets()) closeSocket(ws, LIVE_CLOSE.moved, 'moved');
     return to;
   }
 
@@ -804,19 +842,66 @@ export class Workspace extends DurableObject<Env> {
     return json({ pairSecret, pairExpiresAt: new Date(this.meta!.pairExpiresAt).toISOString() });
   }
 
-  private async events(): Promise<Response> {
-    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
-    const writer = writable.getWriter();
-    this.clients.add(writer);
-    writer.write(this.encoder.encode(`retry: 3000\ndata: ${JSON.stringify({ type: 'snapshot', snapshot: await this.snapshot() })}\n\n`)).catch(() => this.clients.delete(writer));
-    if (!this.pinger) {
-      this.pinger = setInterval(() => {
-        const ping = this.encoder.encode(': ping\n\n');
-        for (const w of this.clients) w.write(ping).catch(() => this.clients.delete(w));
-        if (!this.clients.size && this.pinger) { clearInterval(this.pinger); this.pinger = null; }
-      }, 20_000);
+  /**
+   * Accept a hibernatable WebSocket. It receives nothing until its first message proves a token of
+   * this workspace. Sockets that never do are closed lazily here (no timers, which would keep the
+   * object awake).
+   */
+  private live(req: Request): Response {
+    if (req.headers.get('upgrade')?.toLowerCase() !== 'websocket') return error(426, 'upgrade_required', 'Open this address as a WebSocket.');
+    const at = Date.now();
+    // Count only open sockets; closing or closed ones are not pages.
+    const open: { ws: WebSocket; tag: SocketTag | null }[] = [];
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws.readyState !== SOCKET_OPEN) continue;
+      const tag = tagOf(ws);
+      if (!tag?.role && at - (tag?.at ?? 0) > AUTH_WINDOW_MS) { closeSocket(ws, LIVE_CLOSE.unauthorized, 'unauthorized'); continue; }
+      open.push({ ws, tag });
     }
-    return new Response(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' } });
+    let count = open.length;
+    if (count >= MAX_SOCKETS) {
+      // Full: a page that went away without closing stops sending heartbeats; let it go.
+      for (const { ws, tag } of open) {
+        const heard = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? tag?.at ?? 0;
+        if (tag?.role && at - heard > STALE_SOCKET_MS) { closeSocket(ws, 1001, 'silent'); count--; }
+      }
+    }
+    if (count >= MAX_SOCKETS) return error(429, 'too_many_connections', 'Too many open pages for this workspace. Close one and reload.');
+    const pair = new WebSocketPair();
+    const [client, server] = [pair[0], pair[1]];
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({ role: null, at } satisfies SocketTag);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  /** The only message a socket sends is its token; heartbeats never reach here (the runtime answers them). */
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    const tag = tagOf(ws);
+    const size = typeof message === 'string' ? message.length : message.byteLength;
+    if (size > MAX_SOCKET_MESSAGE) { closeSocket(ws, tag?.role ? LIVE_CLOSE.tooBig : LIVE_CLOSE.unauthorized, 'too large'); return; }
+    if (tag?.role) return;
+    // Checked before any parsing: only a short text message within the window can authenticate.
+    if (!tag || typeof message !== 'string' || Date.now() - tag.at > AUTH_WINDOW_MS) { closeSocket(ws, LIVE_CLOSE.unauthorized, 'unauthorized'); return; }
+    let token: unknown = null;
+    try { const m = JSON.parse(message) as { type?: unknown; token?: unknown }; if (m?.type === 'auth') token = m.token; } catch { /* not JSON */ }
+    const meta = await this.loadMeta();
+    if (!meta || typeof token !== 'string' || !token) { closeSocket(ws, LIVE_CLOSE.unauthorized, 'unauthorized'); return; }
+    if (meta.movedTo) { closeSocket(ws, LIVE_CLOSE.moved, 'moved'); return; }
+    const role = meta.tokens[await sha256(token)];
+    if (!role) { closeSocket(ws, LIVE_CLOSE.unauthorized, 'unauthorized'); return; }
+    // Marked first: an update made while the summary is read is sent before the snapshot, and the
+    // snapshot (read after it) includes it. Lists are read and sent with no await in between.
+    ws.serializeAttachment({ role, at: tag?.at ?? Date.now() } satisfies SocketTag);
+    const workspace = await this.summary();
+    try { ws.send(JSON.stringify({ type: 'snapshot', snapshot: this.snapshotWith(workspace) })); } catch { /* closed meanwhile */ }
+  }
+
+  async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+    closeSocket(ws, code === 1005 || code === 1006 ? 1000 : code, reason);
+  }
+
+  async webSocketError(ws: WebSocket): Promise<void> {
+    closeSocket(ws, 1011, 'error');
   }
 
   private async media(key: string): Promise<Response> {
