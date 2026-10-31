@@ -162,6 +162,38 @@ await call(`/practice/${long.body.id}/attempt`, { method: 'POST', body: JSON.str
 const ty = await until(s => s.practice.find(x => x.id === long.body.id && (x.status === 'done' || x.status === 'failed')), 'typed practice');
 check('practice: a 35 s recording is refused; a typed brief is checked and marked typed', tooLong.res.status === 413 && ty.v.status === 'done' && ty.v.briefSource === 'typed' && ty.v.transcript?.startsWith('For office workers'), `${tooLong.res.status} · ${ty.v.briefSource}`);
 
+// Scene practice (Oct 31): scene → brief → the person's call → image reading → one revision → finish.
+{
+  const ghost = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false, sessionId: 's_missing' }) });
+  check('scene practice: a session that does not exist is refused, never turned into standalone practice', ghost.res.status === 404);
+  const [a, b] = await Promise.all([1, 2].map(() => call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false }) })));
+  const sc = a.body;
+  check('scene practice: two taps at once give one scene (no second paid scene)', a.body.id === b.body.id && (await state()).practice.filter(x => x.id === a.body.id).length === 1, `${a.body.id} / ${b.body.id}`);
+  check('scene practice: the scene has a speaker, 2–3 lines, five facts and a backdrop', sc.status === 'open' && sc.scene?.lines.length >= 2 && ['audience', 'price', 'mood', 'realPhoto', 'productDetail'].every(k => sc.scene.facts[k]?.text && sc.scene.facts[k]?.stake) && ['cafe', 'shop', 'desk'].includes(sc.scene.setting) && sc.scene.hasRealPhoto === true);
+  const early = await call(`/practice/${sc.id}/judge`, { method: 'POST', body: JSON.stringify({ verdict: 'ready' }) });
+  check('scene practice: no call can be saved before there is a draft', early.res.status === 409);
+  await call(`/practice/${sc.id}/attempt`, { method: 'POST', body: JSON.stringify({ text: 'For students after school, pumpkin latte with cinnamon foam, 5,000 won, cozy and playful.' }) });
+  const drafted = await until(s => s.practice.find(x => x.id === sc.id && x.status === 'done' && x.readingStatus === 'ready'), 'scene draft read');
+  check('scene practice: the draft is read against the facts (image only, kept apart from the brief check)', drafted.v.reading?.items.price.status === 'missing' && drafted.v.ingredients?.price === true && drafted.v.reading.provenance === 'fixture');
+  const bad = await call(`/practice/${sc.id}/judge`, { method: 'POST', body: JSON.stringify({ verdict: 'fix' }) });
+  const call1 = await call(`/practice/${sc.id}/judge`, { method: 'POST', body: JSON.stringify({ verdict: 'ready' }) });
+  const call2 = await call(`/practice/${sc.id}/judge`, { method: 'POST', body: JSON.stringify({ verdict: 'redo' }) });
+  check('scene practice: one call per draft, saved before feedback, labeled on its own', bad.res.status === 400 && call1.res.ok && call1.body.judgment.verdict === 'ready' && call1.body.judgment.assistance === 'independent' && call2.res.status === 409);
+  const disc = (await state()).skills.find(k => k.practiceId === sc.id && k.dimension === 'discernment');
+  check('scene practice: the call is stored as a discernment note, not real-user evidence under test models', disc?.assistance === 'independent' && disc.fixture === true && /before any feedback/.test(disc.note));
+  const firstBefore = (await state()).practice.find(x => x.id === sc.id);
+  await call(`/practice/${sc.id}/revise`, { method: 'POST', body: JSON.stringify({ text: 'Window poster for students after school: pumpkin latte with cinnamon foam. Print 5,000 won large. Cozy and playful. Leave room for my own photo of the cup.' }) });
+  const revised = await until(s => s.practice.find(x => x.id === sc.id && x.revision?.status === 'done' && x.revision.readingStatus === 'ready'), 'revision read');
+  const r = revised.v;
+  check('scene practice: the revision is coached and keeps the first brief, check, image and labels as they were', r.revision.assistance === 'coached' && r.transcript === firstBefore.transcript && r.assistance === firstBefore.assistance && r.imageKey === firstBefore.imageKey && JSON.stringify(r.ingredients) === JSON.stringify(firstBefore.ingredients) && r.revision.imageKey !== r.imageKey);
+  const again = await call(`/practice/${sc.id}/revise`, { method: 'POST', body: JSON.stringify({ text: 'One more time please.' }) });
+  const fin = await call(`/practice/${sc.id}/finish`, { method: 'POST' });
+  check('scene practice: one revision per scene; finishing is recorded', again.res.status === 409 && !!fin.body?.finishedAt);
+  const varied = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false, changedFrom: sc.id }) });
+  const crossed = await call('/practice', { method: 'POST', body: JSON.stringify({ autoOpened: false, sessionId: null, changedFrom: 'pr_missing' }) });
+  check('scene practice: a changed-condition scene links to its earlier attempt in the same scope only', varied.body?.changedFrom === sc.id && crossed.res.status === 404);
+}
+
 const ask = await call(`/content/${podcast.id}/ask?at=12`, { method: 'POST', body: JSON.stringify({ question: 'Why not just say premium?' }) });
 check('podcast Ask returns an answer and records it', ask.res.ok && (await state()).content.find(c => c.id === podcast.id).payload.asks.length === 1);
 const fc = all.v.find(c => c.format === 'flashcards');

@@ -3,10 +3,10 @@
 // instead of filling in invented content.
 
 import type {
-  ContentFormat, Flashcard, Ingredients, LadderStep, LearningDesign, ManualPayload, NotePayload, PodcastLine,
-  Reading, ShortScene, ShortSceneRole,
+  ContentFormat, DraftReading, Flashcard, Ingredients, LadderStep, LearningDesign, ManualPayload, NotePayload, PodcastLine,
+  PracticeFact, PracticeScene, Reading, SeenStatus, ShortScene, ShortSceneRole,
 } from '../../contracts/index.ts';
-import { ARTIFACT_KINDS, ARTIFACT_PARTS, CONTENT_FORMATS, INGREDIENT_KEYS, LADDER } from '../../contracts/index.ts';
+import { ARTIFACT_KINDS, ARTIFACT_PARTS, CONTENT_FORMATS, INGREDIENT_KEYS, LADDER, PRACTICE_SETTINGS } from '../../contracts/index.ts';
 import type { JsonSchema } from './schema.ts';
 import { R, S, ShapeError } from './schema.ts';
 import type { Proposal } from './ladder.ts';
@@ -373,13 +373,95 @@ export const shortTask: ModelTask<{ title: string; scenes: Omit<ShortScene, 'ima
 
 // ---------------------------------------------------------------- practice
 
-export const practiceScenarioTask: ModelTask<{ scenario: string; hint: string }> = {
+const factSchema = (what: string) => S.obj({
+  text: S.str(`On the notes: ${what}. A plain fact the person can use, at most 90 characters. Never a full brief.`, 100),
+  stake: S.str(`What goes wrong if the poster leaves this out, said by the speaker in first person, at most 110 characters.`, 120),
+});
+function readFact(v: unknown, path: string): PracticeFact {
+  const o = R.obj(v, path);
+  return { text: R.str(o.text, `${path}.text`, 100), stake: R.str(o.stake, `${path}.stake`, 120) };
+}
+
+/** A short practice scene: a fictional person brings a changed request; the notes hold one fact per ingredient. */
+export const practiceScenarioTask: ModelTask<{ scenario: string; hint: string; scene: PracticeScene }> = {
   name: 'practice_scenario',
   effort: 'low',
-  maxOutputTokens: 400,
-  instructions: `Create one short practice request for the Practice Range, in the person's own domain but with a changed condition (a new item, season, audience or channel). It must ask for something an image model can draw — a poster, flyer, menu board or social-media image — never a caption, email or other text, because the person's brief is drawn as an image. One sentence, at most 140 characters, as if a customer or partner asked for it. Also write a hint (at most 140 characters) listing what a strong brief would include, without writing the brief. ${STYLE}`,
-  schema: S.obj({ scenario: S.str('Practice request.', 160), hint: S.str('Hint.', 160) }),
-  read(json) { const o = R.obj(json, 'scenario'); return { scenario: R.str(o.scenario, 'scenario', 160), hint: R.str(o.hint, 'hint', 160) }; },
+  maxOutputTokens: 1100,
+  instructions: `Write one short practice scene for the Practice Range, in the person's own domain but with one changed condition (a new item, season, audience or channel). A fictional person (a co-owner, regular customer, partner or manager — never the person themself, never a real or famous person) brings a request for something an image model can draw: a poster, flyer, menu board or social-media image — never a caption, email or other text, because the person's brief is drawn as an image.
+- "scenario": the request in one sentence, at most 140 characters.
+- "setting": cafe for a café or coffee bar, shop for a bakery or other small shop, desk for anything else.
+- "speaker": a short first name and their role relative to the person (at most 40 characters).
+- "lines": 2 or 3 short spoken lines (each at most 150 characters) in which the speaker asks for it and mentions the changed condition. Natural speech; do not list every fact.
+- "changed": what is different from the usual request, at most 110 characters.
+- "facts": the notes the person has after the conversation, one per ingredient: who it is for, a concrete number (price or offer), a concrete feeling, the person's own real material (say plainly whether a real photo exists, e.g. "You have a phone photo of the cup on the counter"), and the specific product detail. Facts must be consistent with the lines and invent nothing the lines contradict. Each fact has a "stake": in the speaker's voice, what goes wrong if the poster leaves it out.
+- "hasRealPhoto": true only if the facts say a real photo exists.
+- "hint" (at most 140 characters): what a strong brief would include, without writing the brief.
+${STYLE}`,
+  schema: S.obj({
+    scenario: S.str('Practice request.', 160),
+    setting: S.enumOf(PRACTICE_SETTINGS, 'Backdrop.'),
+    speaker: S.obj({ name: S.str('First name.', 24), role: S.str('Role relative to the person.', 44) }),
+    lines: S.arr(S.str('One spoken line.', 160), 'Dialogue lines.', 2, 3),
+    changed: S.str('What changed.', 120),
+    facts: S.obj({
+      audience: factSchema('who it is for'),
+      price: factSchema('a concrete number: the price or offer'),
+      mood: factSchema('a concrete feeling or scene'),
+      realPhoto: factSchema('whether the person has their own real photo, and of what'),
+      productDetail: factSchema('the specific product and what makes it distinct'),
+    }),
+    hasRealPhoto: S.bool('A real photo exists.'),
+    hint: S.str('Hint.', 160),
+  }),
+  read(json) {
+    const o = R.obj(json, 'scenario');
+    const sp = R.obj(o.speaker, 'speaker');
+    const f = R.obj(o.facts, 'facts');
+    const facts = Object.fromEntries(INGREDIENT_KEYS.map(k => [k, readFact(f[k], `facts.${k}`)])) as PracticeScene['facts'];
+    const scene: PracticeScene = {
+      setting: R.oneOf(o.setting, PRACTICE_SETTINGS, 'setting'),
+      speaker: { name: R.str(sp.name, 'speaker.name', 24), role: R.str(sp.role, 'speaker.role', 44) },
+      lines: R.arr(o.lines, 'lines', (x, p) => R.str(x, p, 160), 2, 3).filter(Boolean),
+      changed: R.str(o.changed, 'changed', 120),
+      facts,
+      hasRealPhoto: R.bool(o.hasRealPhoto, 'hasRealPhoto'),
+    };
+    if (scene.lines.length < 2) throw new ShapeError('lines', 'expected at least 2 non-empty lines');
+    return { scenario: R.str(o.scenario, 'scenario', 160), hint: R.str(o.hint, 'hint', 160), scene };
+  },
+};
+
+const SEEN = ['shown', 'missing', 'unclear'] as const satisfies readonly SeenStatus[];
+const seenSchema = (what: string) => S.obj({
+  status: S.enumOf(SEEN, `${what}: shown = clearly visible in the image; missing = absent or contradicted; unclear = cannot be told from the image alone.`),
+  evidence: S.str('What you actually see that decides it, at most 90 characters. Describe only what is visible.', 100),
+});
+
+/** Reads a generated draft against the scene's facts. It never receives the person's brief. */
+export const practiceObserveTask: ModelTask<Omit<DraftReading, 'provenance'>> = {
+  name: 'practice_observe',
+  effort: 'low',
+  maxOutputTokens: 700,
+  instructions: `You see one AI-generated poster draft and the facts the poster was meant to carry. For each fact, say only what the image itself shows: "shown" when it is clearly visible (for a number, only if that exact number is legible), "missing" when it is absent or the image shows something else, "unclear" when the image alone cannot tell (for example who a poster is for, when nothing in it points to that group). Never assume something is there because it was intended. You are given no photo to compare with: for "realPhoto" always answer "unclear" with the evidence "No photo was given to compare with." Then one sentence (at most 140 characters) on the most important gap, or that the draft carries the facts. ${STYLE}`,
+  schema: S.obj({
+    items: S.obj({
+      audience: seenSchema('Who it is for'),
+      price: seenSchema('The number'),
+      mood: seenSchema('The feeling'),
+      realPhoto: seenSchema('The real photo (always unclear: no photo is given)'),
+      productDetail: seenSchema('The product detail'),
+    }),
+    note: S.str('One sentence.', 160),
+  }),
+  read(json) {
+    const o = R.obj(json, 'observe');
+    const it = R.obj(o.items, 'items');
+    const items = Object.fromEntries(INGREDIENT_KEYS.map(k => {
+      const v = R.obj(it[k], `items.${k}`);
+      return [k, { status: R.oneOf(v.status, SEEN, `items.${k}.status`), evidence: R.str(v.evidence, `items.${k}.evidence`, 100) }];
+    })) as DraftReading['items'];
+    return { items, note: R.str(o.note, 'note', 160) };
+  },
 };
 
 export const practiceCheckTask: ModelTask<{ ingredients: Ingredients; note: string }> = {

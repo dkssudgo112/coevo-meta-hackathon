@@ -82,7 +82,27 @@ const OUT = {
     { role: 'rule', narration: `[test] ${words(18)}.`, imagePrompt: 'a hand writing a menu card', evidence: null, diagram: null },
     { role: 'question', narration: `[test] ${words(16)}?`, imagePrompt: 'a quiet street in the morning', evidence: null, diagram: null },
   ] }),
-  practice_scenario: () => ({ scenario: '[test] A regular asks for a Halloween pumpkin latte poster.', hint: '[test] Who, price, one feeling, a real photo.' }),
+  practice_scenario: () => ({
+    scenario: '[test] A regular asks for a Halloween pumpkin latte poster.', hint: '[test] Who, price, one feeling, a real photo.',
+    setting: 'cafe', speaker: { name: 'Dana', role: '[test] co-owner' },
+    lines: ['[test] Halloween week starts Monday and the pumpkin latte is back.', '[test] Can you get the AI to make the window poster today? Students are our crowd this time.'],
+    changed: '[test] Students after school instead of morning commuters.',
+    facts: {
+      audience: { text: '[test] Students walking home after school', stake: '[test] If it looks like a commuter ad, the students walk past.' },
+      price: { text: '[test] 5,000 won, 500 off with a student card', stake: '[test] Without the price they ask at the counter and the line stalls.' },
+      mood: { text: '[test] Cozy, warm, a little playful', stake: '[test] A cold, glossy look feels wrong for a cozy autumn drink.' },
+      realPhoto: { text: '[test] You have a phone photo of the latte on the counter', stake: '[test] A drawn cup is not our cup; regulars notice.' },
+      productDetail: { text: '[test] Pumpkin latte with cinnamon foam', stake: '[test] If the cup looks plain, nobody knows it is the pumpkin one.' },
+    },
+    hasRealPhoto: true,
+  }),
+  practice_observe: () => ({ items: {
+    audience: { status: 'unclear', evidence: '[test] No people or school cues in the image.' },
+    price: { status: 'missing', evidence: '[test] No number is visible.' },
+    mood: { status: 'shown', evidence: '[test] Warm orange light and soft shadows.' },
+    realPhoto: { status: 'missing', evidence: '[test] A drawn cup, not a photo.' },
+    productDetail: { status: 'shown', evidence: '[test] A latte with cinnamon on the foam.' },
+  }, note: '[test] The price is not visible.' }),
   practice_check: () => ({ ingredients: { audience: true, price: true, mood: false, realPhoto: false, productDetail: true }, note: '[test] Add one concrete feeling next time.' }),
 };
 

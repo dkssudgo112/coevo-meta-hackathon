@@ -1,11 +1,11 @@
 // Session wrap: shared learning design → five formats. Each format fails alone.
 
 import type {
-  CaddieCard, ContentFormat, ContentItem, FlashcardsPayload, ManualPayload, Moment, NotePayload, PodcastPayload,
-  PracticeAttempt, Session, ShortPayload,
+  Assistance, CaddieCard, ContentFormat, ContentItem, DraftVerdict, FlashcardsPayload, Ingredients, ManualPayload, Moment, NotePayload, PodcastPayload,
+  PracticeAttempt, PracticeJudgment, PracticeRevision, Session, ShortPayload,
 } from '../../../packages/contracts/index.ts';
-import { CONTENT_FORMATS } from '../../../packages/contracts/index.ts';
-import { designTask, flashcardsTask, manualTask, noteTask, podcastAskTask, podcastTask, practiceCheckTask, practiceScenarioTask, shortTask } from '../../../packages/core/src/prompts.ts';
+import { CONTENT_FORMATS, INGREDIENT_KEYS } from '../../../packages/contracts/index.ts';
+import { designTask, flashcardsTask, manualTask, noteTask, podcastAskTask, podcastTask, practiceCheckTask, practiceObserveTask, practiceScenarioTask, shortTask } from '../../../packages/core/src/prompts.ts';
 import { isGroundedQuote, speechSeconds } from '../../../packages/core/src/text.ts';
 import { firstDue, nextDue } from '../../../packages/core/src/spaced.ts';
 import { labelPractice, practiceInputFixture, skillFixture, strengthFor } from '../../../packages/core/src/labels.ts';
@@ -300,49 +300,112 @@ export async function podcastAsk(ctx: Ctx, contentId: string, question: string, 
 
 // ---------------------------------------------------------------- Practice Range
 
-export async function startPractice(ctx: Ctx, autoOpened: boolean, sessionId: string | null): Promise<PracticeAttempt> {
-  const own = sessionId ? ctx.store.get('session', sessionId) : null;
+/** Selected-session context only; standalone practice gets none (it never inherits unrelated work). */
+function practiceContext(ctx: Ctx, session: Session | null, earlier: PracticeAttempt | null): string {
+  const lines: string[] = [];
+  if (session) {
+    if (session.task) lines.push(`This session's task: ${session.task}`);
+    if (session.design) lines.push(`Habit from this session: ${session.design.habit}`);
+    const missing = new Set<string>();
+    for (const m of sessionMoments(ctx.store, session.id)) if (m.decision?.action === 'intervene' && !m.misread) for (const k of m.decision.missingIngredients) missing.add(k);
+    if (missing.size) lines.push(`Details the person's requests left out in this session: ${[...missing].join(', ')}`);
+  } else lines.push('Standalone practice with no session. Use a small café launching a new menu item.');
+  if (earlier?.scenario) lines.push(`Change exactly one condition of this earlier practice request and keep the same kind of business: ${earlier.scenario}`);
+  return lines.join('\n');
+}
+
+export async function startPractice(ctx: Ctx, autoOpened: boolean, sessionId: string | null, changedFrom: string | null = null): Promise<PracticeAttempt> {
+  const own = (sessionId ? ctx.store.get('session', sessionId) : null) ?? null;
+  // A second tap while a scene is still being written returns that scene instead of paying for another.
+  const pending = ctx.store.list('practice').find(x => x.status === 'scenario' && x.sessionId === sessionId && Date.now() - Date.parse(x.startedAt) < 90_000);
+  if (pending) return pending;
+  const earlier = changedFrom ? ctx.store.get('practice', changedFrom) : null;
   const attempt: PracticeAttempt = {
     id: id('pr'), sessionId, scenario: '', hint: null, startedAt: now(), autoOpened, hintViewed: false, transcript: null,
     imageKey: null, imageStatus: 'none', ingredients: null, checkNote: null, assistance: null, status: 'scenario', error: null, provenance: modelProvenance(ctx.env),
     fixture: practiceInputFixture(own, !!ctx.sampleWorkspace),
+    scene: null, reading: null, readingStatus: 'none', judgment: null, revision: null, finishedAt: null,
+    changedFrom: earlier && earlier.sessionId === sessionId ? earlier.id : null,
   };
   await ctx.store.put('practice', attempt);
-  const session = sessionId ? ctx.store.get('session', sessionId) : [...ctx.store.list('session')].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
-  const context = [
-    session?.task ? `Recent task: ${session.task}` : '',
-    session?.design ? `Habit: ${session.design.habit}` : '',
-    ...(await ctx.memory()).slice(-5).map(m => `Known: ${m}`),
-  ].filter(Boolean).join('\n') || 'No prior session. Use a small café launching a new menu item.';
   try {
-    const { value } = await runTask(ctx.env, ctx.spender, practiceScenarioTask, { text: context });
-    return ctx.store.put('practice', { ...ctx.store.get('practice', attempt.id)!, scenario: value.scenario, hint: value.hint, status: 'open' });
+    const { value } = await runTask(ctx.env, ctx.spender, practiceScenarioTask, { text: practiceContext(ctx, own, earlier && earlier.sessionId === sessionId ? earlier : null) });
+    return ctx.store.put('practice', { ...ctx.store.get('practice', attempt.id)!, scenario: value.scenario, hint: value.hint, scene: value.scene, status: 'open' });
   } catch (e) {
     return ctx.store.put('practice', { ...ctx.store.get('practice', attempt.id)!, status: 'failed', error: failureStatus(e).message });
   }
 }
 
-/** Draw the practice poster from the person's own brief and store it; null when drawing failed. */
-async function practiceImage(ctx: Ctx, practiceId: string, brief: string): Promise<string | null> {
+/** Draw the practice poster from the person's own brief and store it; the data URL feeds the image reading. */
+async function practiceImage(ctx: Ctx, practiceId: string, brief: string, suffix = ''): Promise<{ key: string; dataUrl: string }> {
   const img = await generateImage(ctx.env, ctx.spender, `A promotional poster. The owner's brief, in their own words: "${brief}". Render no small text.`, '1024x1536');
-  const key = `w/${ctx.wsId}/practice/${practiceId}.jpg`;
+  const key = `w/${ctx.wsId}/practice/${practiceId}${suffix}.jpg`;
   await ctx.r2.put(key, img.bytes, { httpMetadata: { contentType: img.mime } });
   if (!ctx.store.alive('practice', practiceId)) { await ctx.r2.delete(key); throw new Gone(); }
-  return key;
+  return { key, dataUrl: `data:${img.mime};base64,${img.b64}` };
 }
 
-/** Redraw only the image of a finished attempt; the brief, check and label stay as they are. */
-export async function practiceRetryImage(ctx: Ctx, practiceId: string): Promise<void> {
+type Which = 'first' | 'revision';
+
+/** Write fields into the first draft or into the revision, on the latest stored copy. */
+async function patchDraft(ctx: Ctx, practiceId: string, which: Which, fields: Partial<PracticeRevision>): Promise<PracticeAttempt | null> {
+  const cur = ctx.store.get('practice', practiceId);
+  if (!cur) return null;
+  if (which === 'first') return ctx.store.put('practice', { ...cur, ...(fields as Partial<PracticeAttempt>) });
+  if (!cur.revision) return null;
+  return ctx.store.put('practice', { ...cur, revision: { ...cur.revision, ...fields } });
+}
+
+/** Muse Spark reads the draft against the scene's facts. It is never given the brief. */
+async function readDraft(ctx: Ctx, practiceId: string, which: Which, dataUrl?: string): Promise<void> {
   const p = ctx.store.get('practice', practiceId);
-  if (!p || p.status !== 'done' || p.imageStatus !== 'failed' || !p.transcript) return;
-  await ctx.store.put('practice', { ...p, imageStatus: 'generating', error: null });
+  const key = which === 'first' ? p?.imageKey : p?.revision?.imageKey;
+  if (!p?.scene || !key) return;
+  await patchDraft(ctx, practiceId, which, { readingStatus: 'reading' });
   try {
-    const key = await practiceImage(ctx, practiceId, p.transcript);
-    await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, imageKey: key, imageStatus: 'ready' });
+    let url = dataUrl;
+    if (!url) {
+      const obj = await ctx.r2.get(key);
+      if (!obj) throw new Error('The draft image is no longer stored.');
+      url = bytesToDataUrl(new Uint8Array(await obj.arrayBuffer()), obj.httpMetadata?.contentType ?? 'image/jpeg');
+    }
+    const facts = INGREDIENT_KEYS.map(k => `${k}: ${p.scene!.facts[k].text}`).join('\n');
+    const { value } = await runTask(ctx.env, ctx.spender, practiceObserveTask, { text: `Facts the poster was meant to carry:\n${facts}`, images: [url] });
+    if (!ctx.store.alive('practice', practiceId)) return;
+    await patchDraft(ctx, practiceId, which, { reading: { ...value, provenance: modelProvenance(ctx.env) }, readingStatus: 'ready' });
   } catch (e) {
     if (e instanceof Gone || !ctx.store.alive('practice', practiceId)) return;
-    await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, imageStatus: 'failed', error: failureStatus(e).message });
+    console.error(JSON.stringify({ event: 'practice_read_failed', which, name: (e as Error)?.name }));
+    await patchDraft(ctx, practiceId, which, { readingStatus: 'failed' });
   }
+}
+
+export async function practiceRetryImage(ctx: Ctx, practiceId: string, which: Which = 'first'): Promise<void> {
+  const p = ctx.store.get('practice', practiceId);
+  const d = which === 'first' ? (p && p.status === 'done' ? p : null) : (p?.revision?.status === 'done' ? p.revision : null);
+  if (!p || !d || d.imageStatus !== 'failed' || !d.transcript) return;
+  await patchDraft(ctx, practiceId, which, { imageStatus: 'generating', error: null });
+  try {
+    const img = await practiceImage(ctx, practiceId, d.transcript, which === 'revision' ? '-r' : '');
+    await patchDraft(ctx, practiceId, which, { imageKey: img.key, imageStatus: 'ready' });
+    await readDraft(ctx, practiceId, which, img.dataUrl);
+  } catch (e) {
+    if (e instanceof Gone || !ctx.store.alive('practice', practiceId)) return;
+    await patchDraft(ctx, practiceId, which, { imageStatus: 'failed', error: failureStatus(e).message });
+  }
+}
+
+export async function practiceRetryReading(ctx: Ctx, practiceId: string, which: Which = 'first'): Promise<void> {
+  const p = ctx.store.get('practice', practiceId);
+  const status = which === 'first' ? p?.readingStatus : p?.revision?.readingStatus;
+  if (status !== 'failed') return;
+  await readDraft(ctx, practiceId, which);
+}
+
+/** Example briefs the Caddie wrote, scoped like the attempt: its own session, or the whole workspace when standalone. */
+function exampleBriefs(ctx: Ctx, p: PracticeAttempt): string[] {
+  const ms = p.sessionId ? sessionMoments(ctx.store, p.sessionId) : ctx.store.list('moment');
+  return ms.map(m => m.decision?.exampleBrief).filter((x): x is string => !!x);
 }
 
 export async function practiceAttempt(ctx: Ctx, practiceId: string, input: { wav: Uint8Array } | { text: string }): Promise<void> {
@@ -350,23 +413,23 @@ export async function practiceAttempt(ctx: Ctx, practiceId: string, input: { wav
   if (!p || (p.status !== 'open' && p.status !== 'failed') || !p.scenario) return;
   const briefSource = 'text' in input ? 'typed' : 'spoken';
   p = await ctx.store.put('practice', { ...p, status: 'text' in input ? 'checking' : 'transcribing', error: null, briefSource });
+  let drawn: { key: string; dataUrl: string } | null = null;
   try {
     const transcript = 'text' in input ? input.text.trim() : (await transcribe(ctx.env, ctx.spender, input.wav)).transcript;
     if (!transcript) throw new Error('No speech was detected. Try again closer to the microphone, or type the brief.');
     if (!ctx.store.alive('practice', practiceId)) return;
     p = await ctx.store.put('practice', { ...ctx.store.get('practice', practiceId)!, transcript, status: 'checking', imageStatus: 'generating' });
-    const examples = ctx.store.list('moment').map(m => m.decision?.exampleBrief).filter((x): x is string => !!x);
     const [check, image] = await Promise.allSettled([
       runTask(ctx.env, ctx.spender, practiceCheckTask, { text: `Practice request: ${p.scenario}\n${briefSource === 'typed' ? 'Typed' : 'Spoken'} brief: "${transcript}"` }),
       practiceImage(ctx, practiceId, transcript),
     ]);
     if (!ctx.store.alive('practice', practiceId)) return;
-    const imageKey = image.status === 'fulfilled' ? image.value : null;
+    drawn = image.status === 'fulfilled' ? image.value : null;
     if (check.status === 'rejected') throw check.reason;
-    const assistance = labelPractice({ autoOpened: p.autoOpened, hintViewed: p.hintViewed, transcript }, examples);
+    const assistance = labelPractice({ autoOpened: p.autoOpened, hintViewed: p.hintViewed, transcript }, exampleBriefs(ctx, p));
     p = await ctx.store.put('practice', {
       ...ctx.store.get('practice', practiceId)!, ingredients: check.value.value.ingredients, checkNote: check.value.value.note, assistance,
-      imageKey, imageStatus: image.status === 'fulfilled' ? 'ready' : 'failed', status: 'done',
+      imageKey: drawn?.key ?? null, imageStatus: drawn ? 'ready' : 'failed', status: 'done',
     });
     await ctx.store.put('skill', { id: id('sk'), dimension: 'description', assistance, strength: strengthFor(assistance, { practice: true }), momentId: null, practiceId, note: check.value.value.note, at: now(), fixture: skillFixture(p.fixture, p.provenance) });
   } catch (e) {
@@ -374,7 +437,67 @@ export async function practiceAttempt(ctx: Ctx, practiceId: string, input: { wav
     const msg = e instanceof Error && e.name === 'Error' ? e.message : failureStatus(e).message;
     const cur = ctx.store.get('practice', practiceId)!;
     await ctx.store.put('practice', { ...cur, status: 'failed', error: msg, imageStatus: cur.imageStatus === 'generating' ? 'failed' : cur.imageStatus });
+    return;
   }
+  if (drawn) await readDraft(ctx, practiceId, 'first', drawn.dataUrl);
+}
+
+const VERDICT_TEXT: Record<DraftVerdict, string> = { ready: 'ready to put up', fix: 'in need of one fix', redo: 'worth starting over' };
+
+/** The person's call on the first draft, before any feedback. Returns an error message when it cannot be stored. */
+export async function practiceJudge(ctx: Ctx, practiceId: string, verdict: DraftVerdict, fix: keyof Ingredients | null): Promise<PracticeAttempt | string> {
+  const p = ctx.store.get('practice', practiceId);
+  if (!p?.scene || p.status !== 'done' || p.imageStatus !== 'ready') return 'There is no draft to judge yet.';
+  if (p.judgment) return 'This draft has already been judged.';
+  const assistance: Assistance = p.autoOpened || p.hintViewed ? 'coached' : 'independent';
+  const judgment: PracticeJudgment = { verdict, fix: verdict === 'fix' ? fix : null, at: now(), assistance };
+  const saved = await ctx.store.put('practice', { ...p, judgment });
+  const what = verdict === 'fix' && fix ? `in need of one fix (${fix})` : VERDICT_TEXT[verdict];
+  await ctx.store.put('skill', { id: id('sk'), dimension: 'discernment', assistance, strength: strengthFor(assistance, { practice: true }), momentId: null, practiceId, note: `Called the AI's draft ${what} before any feedback.`, at: now(), fixture: skillFixture(p.fixture, p.provenance) });
+  return saved;
+}
+
+/** One revised brief after the feedback. It never changes the first brief, its check, image or labels. */
+export async function practiceRevise(ctx: Ctx, practiceId: string, input: { wav: Uint8Array } | { text: string }): Promise<void> {
+  const p = ctx.store.get('practice', practiceId);
+  if (!p?.scene || !p.judgment || (p.revision && p.revision.status !== 'failed')) return;
+  const briefSource = 'text' in input ? 'typed' : 'spoken';
+  const rev: PracticeRevision = {
+    startedAt: now(), transcript: null, briefSource, imageKey: null, imageStatus: 'none', ingredients: null, checkNote: null,
+    reading: null, readingStatus: 'none', assistance: 'coached', status: 'text' in input ? 'checking' : 'transcribing', error: null,
+  };
+  await ctx.store.put('practice', { ...p, revision: rev });
+  let drawn: { key: string; dataUrl: string } | null = null;
+  try {
+    const transcript = 'text' in input ? input.text.trim() : (await transcribe(ctx.env, ctx.spender, input.wav)).transcript;
+    if (!transcript) throw new Error('No speech was detected. Try again closer to the microphone, or type the brief.');
+    if (!ctx.store.alive('practice', practiceId)) return;
+    await patchDraft(ctx, practiceId, 'revision', { transcript, status: 'checking', imageStatus: 'generating' });
+    const [check, image] = await Promise.allSettled([
+      runTask(ctx.env, ctx.spender, practiceCheckTask, { text: `Practice request: ${p.scenario}\n${briefSource === 'typed' ? 'Typed' : 'Spoken'} brief: "${transcript}"` }),
+      practiceImage(ctx, practiceId, transcript, '-r'),
+    ]);
+    if (!ctx.store.alive('practice', practiceId)) return;
+    drawn = image.status === 'fulfilled' ? image.value : null;
+    if (check.status === 'rejected') throw check.reason;
+    const saved = await patchDraft(ctx, practiceId, 'revision', {
+      ingredients: check.value.value.ingredients, checkNote: check.value.value.note, imageKey: drawn?.key ?? null, imageStatus: drawn ? 'ready' : 'failed', status: 'done',
+    });
+    await ctx.store.put('skill', { id: id('sk'), dimension: 'description', assistance: 'coached', strength: null, momentId: null, practiceId, note: `Revised brief: ${check.value.value.note}`, at: now(), fixture: skillFixture(saved?.fixture, p.provenance) });
+  } catch (e) {
+    if (e instanceof Gone || !ctx.store.alive('practice', practiceId)) return;
+    const msg = e instanceof Error && e.name === 'Error' ? e.message : failureStatus(e).message;
+    const cur = ctx.store.get('practice', practiceId)!;
+    await patchDraft(ctx, practiceId, 'revision', { status: 'failed', error: msg, imageStatus: cur.revision?.imageStatus === 'generating' ? 'failed' : cur.revision?.imageStatus ?? 'none' });
+    return;
+  }
+  if (drawn) await readDraft(ctx, practiceId, 'revision', drawn.dataUrl);
+}
+
+export async function practiceFinish(ctx: Ctx, practiceId: string): Promise<PracticeAttempt | null> {
+  const p = ctx.store.get('practice', practiceId);
+  if (!p?.judgment || p.finishedAt) return p ?? null;
+  return ctx.store.put('practice', { ...p, finishedAt: now() });
 }
 
 export function momentsFor(ctx: Ctx, sessionId: string): Moment[] {

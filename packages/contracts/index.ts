@@ -345,6 +345,63 @@ export interface ContentItem {
 
 // ---------- Practice Range ----------
 
+/** Authored backdrops for the scene stage (illustrations, not photos of a real place). */
+export const PRACTICE_SETTINGS = ['cafe', 'shop', 'desk'] as const;
+export type PracticeSetting = (typeof PRACTICE_SETTINGS)[number];
+
+/** One detail on the scene's notes: what the person knows, and what goes wrong without it (in the speaker's voice). */
+export interface PracticeFact { text: string; stake: string }
+
+/** A short scene written by the model: a fictional person brings a changed request. */
+export interface PracticeScene {
+  setting: PracticeSetting;
+  speaker: { name: string; role: string };
+  /** 2–3 lines of dialogue, read one at a time. */
+  lines: string[];
+  /** What is different from the usual request. */
+  changed: string;
+  /** One fact per ingredient. */
+  facts: Record<keyof Ingredients, PracticeFact>;
+  /** The scene says a real photo exists; a generated image can then never be the final poster. */
+  hasRealPhoto: boolean;
+}
+
+export type SeenStatus = 'shown' | 'missing' | 'unclear';
+
+/** Muse Spark's reading of a generated draft against the scene's facts (it never sees the brief). */
+export interface DraftReading {
+  items: Record<keyof Ingredients, { status: SeenStatus; evidence: string }>;
+  note: string;
+  provenance: Provenance;
+}
+
+export type DraftVerdict = 'ready' | 'fix' | 'redo';
+
+/** The person's call on the first draft, made before any feedback. */
+export interface PracticeJudgment {
+  verdict: DraftVerdict;
+  /** With 'fix': the detail they think needs fixing. */
+  fix: keyof Ingredients | null;
+  at: string;
+  assistance: Assistance;
+}
+
+/** The one revised brief after feedback (always coached). */
+export interface PracticeRevision {
+  startedAt: string;
+  transcript: string | null;
+  briefSource: 'spoken' | 'typed';
+  imageKey: string | null;
+  imageStatus: 'none' | 'generating' | 'ready' | 'failed';
+  ingredients: Ingredients | null;
+  checkNote: string | null;
+  reading: DraftReading | null;
+  readingStatus: 'none' | 'reading' | 'ready' | 'failed';
+  assistance: Assistance;
+  status: 'transcribing' | 'checking' | 'done' | 'failed';
+  error: string | null;
+}
+
 export interface PracticeAttempt {
   id: string;
   sessionId: string | null;
@@ -373,6 +430,17 @@ export interface PracticeAttempt {
    * workspace), false for an ordinary person's attempt, null when an older record did not say.
    */
   fixture?: boolean | null;
+  // Scene practice (Oct 31). Older attempts have none of these and keep their original layout.
+  scene?: PracticeScene | null;
+  /** Reading of the first draft. */
+  reading?: DraftReading | null;
+  readingStatus?: 'none' | 'reading' | 'ready' | 'failed';
+  judgment?: PracticeJudgment | null;
+  revision?: PracticeRevision | null;
+  /** The person finished without revising (or after it). */
+  finishedAt?: string | null;
+  /** This scene changes one condition of an earlier attempt. */
+  changedFrom?: string | null;
 }
 
 // ---------- Sessions, inbox, workspace ----------

@@ -2,7 +2,8 @@
 // here, so workspaces are isolated by construction.
 
 import { DurableObject } from 'cloudflare:workers';
-import type { CaptureSource, CropRect, FrameRef, Moment, PodcastPayload, ServerEvent, Session, ShortPayload, Snapshot, WorkspaceSummary } from '../../../packages/contracts/index.ts';
+import type { CaptureSource, CropRect, FrameRef, Ingredients, Moment, PodcastPayload, ServerEvent, Session, ShortPayload, Snapshot, WorkspaceSummary } from '../../../packages/contracts/index.ts';
+import { INGREDIENT_KEYS } from '../../../packages/contracts/index.ts';
 import { CAPS, charge, dayKey, remaining, type BudgetState } from '../../../packages/core/src/budget.ts';
 import { parseWav } from '../../../packages/core/src/wav.ts';
 import { asksFromText } from '../../../packages/core/src/cards.ts';
@@ -10,7 +11,7 @@ import { BudgetExceeded, egressProbe, fakeMeta, liveEnabled, segmentBoxes, trans
 import { pollJob } from './media.ts';
 import { followUp, failureStatus, processMoment, retainOrDiscard, ruleDecision, sessionMoments, type Ctx } from './pipeline.ts';
 import { skillFixture } from '../../../packages/core/src/labels.ts';
-import { cardAction, generate, podcastAsk, practiceAttempt, practiceRetryImage, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
+import { cardAction, generate, podcastAsk, practiceAttempt, practiceFinish, practiceJudge, practiceRetryImage, practiceRetryReading, practiceRevise, reviewFlashcard, startPractice, wrapSession, type CardAction } from './content.ts';
 import { Store } from './store.ts';
 import { usWorkspaces } from './jurisdiction.ts';
 import type { LedgerScope } from './budget-do.ts';
@@ -155,6 +156,13 @@ export class Workspace extends DurableObject<Env> {
       if (p.status === 'scenario') await this.store.put('practice', { ...p, status: 'failed', error: cut });
       else if (p.status === 'transcribing' || p.status === 'checking') await this.store.put('practice', { ...p, status: 'failed', error: cut, imageStatus: p.imageStatus === 'generating' ? 'failed' : p.imageStatus });
       else if (p.status === 'done' && p.imageStatus === 'generating') await this.store.put('practice', { ...p, imageStatus: 'failed', error: cut });
+      // Scene practice: an image reading or a revision cut off by the restart offers its own retry; the first brief stays as it was.
+      const q = this.store.get('practice', p.id)!;
+      const r = q.revision;
+      const rev = r && (r.status === 'transcribing' || r.status === 'checking' || r.imageStatus === 'generating' || r.readingStatus === 'reading')
+        ? { ...r, status: r.status === 'done' ? 'done' as const : 'failed' as const, error: r.status === 'done' ? r.error : cut, imageStatus: r.imageStatus === 'generating' ? 'failed' as const : r.imageStatus, readingStatus: r.readingStatus === 'reading' ? 'failed' as const : r.readingStatus }
+        : r;
+      if (q.readingStatus === 'reading' || rev !== r) await this.store.put('practice', { ...q, readingStatus: q.readingStatus === 'reading' ? 'failed' : q.readingStatus, revision: rev });
     }
     // Practice records made before input origin was stored: take it from their session or a sample
     // workspace; when neither says, record it as unknown (null), never as a real person.
@@ -593,13 +601,48 @@ export class Workspace extends DurableObject<Env> {
 
       if (seg[0] === 'practice') {
         if (seg.length === 1 && method === 'POST') {
-          const b = (await req.json().catch(() => ({}))) as { autoOpened?: boolean; sessionId?: string };
-          const p = await startPractice(ctx, Boolean(b.autoOpened), b.sessionId ?? null);
+          const b = (await req.json().catch(() => ({}))) as { autoOpened?: boolean; sessionId?: string | null; changedFrom?: string | null };
+          // A session that does not exist (deleted, or another workspace's) is refused, never turned into standalone practice.
+          if (b.sessionId && !this.store.get('session', b.sessionId)) return error(404, 'not_found', 'That session no longer exists.');
+          const from = typeof b.changedFrom === 'string' ? this.store.get('practice', b.changedFrom) : null;
+          if (b.changedFrom && (!from || from.sessionId !== (b.sessionId ?? null))) return error(404, 'not_found', 'That earlier practice is not part of this scope.');
+          const p = await startPractice(ctx, Boolean(b.autoOpened), b.sessionId ?? null, from?.id ?? null);
           return json(p);
         }
         const p = this.store.get('practice', seg[1]);
         if (!p) return error(404, 'not_found', 'Unknown practice.');
         if (seg[2] === 'hint' && method === 'POST') return json(await this.store.put('practice', { ...p, hintViewed: true }));
+        if (seg[2] === 'judge' && method === 'POST') {
+          const b = (await req.json().catch(() => ({}))) as { verdict?: unknown; fix?: unknown };
+          const verdict = b.verdict === 'ready' || b.verdict === 'fix' || b.verdict === 'redo' ? b.verdict : null;
+          const fix = typeof b.fix === 'string' && (INGREDIENT_KEYS as readonly string[]).includes(b.fix) ? b.fix as keyof Ingredients : null;
+          if (!verdict || (verdict === 'fix' && !fix)) return error(400, 'bad_verdict', 'Choose ready, one fix (with the detail), or start over.');
+          const r = await practiceJudge(ctx, p.id, verdict, fix);
+          return typeof r === 'string' ? error(409, 'conflict', r) : json(r);
+        }
+        if (seg[2] === 'finish' && method === 'POST') return json(await practiceFinish(ctx, p.id));
+        if (seg[2] === 'read' && method === 'POST') {
+          const b = (await req.json().catch(() => ({}))) as { which?: unknown };
+          this.enqueue(() => practiceRetryReading(ctx, p.id, b.which === 'revision' ? 'revision' : 'first'));
+          return json({ ok: true });
+        }
+        if (seg[2] === 'revise' && method === 'POST') {
+          if (!p.judgment) return error(409, 'conflict', 'Judge the first draft before revising.');
+          if (p.revision && p.revision.status !== 'failed') return error(409, 'conflict', 'This scene already has its revision.');
+          if ((req.headers.get('content-type') ?? '').startsWith('application/json')) {
+            const b = (await req.json().catch(() => ({}))) as { text?: unknown };
+            const text = typeof b.text === 'string' ? b.text.trim() : '';
+            if (text.length < 3 || text.length > 600) return error(400, 'bad_text', 'Type a brief of up to 600 characters.');
+            this.enqueue(() => practiceRevise(ctx, p.id, { text }));
+            return json({ ok: true });
+          }
+          const wav = new Uint8Array(await req.arrayBuffer());
+          if (wav.length > MAX_AUDIO_BYTES) return error(413, 'too_large', 'Keep the brief under 30 seconds.');
+          const info = parseWav(wav);
+          if (info && info.seconds > PRACTICE_MAX_SECONDS + 1) return error(413, 'too_long', 'Keep the brief under 30 seconds.');
+          this.enqueue(() => practiceRevise(ctx, p.id, { wav }));
+          return json({ ok: true });
+        }
         if (seg[2] === 'attempt' && method === 'POST') {
           if ((req.headers.get('content-type') ?? '').startsWith('application/json')) {
             // Typed fallback when speaking is not possible; recorded as typed.
@@ -616,7 +659,11 @@ export class Workspace extends DurableObject<Env> {
           this.enqueue(() => practiceAttempt(ctx, p.id, { wav }));
           return json({ ok: true });
         }
-        if (seg[2] === 'image' && method === 'POST') { this.enqueue(() => practiceRetryImage(ctx, p.id)); return json({ ok: true }); }
+        if (seg[2] === 'image' && method === 'POST') {
+          const b = (await req.json().catch(() => ({}))) as { which?: unknown };
+          this.enqueue(() => practiceRetryImage(ctx, p.id, b.which === 'revision' ? 'revision' : 'first'));
+          return json({ ok: true });
+        }
       }
       return error(404, 'not_found', 'Unknown route.');
     } catch (e) {
@@ -810,6 +857,7 @@ export class Workspace extends DurableObject<Env> {
     for (const c of this.store.list('card').filter(c => c.sessionId === s.id && c.status === 'proposed')) await this.store.remove('card', c.id);
     for (const pr of this.store.list('practice').filter(x => x.sessionId === s.id)) {
       if (pr.imageKey) keys.push(pr.imageKey);
+      if (pr.revision?.imageKey) keys.push(pr.revision.imageKey);
       for (const sk of this.store.list('skill').filter(k => k.practiceId === pr.id)) await this.store.remove('skill', sk.id);
       await this.store.remove('practice', pr.id);
     }

@@ -21,10 +21,10 @@ export interface CameraInfo {
 /** Content opened from a past session remembers it, so Back returns there (not to the live session). */
 type Sheet = { kind: 'content'; id: string } | { kind: 'practice'; id: string | null; sessionId: string | null } | { kind: 'session'; id: string; highlight?: string } | null;
 
-function Sheet({ title, onClose, back = 'Back to session', waiting, onToQuestion, children }: { title: string; onClose: () => void; back?: string; waiting?: boolean; onToQuestion?: () => void; children: ReactNode }) {
+function Sheet({ title, onClose, back = 'Back to session', waiting, onToQuestion, wide, children }: { title: string; onClose: () => void; back?: string; waiting?: boolean; onToQuestion?: () => void; wide?: boolean; children: ReactNode }) {
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
-      <div className="sheet" onClick={e => e.stopPropagation()}>
+      <div className={wide ? 'sheet wide' : 'sheet'} onClick={e => e.stopPropagation()}>
         <header><h2 className="grow">{title}</h2><button className="btn small" onClick={onClose}>{back}</button></header>
         {waiting && <div className="row" role="status"><span className="faint grow">The Caddie has a new question. It waits until you go back.</span>{onToQuestion && <button className="btn small" onClick={onToQuestion}>Go to the question</button>}</div>}
         {children}
@@ -161,8 +161,8 @@ export function LiveScreen({ creds, state, conn, camera, embedded, onUnpair }: {
         ) : null;
       })()}
       {sheet?.kind === 'practice' && (
-        <Sheet title="Practice Range" onClose={back} back={backLabel} waiting={unseenAsk} onToQuestion={() => setStack([])}>
-          <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={sheet.sessionId} onStart={id => replaceTop({ kind: 'practice', id, sessionId: sheet.sessionId })} onOpen={id => open({ kind: 'practice', id, sessionId: sheet.sessionId })} />
+        <Sheet title="Practice Range" onClose={back} back={backLabel} waiting={unseenAsk} onToQuestion={() => setStack([])} wide>
+          <PracticeRange creds={creds} state={state} attemptId={sheet.id} sessionId={sheet.sessionId} onStart={id => replaceTop({ kind: 'practice', id, sessionId: sheet.sessionId })} onOpen={id => open({ kind: 'practice', id, sessionId: sheet.sessionId })} onReturn={back} />
         </Sheet>
       )}
       {sheet?.kind === 'session' && (
