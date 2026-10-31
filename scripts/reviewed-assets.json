@@ -51,9 +51,15 @@
     },
     {
       "path": "apps/web/public/demo/coevo-caddie-demo.mp4",
-      "sha256": "0fc009afbf29220cd8643370501dc820d106a73e60df57524f1b656ea6c4c194",
-      "review": "Final three-minute demo (161.0 s, 1920x1080 H.264 + AAC, 5,568,362 bytes). Codex reviewed these exact bytes on 2026-10-31: every scene, full decode, no credentials, private account screens, personal data, local paths or raw IDs; each scene tagged with its run; assumed setup and still captures stated.",
-      "provenance": "Rendered by scripts/demo/assemble.py from still captures of the deployed phone screen during one live run (controlled camera on reviewed Meta AI screenshots, synthetic voice), the published recorded live run (replay clip, podcast excerpt, short), a screen recording of a stored Practice sample result, and reviewed Meta AI / ChatGPT screenshots of scripted, fictional scenarios."
+      "sha256": "4b468afd14935ad42ea66011314e1850efacd3fd6c19f7baf6e256c0b9eb46ab",
+      "review": "Demo film (160.4 s, 1920x1080 30 fps H.264 + AAC 48 kHz, 23,041,280 bytes; only standard encoder tags and a 'Made with Remotion' comment). Codex reviewed the previous cut (25203577…afdb) on 2026-10-31: 36 key frames, the independent review and fix pass, captions and the watch page; no credentials, QR codes, private account screens, personal data, local paths or raw IDs. These bytes add only the two pre-publication fact fixes the maintainer approved (Practice wording describes an input check; closing hackathon notice); every other scene was checked frame by frame against the reviewed cut (no visible change; PSNR ≥ 45 dB).",
+      "provenance": "Made with video-shotcraft (Apache-2.0) and Remotion from real captures of the deployed app: one live run (scripted, fictional café owner; actual Meta AI replies; assumed phone setup with a controlled camera; the synthetic spoken answer shown as waveform and stored transcript, not played), the published recorded live run (podcast excerpt, short), a separate Practice sample session and a separate pinned-chat check with a card approved in an earlier run; every scene tagged with its run. Setup illustration labeled. Narration Kokoro-82M (local); original synthesized music; CC0 Freesound effects."
+    },
+    {
+      "path": "apps/web/public/demo/coevo-caddie-demo.en.vtt",
+      "sha256": "dc944a6f0e760a24560e8948dc27ea3da67e0681ef658542c31cc078a6fff003",
+      "review": "English captions for the demo film (40 cues: narration, three speaker-labelled lines from the earlier run's podcast and short, and the closing on-screen notice). Plain text; listed so the published bytes are recorded with the film.",
+      "provenance": "Generated from the film's narration script and measured timings (scripts/vtt.py in the film project)."
     },
     {
       "path": "apps/web/public/img/setup-guide.jpg",

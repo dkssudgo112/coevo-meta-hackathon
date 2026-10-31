@@ -56,9 +56,13 @@ The maintainer decided that, as in the earlier Coevo project, the phone is assum
 
 The landing page now starts the real service: *Start on this computer* opens the Desk, then four short steps (scan the code with the phone, aim at the screen, tap Start watching, keep working in the usual AI tool), with a labeled setup illustration. The Desk shows the same steps with the current one marked and a *phone connected* state; the phone's setup screens say which step they are. The demo and the recorded session stay available as secondary ways to look first. The README leads with the product and real screens of this flow.
 
+## Demo film (Oct 31)
+
+/demo now plays a new 2:40 film made with video-shotcraft and Remotion from real captures of the deployed app, with English captions. It follows one live run (scripted café owner, actual Meta AI replies, assumed phone setup with a controlled camera and a synthetic voice whose audio is not played), then an earlier recorded run's podcast and short, a separate Practice sample session, and a separate pinned-chat check with a card approved in an earlier run; a tag on each scene names its run. The closing scene states that the app was newly implemented during this hackathon, based on the earlier Coevo concept. The published bytes are listed in `scripts/reviewed-assets.json`.
+
 ## Still to do
 
-- A new three-minute film, made with video-shotcraft from real captures of the deployed app, is in production and review. The current demo at /demo stays published until the new one passes the exact-byte review. The final submission is the maintainer's.
+- The final submission is the maintainer's.
 
 ## Publication
 

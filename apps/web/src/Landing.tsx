@@ -91,7 +91,7 @@ export function Landing() {
       <section className="stack" aria-labelledby="see-first">
         <h2 id="see-first">Want to see it first?</h2>
         <div className="row wrap" style={{ gap: 12 }}>
-          <a className="btn" href="/demo">Watch the three-minute demo</a>
+          <a className="btn" href="/demo">Watch the demo</a>
           <a className="btn" href="/sample">Replay a recorded session</a>
         </div>
         <p className="faint">The recorded session replays one live run on a scripted, fictional café, with no new model calls.</p>

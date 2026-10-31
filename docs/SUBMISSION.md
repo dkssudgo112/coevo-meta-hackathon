@@ -1,4 +1,4 @@
-# Submission and three-minute demo
+# Submission and demo
 
 Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Deadline: **November 5, 2026, 11:00 KST**. The maintainer presses the final submit button; nothing has been submitted.
 
@@ -27,24 +27,27 @@ Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-develope
 - [ ] `npm run verify` and `npm run check:release -- --staged` pass; the exact staged diff and commit metadata reviewed.
 - [ ] No secrets, private notes, account screenshots, raw sessions or personal frames.
 - Optional: a project license is the maintainer's choice. The competition requires a public repository, not a license.
-- [x] README explains the earlier concept and the new implementation; demo opening says the same.
+- [x] README explains the earlier concept and the new implementation; the demo's closing scene says the same ("Coevo Caddie app: newly implemented during this hackathon. Based on my earlier Coevo concept.").
 - [ ] Claims match evidence: real model output, fixture data and simulated persona tests are labeled.
 
-## Three-minute storyboard
+## Demo storyboard (2:40)
 
-Composition (maintainer's decision, Oct 31): the phone is **assumed** to stand beside the monitor, as in the earlier Coevo project. The opening card says so. The run scenes are still captures of the deployed app at phone size, taken during one live run with a controlled camera (a monitor showing screenshots of actual Meta AI replies) and a synthetic voice; each is shown beside the Meta AI screen the camera saw at that moment. Every Caddie line on screen is real model output; the café owner is a scripted, fictional persona. A tag on each scene names its run: this run, an earlier recorded live run (replay, podcast, short), a separate Practice sample session, a separate pinned-chat check with an earlier card, and a separate ChatGPT run. The Practice scene is a screen recording of the stored result (no new model calls). The full cut is 2:41.
+The film at /demo was made with [video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) and Remotion from real captures of the deployed app. One persona and one live run carry the story: a scripted, fictional café owner and actual Meta AI replies. The phone is **assumed** to stand beside the monitor, as in the earlier Coevo project: the phone screens come from a live run in a phone-sized browser with a controlled camera, and the spoken answer was a synthetic voice, whose audio the film does not play (it shows a waveform and the transcript exactly as stored). A tag on each scene names its run. The opening setup picture is a labeled illustration; the narration is a synthetic voice (Kokoro-82M), and English captions ship with the player. No development budget or cost figures appear in the film.
 
 | Time | Scene | What is shown |
 | --- | --- | --- |
-| 0:00–0:08 | Title | A new implementation built during the hackathon from the earlier Coevo concept; "Assumed setup: phone beside the monitor, controlled camera, synthetic voice." |
-| 0:08–0:28 | This run | Phone setup (only the boxed area is sent); "Make it more premium." → quiet, with the reason; the third vague request → "What exactly is your new dessert — flavor and what makes it special?" |
-| 0:28–0:46 | Answer | The synthetic spoken answer plays ("It is matcha Basque cheesecake…"), then: "You named matcha, but the poster still shows berry. Tell AI your price, your real matcha photo, and who it's for." |
-| 0:46–1:03 | Brief and wrap | The full brief, labeled *with the Caddie*, SAM 3.1's price marker; session end: note, playbook, flashcards and a short; no podcast: "No real objection or trade-off was stated." |
-| 1:03–1:48 | Earlier recorded run | The /sample replay (no new model calls); its podcast, made on request (guest objection, advice narrowed); its vertical short. |
-| 1:48–2:00 | Practice Range | "Please design a window poster for our cafe's new honey oat latte for morning commuters." → a typed scripted brief → a Muse Image poster drawn from the brief → all five ingredients found in the brief (sample-labeled). |
-| 2:00–2:14 | Pinned-chat check | A separate pinned Meta AI chat that began with an earlier card: Meta AI asks five questions first; the Caddie: "AI asked first as card says, staying quiet." This run's new card stays proposed. |
-| 2:14–2:28 | Cameo | Actual ChatGPT replies to a scripted, fictional cover letter; the Caddie stayed quiet twice, then asked: "What is one real project you coordinated that you want in this letter?" |
-| 2:28–2:41 | Close | The four Meta models and their jobs; live model output with scripted personas; physical camera accuracy not measured. |
+| 0:00–0:06 | Title | "Coevo Caddie. A coach on the phone beside your screen." |
+| 0:06–0:19 | The problem | Actual Meta AI screens; the owner's three requests stack up: "make it more premium", again and again. |
+| 0:19–0:34 | Setup in four steps | The labeled illustration, then real app screens (camera view simulated, pairing code blurred): open the Desk, scan the code, aim at the screen and tap Start watching, keep working. |
+| 0:34–0:48 | Quiet, then one question | The Caddie stays quiet with its reasons, then asks: "What exactly is your new dessert — flavor and what makes it special?" |
+| 0:48–1:02 | The answer, out loud | The stored transcript of the synthetic spoken answer; the Caddie names what is missing: "Tell AI your price, your real matcha photo, and who it's for." |
+| 1:02–1:13 | The brief changes | Before and after Meta AI screens (berry poster → matcha poster with its price), labeled *with the Caddie*; SAM 3.1's price marker. |
+| 1:13–1:27 | What the session leaves | The Desk's five rows: note, playbook, flashcards, short, and no podcast, with the reason it gave. |
+| 1:27–1:49 | Earlier recorded run | An excerpt of its two-voice podcast and the opening of its vertical short. |
+| 1:49–2:01 | Practice Range | A separate sample session: a typed, scripted brief and the poster Muse Image drew from it; the Caddie checks which details the brief includes (all five named: audience, price, mood, that it asks for a real photo, and product detail; no photo was attached). |
+| 2:01–2:21 | Your AI learns too | This run's card stays proposed. A separate pinned Meta AI chat that began with a card approved in an earlier run: asked for a new drink poster, Meta AI asks five questions first, and the Caddie stays quiet. |
+| 2:21–2:33 | Four Meta models | Muse Spark reads and decides, SAM 3.1 points, Muse Voice Transcribe listens, Muse Image draws. |
+| 2:33–2:40 | Close | "Keep your AI. Add a caddie beside it." The app URL and the notice: "Coevo Caddie app: newly implemented during this hackathon. Based on my earlier Coevo concept." |
 
 ## Draft texts (finalize only with verified numbers)
 

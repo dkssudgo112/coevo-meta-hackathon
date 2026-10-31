@@ -2,7 +2,7 @@
 
 **A coach on the phone beside your screen.** Keep working in your usual AI tool. The Caddie watches the screen from your phone, stays quiet while you are on track, and asks one short question when you are stuck. Afterwards it leaves you only what helps, and your AI can learn to ask the right questions first.
 
-**[Watch the 3-minute demo](https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo)** · **[Try it](https://coevo-caddie.coevo-meta-hackathon.workers.dev)** · **[Replay a recorded session, no phone needed](https://coevo-caddie.coevo-meta-hackathon.workers.dev/sample)**
+**[Watch the demo (2:40)](https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo)** · **[Try it](https://coevo-caddie.coevo-meta-hackathon.workers.dev)** · **[Replay a recorded session, no phone needed](https://coevo-caddie.coevo-meta-hackathon.workers.dev/sample)**
 
 ![The recorded sample session: an actual Meta AI reply on the left, the Caddie's question on the phone on the right](docs/img/hero.jpg)
 <sub>The recorded sample session (`/sample`): an actual Meta AI reply to a scripted café owner (left) and the Caddie's question on the phone (right).</sub>
@@ -53,11 +53,11 @@ The recorded sample session includes a podcast made on request (its guest is a c
 
 ## Practice Range
 
-A new request arrives; you brief the AI out loud or by typing; Muse Image draws what your words produce; and the Caddie checks which details made it in.
+A new request arrives; you brief the AI out loud or by typing; Muse Image draws what your words produce; and the Caddie checks which details your brief includes.
 
-<img src="docs/img/practice.jpg" width="320" alt="Practice Range: the request, the typed brief, the drawn poster and five checked details">
+<img src="docs/img/practice.jpg" width="320" alt="Practice Range: the request, the typed brief, the drawn poster and the five details the brief names">
 
-<sub>A separate sample session with a typed, scripted brief.</sub>
+<sub>A separate sample session with a typed, scripted brief. The brief asks for a real photo; no photo was attached, so the check is about what the brief names.</sub>
 
 ## Your AI learns too
 
@@ -85,7 +85,7 @@ Send an approved card as the first message of a dedicated chat and pin it. In se
 
 Podcast and short voices use the open-source **Kokoro-82M** (Apache-2.0) on Modal, because Meta's API has no text-to-speech.
 
-Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer · Build for Your World). The product concept continues the author's earlier Coevo work; all code in this repository was written during the event.
+Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer · Build for Your World). The Coevo Caddie app was newly implemented during this hackathon, based on the author's earlier Coevo concept; all code in this repository was written during the event.
 
 ## Run it yourself
 
