@@ -387,10 +387,10 @@ export const practiceScenarioTask: ModelTask<{ scenario: string; hint: string; s
   name: 'practice_scenario',
   effort: 'low',
   maxOutputTokens: 1100,
-  instructions: `Write one short practice scene for the Practice Range, in the person's own domain but with one changed condition (a new item, season, audience or channel). A fictional person (a co-owner, regular customer, partner or manager — never the person themself, never a real or famous person) brings a request for something an image model can draw: a poster, flyer, menu board or social-media image — never a caption, email or other text, because the person's brief is drawn as an image.
+  instructions: `Write one short practice scene for the Practice Range, in the person's own domain but with one changed condition (a new item, season, audience or channel). A fictional colleague who shares the work (a co-owner, business partner, manager or teammate — never the person themself, never a customer, never a real or famous person) brings a request for something an image model can draw: a poster, flyer, menu board or social-media image — never a caption, email or other text, because the person's brief is drawn as an image.
 - "scenario": the request in one sentence, at most 140 characters.
 - "setting": cafe for a café or coffee bar, shop for a bakery or other small shop, desk for anything else.
-- "speaker": a short first name and their role relative to the person (at most 40 characters).
+- "speaker": a short first name and their role relative to the person (at most 40 characters). The lines and every "stake" speak as that colleague, about the shared business ("our customers", "we").
 - "lines": 2 or 3 short spoken lines (each at most 150 characters) in which the speaker asks for it and mentions the changed condition. Natural speech; do not list every fact.
 - "changed": what is different from the usual request, at most 110 characters.
 - "facts": the notes the person has after the conversation, one per ingredient: who it is for, a concrete number (price or offer), a concrete feeling, the person's own real material (say plainly whether a real photo exists, e.g. "You have a phone photo of the cup on the counter"), and the specific product detail. Facts must be consistent with the lines and invent nothing the lines contradict. Each fact has a "stake": in the speaker's voice, what goes wrong if the poster leaves it out.
