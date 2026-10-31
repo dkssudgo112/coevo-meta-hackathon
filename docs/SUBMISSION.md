@@ -1,26 +1,26 @@
 # Submission and demo
 
-Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-developer-hackathon). Deadline: **November 5, 2026, 11:00 KST**. The maintainer presses the final submit button; nothing has been submitted.
+Submitted through the [event platform](https://cerebralvalley.ai/e/meta-ai-developer-hackathon) on **November 1, 2026 (KST)** with the maintainer's explicit authorization. The saved submission was reopened and its narrative fields verified against the final text below. Deadline: **November 5, 2026, 11:00 KST**. Receipt and account screenshots remain private.
 
 ## Form fields (in the platform's order)
 
-| # | Field | Plan |
+| # | Field | Submitted value or handling |
 | --- | --- | --- |
-| 1 | Team name | Maintainer |
-| 2 | Team members | Only actual collaborators |
+| 1 | Team name | Coevo Caddie |
+| 2 | Team members | Solo maintainer |
 | 3 | Track | Indie Developer |
 | 4 | Problem statement | Build for Your World |
 | 5 | Most Viral X post (optional) | Optional |
-| 6 | Project description | Draft below; includes the live app URL (the form has no separate field) |
+| 6 | Project description | Final text below; includes the live app URL (the form has no separate field) |
 | 7 | Public GitHub repository | https://github.com/dkssudgo112/coevo-meta-hackathon (check while signed out) |
 | 8 | 3-minute demo video | https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo (the app's own watch page; the official guide allows any public link; check playback while signed out and the exact published bytes) |
-| 9 | Use of Meta products | Draft below |
-| 10 | Why Meta's models matter | Draft below |
-| 11 | Partner technology feedback | Draft below |
+| 9 | Use of Meta products | Final text below |
+| 10 | Why Meta's models matter | Final text below |
+| 11 | Partner technology feedback | Final text below |
 | 12–13 | Likelihood and opinion surveys | The maintainer's own answers (recorded privately) |
-| 14 | Consent checkbox | The maintainer decides at final submission |
+| 14 | Optional promotion consent | Not selected |
 | 15–22 | Optional recommendation and product-feedback questions | Added to the platform by October 31; left blank unless the maintainer chooses to answer |
-| 23 | Submit | The maintainer only |
+| 23 | Submit | Completed November 1, 2026 (KST); saved submission verified |
 
 ## Before publication
 
@@ -50,7 +50,7 @@ The film at /demo was made with [video-shotcraft](https://github.com/Vincentwei1
 | 2:33–2:45 | Four Meta models | Muse Spark reads and decides, SAM 3.1 points, Muse Voice Transcribe listens, Muse Image draws. |
 | 2:45–2:52 | Close | "Keep your AI. Add a caddie beside it." The app URL and the notice: "Coevo Caddie app: newly implemented during this hackathon. Based on my earlier Coevo concept." |
 
-## Draft texts (finalize only with verified numbers)
+## Submitted texts
 
 **6 · Project description**
 

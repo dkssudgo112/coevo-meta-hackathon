@@ -1,6 +1,6 @@
 # Current status
 
-Updated: October 31, 2026 (KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
+Updated: November 1, 2026 (KST). For per-requirement evidence see [VERIFICATION.md](VERIFICATION.md).
 
 ## Deployed with real model calls
 
@@ -67,9 +67,9 @@ The landing page now starts the real service: *Start on this computer* opens the
 
 /demo now plays a 2:52 film made with video-shotcraft and Remotion from real captures of the deployed app, with English captions. It follows one live run (scripted café owner, actual Meta AI replies, assumed phone setup with a controlled camera and a synthetic voice whose audio is not played), then an earlier recorded run's podcast and short, a separate Practice live sample showing the person’s judgment and before/after revision, and a separate pinned-chat check with a card approved in an earlier run; a tag on each scene names its run. The closing scene states that the app was newly implemented during this hackathon, based on the earlier Coevo concept. The published bytes are listed in `scripts/reviewed-assets.json`; public MP4/VTT hashes, Range 206, browser playback/seek and visible captions were checked after deployment.
 
-## Still to do
+## Submission
 
-- The final submission is the maintainer's.
+Submitted through the official platform on November 1, 2026 (KST), with the maintainer's explicit authorization. The saved submission was reopened and its narrative fields verified against the final text. Track: Indie Developer; theme: Build for Your World. Receipt and account screenshots remain private. See [Submission](SUBMISSION.md).
 
 ## Modal allowance
 
@@ -77,4 +77,4 @@ The app now supports an explicit funded opt-in to a separate $25 Modal lifetime 
 
 ## Publication
 
-Public repository: https://github.com/dkssudgo112/coevo-meta-hackathon. No competition submission has been made. Account records, coordination notes and private checks stay in ignored local files. Published screenshots are listed with their exact SHA-256 in `scripts/reviewed-assets.json`.
+Public repository: https://github.com/dkssudgo112/coevo-meta-hackathon. Competition submission completed November 1, 2026 (KST). Account records, coordination notes and private checks stay in ignored local files. Published screenshots are listed with their exact SHA-256 in `scripts/reviewed-assets.json`.
