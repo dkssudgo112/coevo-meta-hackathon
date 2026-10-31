@@ -53,11 +53,18 @@ The recorded sample session includes a podcast made on request (its guest is a c
 
 ## Practice Range
 
-A new request arrives; you brief the AI out loud or by typing; Muse Image draws what your words produce; and the Caddie checks which details your brief includes.
+A short scene to rehearse what the session taught, in four steps:
 
-<img src="docs/img/practice.jpg" width="320" alt="Practice Range: the request, the typed brief, the drawn poster and the five details the brief names">
+1. **Request.** A fictional colleague brings a changed request in an illustrated scene, with the details you know laid out as notes. Opened from a session, it quotes that session's question from the Caddie when there is one; standalone practice uses none of your sessions.
+2. **Brief.** You brief the AI out loud or by typing. Muse Image draws a draft from your brief.
+3. **Judge.** You decide whether the draft is ready for the window, or which detail needs fixing, before the Caddie says anything. Then Muse Spark reads the draft against the notes (it never sees your brief), and the Caddie compares your call with that reading: what is missing, what it could not tell, and whether your brief named it.
+4. **Revise.** You brief it once more and see both drafts side by side.
 
-<sub>A separate sample session with a typed, scripted brief. The brief asks for a real photo; no photo was attached, so the check is about what the brief names.</sub>
+There is no score. The brief check only says which kinds of detail your words contain, not whether each value matches, and a generated image never counts as your real photo.
+
+![Practice Range on the phone: the scene with the colleague's request and the notes, the draft with the decision, the Caddie's feedback with the colleague's consequence lines, and the before-and-after comparison](docs/img/practice.jpg)
+
+<sub>A live run on the deployed app in a sample session: the scene, both drafts, the brief checks and the image readings are real model output (Muse Spark, Muse Image); the typed briefs and the call were scripted. Backdrops are original illustrations.</sub>
 
 ## Your AI learns too
 
@@ -81,7 +88,7 @@ Send an approved card as the first message of a dedicated chat and pin it. In se
 - **Muse Spark 1.3** reads each screen into a structured moment, decides whether to speak (and why it stays quiet), plans one learning design per session and writes the five formats.
 - **SAM 3.1** finds the monitor in one disclosed setup photo, so the phone crops on-device afterwards, and points at a poster's price, title or photo on a kept frame.
 - **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
-- **Muse Image** draws what a practice brief produces, and scenes for the short.
+- **Muse Image** draws the draft a practice brief produces, and scenes for the short; Muse Spark then reads that draft against the scene's notes.
 
 Podcast and short voices use the open-source **Kokoro-82M** (Apache-2.0) on Modal, because Meta's API has no text-to-speech.
 

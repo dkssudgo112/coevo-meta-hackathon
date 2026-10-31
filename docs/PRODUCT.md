@@ -43,7 +43,7 @@ The Caddie makes a format only when the session earned it; a skipped format show
 
 ## Practice Range
 
-A one-sentence request with a changed condition (new item, season or audience). The person briefs the AI out loud; Muse Image draws what those words produce; the brief is checked for ingredients. Viewing the hint, or an exercise opened by the Caddie, makes the attempt *with the Caddie*.
+A short scene in four steps, Request · Brief · Judge · Revise. Muse Spark writes the scene from the selected session only (standalone practice uses none): a fictional colleague, two or three lines with one changed condition, and five notes (who, price, feeling, real photo, product), each with what goes wrong without it. The person briefs the AI out loud or by typing; Muse Image draws a draft; Muse Spark checks the brief's words and, separately, reads the draft against the notes without seeing the brief. The person calls the draft ready, in need of one named fix, or worth starting over before any feedback; deterministic feedback then compares the call with the reading ("can't tell" stays unknown, the brief check never claims an exact value, and a generated image is never the person's photo). One revision follows; both drafts are compared with no score. Viewing the hint, or an exercise opened by the Caddie, makes the first brief and the call *with the Caddie*; the revision is always *with the Caddie*. The first brief, its image and labels never change. Attempts from before scenes keep their original layout.
 
 ## Evidence rules
 

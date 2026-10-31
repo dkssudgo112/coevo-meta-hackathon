@@ -117,9 +117,9 @@
     },
     {
       "path": "docs/img/practice.jpg",
-      "sha256": "f46427dc494157a974b0bbb680738f0abb3e129d19ed12ce1c5b84d887525a0b",
-      "review": "3× capture of the deployed phone Practice Range result sheet of the separate sample session (typed scripted brief, Muse Image poster, five checks), cropped above the footer. Reviewed visually by Claude, 2026-10-31; zero EXIF entries.",
-      "provenance": "Practice sample session: scripted typed brief; real model output."
+      "sha256": "d77a22d3823611beb46b1f371a82c85a4d26866da4fe4e17bf56c4c5ec815fe7",
+      "review": "Four 3× captures of the deployed phone Practice Range sheet (scene with notes, judge, feedback, before/after), placed side by side on the cream background; JPEG with no EXIF. Taken by Claude on 2026-10-31 from its own sample workspace: no ids, tokens, account areas or personal data; the posters are Muse Image drafts of a fictional café drink.",
+      "provenance": "Live run on the deployed app in a fixture (sample) session: the scene, both Muse Image drafts, the brief checks and Muse Spark's image readings are live-model output; the typed briefs and the call are scripted input. Backdrop: original illustration."
     },
     {
       "path": "docs/img/pinned-chat.jpg",
