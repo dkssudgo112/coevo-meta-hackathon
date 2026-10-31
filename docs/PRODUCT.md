@@ -45,6 +45,10 @@ The Caddie makes a format only when the session earned it; a skipped format show
 
 A short scene in four steps, Request · Brief · Judge · Revise. Muse Spark writes the scene from the selected session only (standalone practice uses none): a fictional colleague, two or three lines with one changed condition, and five notes (who, price, feeling, real photo, product), each with what goes wrong without it. The person briefs the AI out loud or by typing; Muse Image draws a draft; Muse Spark checks the brief's words and, separately, reads the draft against the notes without seeing the brief. The person calls the draft ready, in need of one named fix, or worth starting over before any feedback; deterministic feedback then compares the call with the reading ("can't tell" stays unknown, the brief check never claims an exact value, and a generated image is never the person's photo). One revision follows; both drafts are compared with no score. Viewing the hint, or an exercise opened by the Caddie, makes the first brief and the call *with the Caddie*; the revision is always *with the Caddie*. The first brief, its image and labels never change. Attempts from before scenes keep their original layout.
 
+## Explore without a phone
+
+The real service starts with the Desk and a phone. A secondary entrance at `/practice-preview` lets a visitor read the current fictional practice scene, inspect its recorded first draft, choose a response, and compare its recorded revision. Feedback uses the same deterministic rules as the live app over the saved Muse Spark reading. Visitor choices are local only: no account, camera, microphone, storage writes or API calls. They do not overwrite the recorded choice or become evidence of anyone’s ability. The separate `/sample` replay still shows the Caddie during work and all five formats.
+
 ## Evidence rules
 
 - Labels: `independent` (on your own), `coached` (with the Caddie), `ai-produced` (AI wrote it), `unobserved` (not seen yet). Strength: transfer to later real work > practice > in-task.

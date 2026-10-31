@@ -51,14 +51,14 @@
     },
     {
       "path": "apps/web/public/demo/coevo-caddie-demo.mp4",
-      "sha256": "4b468afd14935ad42ea66011314e1850efacd3fd6c19f7baf6e256c0b9eb46ab",
-      "review": "Demo film (160.4 s, 1920x1080 30 fps H.264 + AAC 48 kHz, 23,041,280 bytes; only standard encoder tags and a 'Made with Remotion' comment). Codex reviewed the previous cut (25203577…afdb) on 2026-10-31: 36 key frames, the independent review and fix pass, captions and the watch page; no credentials, QR codes, private account screens, personal data, local paths or raw IDs. These bytes add only the two pre-publication fact fixes the maintainer approved (Practice wording describes an input check; closing hackathon notice); every other scene was checked frame by frame against the reviewed cut (no visible change; PSNR ≥ 45 dB).",
-      "provenance": "Made with video-shotcraft (Apache-2.0) and Remotion from real captures of the deployed app: one live run (scripted, fictional café owner; actual Meta AI replies; assumed phone setup with a controlled camera; the synthetic spoken answer shown as waveform and stored transcript, not played), the published recorded live run (podcast excerpt, short), a separate Practice sample session and a separate pinned-chat check with a card approved in an earlier run; every scene tagged with its run. Setup illustration labeled. Narration Kokoro-82M (local); original synthesized music; CC0 Freesound effects."
+      "sha256": "97ce8420ce6871a9405f0da1efedd023fb8ac45c1b21f014177f8081577785ee",
+      "review": "172.394 s, 1920x1080 H.264 30 fps + AAC, 24,573,212 bytes. Codex reviewed 36 key frames, 12 changed Practice frames, captions and full decode on October 31, 2026. No account data, credentials, usable QR, private IDs or local paths. Claude checked audio, speech alignment, unchanged scenes and workbench parity. Standard encoder/Remotion metadata only.",
+      "provenance": "Video-shotcraft/Remotion film from deployed app captures. The Practice segment now shows one separate live sample with scripted briefs and a scripted price-fix choice: first draft, feedback, coached revision and comparison. Other live/recorded runs remain individually labeled, with assumed phone setup and event-period implementation notice. Local Kokoro narration, original synthesized BGM and CC0 effects."
     },
     {
       "path": "apps/web/public/demo/coevo-caddie-demo.en.vtt",
-      "sha256": "8dc4d16af2a72a64979ec4318e3e459d7abafb523414471170fedc054dc56ab0",
-      "review": "English captions for the demo film (40 cues: narration, three speaker-labelled lines from the earlier run's podcast and short, and the closing on-screen notice as a two-line cue with default placement, so players wrap it). Plain text; listed so the published bytes are recorded with the film.",
+      "sha256": "4fcedd902de7b79786bfe42a5c5b835fb7a01c51ac9791640a562def51713cae",
+      "review": "43 English caption cues for the 2:52 film, including new Practice narration and shifted closing notice. Plain text reviewed with the video; default-position closing cue can wrap in narrow players.",
       "provenance": "Generated from the film's narration script and measured timings (scripts/vtt.py in the film project)."
     },
     {
@@ -144,6 +144,18 @@
       "sha256": "17125e3bf137c42f7b6116539048cfd6732aef7136e60f60b4e8bedd2f738dd0",
       "review": "JPEG (quality 80, no EXIF) of an original backdrop (sha256 c80b62a44c35a95bfa959e712f451d0fd5a3b81ef68a6ba5e57159a8bdf166f6) that Codex generated and reviewed for public use on 2026-10-31: no people, faces, text, logos, brands, UI or real business; derivative metadata and hash reviewed by Codex. Re-encoded by Claude for the web.",
       "provenance": "Original illustrative scenery for the Practice Range scene stage (desk), generated for this project on 2026-10-31. Shown with the label \"Illustrative scene\"; not a photo of a real place and not model evidence."
+    },
+    {
+      "path": "apps/web/public/samples/practice/first.jpg",
+      "sha256": "4fbd9e7558a070318ca5496f63cb0b29532d1a2be8d35ad81222e2db21c6e976",
+      "review": "Visually reviewed by Codex: fictional peppermint mocha poster only, no account data, IDs or secrets. APP1 metadata removed without changing decoded pixels; standard JFIF metadata remains.",
+      "provenance": "Muse Image output from the deployed Practice Range live sample on October 31, 2026. Typed scripted brief; not a real user or real photo. The revised draft includes a placeholder for a photo that was not attached."
+    },
+    {
+      "path": "apps/web/public/samples/practice/revised.jpg",
+      "sha256": "1ea3baac215c617530d6fe00f09aa2bdeb51e47d13107cee6b0313a5f0566aa6",
+      "review": "Visually reviewed by Codex: fictional peppermint mocha poster only, no account data, IDs or secrets. APP1 metadata removed without changing decoded pixels; standard JFIF metadata remains.",
+      "provenance": "Muse Image output from the deployed Practice Range live sample on October 31, 2026. Typed scripted brief; not a real user or real photo. The revised draft includes a placeholder for a photo that was not attached."
     }
   ]
 }

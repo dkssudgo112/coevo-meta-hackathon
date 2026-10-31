@@ -50,6 +50,7 @@ export function Landing() {
               <span className="faint">Four short steps. You will need your phone.</span>
             </div>
           )}
+          <a className="preview-entry" href="/practice-preview">Explore a practice scene — no phone needed <span aria-hidden="true">→</span></a>
         </div>
       </section>
       <SetupIllustration />
@@ -92,6 +93,7 @@ export function Landing() {
         <h2 id="see-first">Want to see it first?</h2>
         <div className="row wrap" style={{ gap: 12 }}>
           <a className="btn" href="/demo">Watch the demo</a>
+          <a className="btn" href="/practice-preview">Explore the Practice Range</a>
           <a className="btn" href="/sample">Replay a recorded session</a>
         </div>
         <p className="faint">The recorded session replays one live run on a scripted, fictional café, with no new model calls.</p>

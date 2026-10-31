@@ -97,66 +97,78 @@ Podcast, the Caddie: “You wrote, ‘The new dessert is matcha basque cheesecak
 Short: “What happens when you ask for premium three times without a brief?”
 
 25
-00:01:50.000 --> 00:01:53.249
-In the Practice Range, you brief a new request.
+00:01:50.000 --> 00:01:53.693
+In the Practice Range, a colleague asks for a poster.
 
 26
-00:01:53.249 --> 00:02:00.025
-Muse Image draws what your words produce, and the Caddie checks which details your brief includes.
+00:01:53.693 --> 00:01:58.153
+Your brief leaves out the price, and so does Muse Image's draft.
 
 27
-00:02:02.000 --> 00:02:03.446
-Your AI learns too.
+00:01:58.153 --> 00:02:01.150
+You call it, before the Caddie says a word.
 
 28
-00:02:03.446 --> 00:02:05.500
-The Caddie proposes a card.
+00:02:03.000 --> 00:02:08.289
+One revised brief later, Muse Spark sees the price, and who it's for.
 
 29
-00:02:05.500 --> 00:02:10.675
-You approve it, and pin it as the first message of a dedicated chat.
+00:02:08.289 --> 00:02:11.125
+The real photo is still yours to add.
 
 30
-00:02:11.867 --> 00:02:18.824
-In a separate check, asked for a new drink poster, Meta AI asked those five questions first.
+00:02:14.000 --> 00:02:15.446
+Your AI learns too.
 
 31
-00:02:18.824 --> 00:02:20.942
-And the Caddie stayed quiet.
+00:02:15.446 --> 00:02:17.500
+The Caddie proposes a card.
 
 32
-00:02:22.000 --> 00:02:23.636
-Four Meta models.
+00:02:17.500 --> 00:02:22.675
+You approve it, and pin it as the first message of a dedicated chat.
 
 33
-00:02:23.636 --> 00:02:26.428
-Muse Spark reads and decides.
+00:02:23.867 --> 00:02:30.824
+In a separate check, asked for a new drink poster, Meta AI asked those five questions first.
 
 34
-00:02:26.428 --> 00:02:27.872
-SAM 3.1 points.
+00:02:30.824 --> 00:02:32.942
+And the Caddie stayed quiet.
 
 35
-00:02:27.872 --> 00:02:30.279
-Voice Transcribe listens.
+00:02:34.000 --> 00:02:35.636
+Four Meta models.
 
 36
-00:02:30.279 --> 00:02:32.300
-And Muse Image draws.
+00:02:35.636 --> 00:02:38.428
+Muse Spark reads and decides.
 
 37
-00:02:34.333 --> 00:02:35.410
-Keep your AI.
+00:02:38.428 --> 00:02:39.872
+SAM 3.1 points.
 
 38
-00:02:35.000 --> 00:02:40.333
+00:02:39.872 --> 00:02:42.279
+Voice Transcribe listens.
+
+39
+00:02:42.279 --> 00:02:44.300
+And Muse Image draws.
+
+40
+00:02:46.333 --> 00:02:47.410
+Keep your AI.
+
+41
+00:02:47.000 --> 00:02:52.333
 [On screen] Coevo Caddie app: newly implemented during this hackathon.
 Based on my earlier Coevo concept.
 
-39
-00:02:35.410 --> 00:02:38.226
+42
+00:02:47.410 --> 00:02:50.226
 And add a caddie, right beside it.
 
-40
-00:02:38.226 --> 00:02:39.633
+43
+00:02:50.226 --> 00:02:51.633
 Try Coevo Caddie.

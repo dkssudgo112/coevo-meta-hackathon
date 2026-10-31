@@ -5,6 +5,7 @@ import { CaddieApp } from './phone/Caddie.tsx';
 import { DeskApp } from './desk/Desk.tsx';
 import { SampleApp } from './desk/Sample.tsx';
 import { DemoPage } from './Demo.tsx';
+import { PracticePreview } from './desk/PracticePreview.tsx';
 import './style.css';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
   if (path === '/desk') return <DeskApp />;
   if (path === '/sample') return <SampleApp />;
   if (path === '/demo') return <DemoPage />;
+  if (path === '/practice-preview') return <PracticePreview />;
   return <Landing />;
 }
 

@@ -61,3 +61,11 @@ A Caddie card counts as *observed working* only when it was applied (not merely 
 ## October 31, 2026 — Meta lifetime total raised to US$100
 
 The maintainer raised the approved Meta Model API total from US$3.00 to **US$100 in total, including what was already spent** ($1.4059 at the time). It is one lifetime total for the deployment, not per run, day or workspace, and not a reason to spend more than the work needs. The same global `Budget` object, ledger, start time, reservations and once-only settlement stay in place; only the ceiling changes, and configuration may still lower it but never raise it above $100. Per-workspace ($0.60/day) and per-sample ($0.30) limits are unchanged. Modal media keeps its separate $0.90 ceiling. This entry replaces the $3.00/$2.50 figures in the October 30 entries above.
+
+## October 31, 2026 — A scene you judge and revise
+
+Practice became a four-stage scenario: a fictional colleague’s changed request, the person’s brief, their judgment of an AI draft before feedback, and one coached revision. The brief check and the image reading remain separate. Unknown visual details never become success; a generated image cannot stand for an unattached real photo. The first attempt and its labels remain unchanged, and the person returns to the same session. The earlier product was a design reference only; this implementation and its original scenery were made during the event.
+
+## October 31, 2026 — A short public Practice walkthrough
+
+The maintainer approved aligning the final video, judge experience and submission material. `/practice-preview` uses a selected, reviewed live sample with scripted input. Visitors can explore choices against the saved reading and see the recorded revision without accounts or new model calls. Their choices are not saved or credited as performance. Only whitelisted fictional content and reviewed image bytes are published, with no workspace identity or credentials. Real service onboarding remains primary; the work-session replay remains available. This finishing pass adds no model, new content format or account requirement.

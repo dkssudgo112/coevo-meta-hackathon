@@ -119,9 +119,10 @@ Last updated: 2026-10-31 (KST).
 | H2 | Health/status, security headers, rate limits | ☑ | ☑ | ☐ | deployed integration 17/17: CSP, Permissions-Policy, frame 429, admin routes closed, test mode off | |
 | H3 | Application-enforced budget: US$100 lifetime total including earlier spend (raised from $2.50 on Oct 31, same ledger), single authority; per workspace and per sample caps | ☑ | ☑ | ☐ | unit (36): ledger rules, exact pre-dispatch reservation from counted input tokens, refusal when unverifiable, missing usage kept, ambiguous failures kept, Retry-After honored, no-bypass guards; real Durable Object (`npm run test:budget`): a configured $1000 is clamped to $100 and a lower configured $2.50 is respected; concurrent reservations never exceed the ceiling; after a restart the ledger keeps its spend, start time and reservation count; durable tickets settle once (duplicate, unknown and 20 concurrent settles); tickets reserved before a restart settle once after it; priced model allowlist and WAV-derived audio cost; live: every real call reserved and settled through the deployment; a full session cost Meta $0.163 | |
 | H4 | Three entrances: camera / photo / sample session (live model, fixture frames labeled) | ☑ | ◐ | ☐ | live: the full public sample on the deployed app (all five formats, $0.2034 Meta + $0.08 media reservation); a labeled recorded live run of it replays with no model calls as the default preview (deployed; exact reviewed bytes; reviewer fact-check notes beside the output) | Physical phone camera not measured (assumed setup); the camera path ran in a phone-sized browser with a controlled camera |
-| H5 | English docs, reproducible setup | ◐ | ☐ | ☐ | | |
-| H6 | Demo video under three minutes | ☑ | ☐ | ☐ | Oct 31: a 2:40 film from real captures of the deployed app, published at /demo with English captions; every scene tagged with its run; exact published bytes in `scripts/reviewed-assets.json` | Signed-out playback is checked after each deploy |
-| H7 | Submission texts ready (not submitted) | ☐ | ☐ | ☐ | | R8 |
+| H9 | No-phone walkthrough of the current Practice scene | ☑ | ☑ | ☑ | Local browser: ready/fix/redo branches, back/restart/reload, 320/390/1280px, no horizontal overflow; 57 observed requests, zero app API calls and zero non-GET requests. Public recording excludes workspace IDs/credentials; first draft and revision remain distinct | Recorded model output with scripted input; visitor choices are local and not performance evidence |
+| H5 | English docs, reproducible setup | ☑ | ◐ | ◐ | English UI/README and setup commands; typecheck, build, Worker dry-run and doctor pass in the development checkout | Fresh-machine installation has not been independently tested |
+| H6 | Demo video under three minutes | ☑ | ◐ | ☑ | Oct 31: 172.394 s film with the current Practice scene, judgment and before/after revision; 43 English caption cues, full decode and key-frame review; every scene tagged with its run; exact bytes in `scripts/reviewed-assets.json` | Public playback and served hashes checked after deployment |
+| H7 | Submission texts ready (not submitted) | ☑ | ☑ | ☑ | Oct 31: current English text and app/replay/video links in SUBMISSION.md; all four narrative fields matched the official form after staging; required survey choices preserve the maintainer’s answers | Optional new survey questions blank; marketing consent and Submit untouched; no submission receipt |
 | H8 | Public repository audit (release check, signed-out access) | ☑ | ◐ | ☐ | Oct 30: signed-out requests to the repository page and raw docs return 200 and show the latest README; Gitleaks over the full history (59 commits): no leaks; no private, account, local-notes or secret paths in any commit; every commit uses the noreply address; the release check reads the staged index with an exact-hash allowlist for binaries | Re-run before submission; project license still the maintainer's decision |
 
 ## Technical spikes (approved plan §6.3)
@@ -139,13 +140,15 @@ Last updated: 2026-10-31 (KST).
 
 ## Screen states
 
+This is the detailed scenario checklist, not a percentage-complete estimate. Unchecked cells mean that case has not been individually recorded here. The evidence paragraphs and per-requirement rows above state what was actually verified; the agreed assumed-phone setup does not become a physical-device claim.
+
 | Screen | Waiting | Empty | Failure | Partial success | Retry | Return to context | Delete / revoke |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Phone · Pair | ☐ | ☐ | ☐ | — | ☐ | ☐ auto re-pair | — |
 | Phone · Live | ◐ reading | ◐ "Work as usual" | ◐ paused — connection; can't read → tilt or photo | ☐ | ◐ quiet retry of an unreadable frame (camera, code) | ◐ answer in progress kept; newer question waits | ☐ pause |
 | Phone · Session wrap | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ card reject/revoke |
 | Phone · Players | ☐ | — | ☐ | ☐ | ☐ | ☐ podcast resume | — |
-| Phone · Practice Range | ☐ | — | ☐ | ☐ | ☐ | ☐ | — |
+| Phone · Practice Range | ☑ | — | ◐ | ☑ | ◐ | ☑ | — |
 | Phone · Drawer | — | ☐ | — | — | — | ☐ | ☐ frames, session |
 | Desk | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ frames, card revoke |
 

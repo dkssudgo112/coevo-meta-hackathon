@@ -19,18 +19,19 @@ Submit through the [event platform](https://cerebralvalley.ai/e/meta-ai-develope
 | 11 | Partner technology feedback | Draft below |
 | 12–13 | Likelihood and opinion surveys | The maintainer's own answers (recorded privately) |
 | 14 | Consent checkbox | The maintainer decides at final submission |
-| 15 | Submit | The maintainer only |
+| 15–22 | Optional recommendation and product-feedback questions | Added to the platform by October 31; left blank unless the maintainer chooses to answer |
+| 23 | Submit | The maintainer only |
 
 ## Before publication
 
-- [ ] Only event-period code and properly licensed dependencies/assets (Kokoro-82M Apache-2.0; fonts via Google Fonts OFL).
-- [ ] `npm run verify` and `npm run check:release -- --staged` pass; the exact staged diff and commit metadata reviewed.
-- [ ] No secrets, private notes, account screenshots, raw sessions or personal frames.
+- [x] Only event-period code and properly licensed dependencies/assets (Kokoro-82M Apache-2.0; fonts via Google Fonts OFL).
+- [x] `npm run verify` and `npm run check:release -- --staged` pass; the exact staged diff and commit metadata reviewed.
+- [x] No secrets, private notes, account screenshots, raw sessions or personal frames.
 - Optional: a project license is the maintainer's choice. The competition requires a public repository, not a license.
 - [x] README explains the earlier concept and the new implementation; the demo's closing scene says the same ("Coevo Caddie app: newly implemented during this hackathon. Based on my earlier Coevo concept.").
-- [ ] Claims match evidence: real model output, fixture data and simulated persona tests are labeled.
+- [x] Claims match evidence: real model output, fixture data and simulated persona tests are labeled.
 
-## Demo storyboard (2:40)
+## Demo storyboard (2:52)
 
 The film at /demo was made with [video-shotcraft](https://github.com/Vincentwei1021/video-shotcraft) and Remotion from real captures of the deployed app. One persona and one live run carry the story: a scripted, fictional café owner and actual Meta AI replies. The phone is **assumed** to stand beside the monitor, as in the earlier Coevo project: the phone screens come from a live run in a phone-sized browser with a controlled camera, and the spoken answer was a synthetic voice, whose audio the film does not play (it shows a waveform and the transcript exactly as stored). A tag on each scene names its run. The opening setup picture is a labeled illustration; the narration is a synthetic voice (Kokoro-82M), and English captions ship with the player. No development budget or cost figures appear in the film.
 
@@ -44,10 +45,10 @@ The film at /demo was made with [video-shotcraft](https://github.com/Vincentwei1
 | 1:02–1:13 | The brief changes | Before and after Meta AI screens (berry poster → matcha poster with its price), labeled *with the Caddie*; SAM 3.1's price marker. |
 | 1:13–1:27 | What the session leaves | The Desk's five rows: note, playbook, flashcards, short, and no podcast, with the reason it gave. |
 | 1:27–1:49 | Earlier recorded run | An excerpt of its two-voice podcast and the opening of its vertical short. |
-| 1:49–2:01 | Practice Range | A separate sample session: a typed, scripted brief and the poster Muse Image drew from it; the Caddie checks which details the brief includes (all five named: audience, price, mood, that it asks for a real photo, and product detail; no photo was attached). |
-| 2:01–2:21 | Your AI learns too | This run's card stays proposed. A separate pinned Meta AI chat that began with a card approved in an earlier run: asked for a new drink poster, Meta AI asks five questions first, and the Caddie stays quiet. |
-| 2:21–2:33 | Four Meta models | Muse Spark reads and decides, SAM 3.1 points, Muse Voice Transcribe listens, Muse Image draws. |
-| 2:33–2:40 | Close | "Keep your AI. Add a caddie beside it." The app URL and the notice: "Coevo Caddie app: newly implemented during this hackathon. Based on my earlier Coevo concept." |
+| 1:49–2:13 | Practice Range | One separate live sample: Maya’s request and price notes → a scripted brief without the price → first draft without a price → a price-fix choice saved before feedback → the Caddie’s answer from Muse Spark’s reading → one coached revision → both drafts and their comparison. Prices and audience are now visible in that reading; the real photo is still the person’s to add. |
+| 2:13–2:33 | Your AI learns too | This run's card stays proposed. A separate pinned Meta AI chat that began with a card approved in an earlier run: asked for a new drink poster, Meta AI asks five questions first, and the Caddie stays quiet. |
+| 2:33–2:45 | Four Meta models | Muse Spark reads and decides, SAM 3.1 points, Muse Voice Transcribe listens, Muse Image draws. |
+| 2:45–2:52 | Close | "Keep your AI. Add a caddie beside it." The app URL and the notice: "Coevo Caddie app: newly implemented during this hackathon. Based on my earlier Coevo concept." |
 
 ## Draft texts (finalize only with verified numbers)
 
@@ -60,19 +61,24 @@ People stuck with an AI tool often repeat vague requests like "make it more prem
 - **It watches quietly.** The camera reads your screen only when it changes, and only the boxed screen area leaves the phone (plus one disclosed setup photo if you ask it to find your screen).
 - **It decides when to speak.** Muse Spark decides whether to step in, always with a reason, and staying quiet is a decision too. When it steps in, it asks one question in your own words, and you answer out loud.
 - **It makes only what the session earned.** Afterwards you get a note, a playbook, applied flashcards, a two-voice podcast you can interrupt, and a 9:16 short built on your own before/after screens.
+- **You rehearse the next decision.** A fictional colleague brings a changed request in the Practice Range. You brief the AI, judge its draft before feedback, and revise once. Muse Spark checks the words and reads the image separately; the before-and-after view keeps what you said distinct from what the AI actually drew. The first attempt stays intact and the revision is labeled with the Caddie.
 - **Your AI learns too.** It proposes a Caddie card for your AI. Approve it and start a pinned chat with it, and next time your AI asks the right questions first while the Caddie stays quiet.
 
 Evidence is labeled honestly: on your own, with the Caddie, AI wrote it, or not seen yet.
 
-What is real: every Caddie line, every note, playbook, flashcard, podcast script and short script, and every practice image is written or drawn live by Meta's models through the deployed app; the podcast and short voices are Kokoro-82M text-to-speech on Modal. The café owner and job applicant are scripted, fictional personas; the AI screens are actual replies to those scripts. As in our earlier Coevo work, the phone is assumed to stand beside the monitor: the phone screen is verified in a phone-sized browser with a controlled camera and a synthetic voice, so physical camera accuracy and a human voice were not measured.
+What is real: screen readings, intervention messages, scenarios, notes, playbooks, flashcards, podcast and short scripts, and practice images were produced by Meta's models through the deployed app. Deterministic rules enforce evidence labels and compare a person's Practice judgment with the model's image reading. The podcast and short voices are Kokoro-82M text-to-speech on Modal. The café owner and job applicant are scripted, fictional personas; the AI screens are actual replies to those scripts. As in our earlier Coevo work, the phone is assumed to stand beside the monitor: the phone screen is verified in a phone-sized browser with a controlled camera and a synthetic voice, so physical camera accuracy and a human voice were not measured.
 
 Demo: https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo
 
-Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone, or /sample with no phone. The sample replays a labeled recorded live run on screenshots of actual Meta AI replies to a scripted, fictional café scenario — the Caddie's real output, five formats, podcast and short — with no new model calls; "Run it live" makes fresh calls. Model spend is capped by the app.
+Live app: https://coevo-caddie.coevo-meta-hackathon.workers.dev. Open /desk on a computer and /caddie on a phone.
+
+No-phone walkthrough: https://coevo-caddie.coevo-meta-hackathon.workers.dev/practice-preview. Explore the new Practice scene, judge its saved first draft and compare the recorded revision. The scene, images and readings are real model outputs from a scripted sample; visitor choices are local, not saved or sent to a model.
+
+Work-session replay: https://coevo-caddie.coevo-meta-hackathon.workers.dev/sample. This labeled recording shows actual Meta AI replies, the Caddie's output, five formats, podcast and short with no new model calls. "Run it live" makes fresh calls.
 
 **9 · Use of Meta products**
 
-- **Muse Spark 1.3** reads phone photos of any AI tool's screen into structured moments. It decides each intervention, or each silence, with deterministic guardrails. It writes one learning design per session and the five formats from it. It also writes and checks Practice Range requests.
+- **Muse Spark 1.3** reads phone photos of any AI tool's screen into structured moments. It decides each intervention, or each silence, with deterministic guardrails. It writes one learning design per session and the five formats from it. In the Practice Range it writes a scene, checks the person's brief, and separately reads the generated draft against the scene's facts without seeing that brief.
 - **SAM 3.1** finds the monitor on one disclosed setup photo, so the phone crops on-device afterwards. It also points at a poster's price, title or product photo on a kept frame for visual coaching ("The price isn't visible."); on a real Meta AI screenshot it boxed the poster's price and title and ignored the same price in the chat.
 - **Muse Voice Transcribe** turns spoken answers and practice briefs into text.
 - **Muse Image** draws what a spoken or typed practice brief produces, and the background scenes of the short.
@@ -82,7 +88,7 @@ All model calls are server-side with Standard models, strict JSON schemas, and a
 
 **10 · Why Meta's models matter**
 
-Seeing the screen is what makes the Caddie work with every AI tool without integrations. Muse Spark's image understanding turns a phone photo of ChatGPT, Gemini or Meta AI into the same structured moment. SAM 3.1 keeps the room out of every later frame. Voice Transcribe lets a busy café owner answer while working, and those spoken details become the brief. Muse Image closes the loop in practice: you hear your own words, then see what they produce.
+Seeing the screen is what makes the Caddie work across AI tools without integrations. Muse Spark's image understanding turns a phone photo of ChatGPT, Gemini or Meta AI into the same structured moment. After a manual crop or SAM 3.1's screen suggestion, the phone crops later frames on-device. Voice Transcribe lets a busy café owner answer while working. In practice, Muse Image draws the person's brief, and Muse Spark reads what that draft actually shows: naming a price is different from the price appearing in the image. The person judges it and revises, with both drafts preserved.
 
 **11 · Partner technology feedback**
 
@@ -99,3 +105,4 @@ Modal runs the open-source Kokoro-82M text-to-speech and the ffmpeg composition 
 - The full flow at phone size (assumed setup: controlled camera on actual Meta AI screens, synthetic voice): quiet twice → a question → the spoken answer transcribed → the ingredients step → the brief labeled with the Caddie, with SAM 3.1's price pointer → a wrap that skipped the podcast for a stated reason; $0.1465.
 - Another tool: on four actual ChatGPT screens (scripted, fictional cover letter) the live Caddie read the tool and each request, stayed quiet twice, then asked one question; $0.038.
 - Persona simulations: see the labeled simulation section (never real-user evidence).
+- The current Practice scene (scripted, typed sample on the deployed app): first brief omitted price/photo; Muse Spark found the price missing and the audience unclear in the draft; a recorded price-fix choice preceded feedback; one coached revision showed prices and audience, while the unattached real photo remained missing by rule. These are functional results, not measured learning gains.

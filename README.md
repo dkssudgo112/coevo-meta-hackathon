@@ -2,7 +2,7 @@
 
 **A coach on the phone beside your screen.** Keep working in your usual AI tool. The Caddie watches the screen from your phone, stays quiet while you are on track, and asks one short question when you are stuck. Afterwards it leaves you only what helps, and your AI can learn to ask the right questions first.
 
-**[Watch the demo (2:40)](https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo)** · **[Try it](https://coevo-caddie.coevo-meta-hackathon.workers.dev)** · **[Replay a recorded session, no phone needed](https://coevo-caddie.coevo-meta-hackathon.workers.dev/sample)**
+**[Watch the demo (2:52)](https://coevo-caddie.coevo-meta-hackathon.workers.dev/demo)** · **[Start using Coevo](https://coevo-caddie.coevo-meta-hackathon.workers.dev)** · **[Explore a practice scene, no phone needed](https://coevo-caddie.coevo-meta-hackathon.workers.dev/practice-preview)** · **[Replay a work session](https://coevo-caddie.coevo-meta-hackathon.workers.dev/sample)**
 
 ![The recorded sample session: an actual Meta AI reply on the left, the Caddie's question on the phone on the right](docs/img/hero.jpg)
 <sub>The recorded sample session (`/sample`): an actual Meta AI reply to a scripted café owner (left) and the Caddie's question on the phone (right).</sub>
@@ -53,6 +53,8 @@ The recorded sample session includes a podcast made on request (its guest is a c
 
 ## Practice Range
 
+[Explore this scene without a phone or sign-in.](https://coevo-caddie.coevo-meta-hackathon.workers.dev/practice-preview) Read Maya’s notes, make a choice about the recorded draft, and compare the saved revision. This public walkthrough uses reviewed live model outputs; choices stay in the page and trigger no new model calls. The real service starts from the Desk and phone flow above.
+
 A short scene to rehearse what the session taught, in four steps:
 
 1. **Request.** A fictional colleague brings a changed request in an illustrated scene, with the details you know laid out as notes. Opened from a session, it quotes that session's question from the Caddie when there is one; standalone practice uses none of your sessions.
@@ -80,7 +82,7 @@ Send an approved card as the first message of a dedicated chat and pin it. In se
 ## Honest by design
 
 - Every observation is labeled *on your own*, *with the Caddie*, *AI wrote it* or *not seen yet*. *Not seen yet* never means you can't.
-- Nothing the Caddie says is pre-written. Readings, decisions and content are live model output; when a call is off, refused or fails, the app says so instead of inventing output.
+- Readings, intervention messages, scenarios and content come from Meta models. Deterministic rules enforce evidence labels and turn saved Practice readings into feedback. Public replays say when they use recorded output; when a live call is off, refused or fails, the app says so instead of inventing output.
 - The café owner is scripted and fictional; the AI screens are actual replies to that script. Physical phone-camera accuracy and a human voice were not measured: the phone setup is verified in a phone-sized browser with a controlled camera and a synthetic voice. Details: [Current status](docs/STATUS.md) · [Verification matrix](docs/VERIFICATION.md).
 
 ## Built on Meta's models
@@ -96,7 +98,7 @@ Built for the 2026 Meta Global AI Developer Hackathon (Indie Developer · Build 
 
 ## Run it yourself
 
-Requirements: Node.js 22.12+ and npm. Python 3.12+ with ffmpeg, numpy and Pillow for the optional media checks.
+Tested environment: Node.js 26.7.0 and npm. Python 3.12+ with ffmpeg, numpy and Pillow for the optional media checks.
 
 ```bash
 git clone https://github.com/dkssudgo112/coevo-meta-hackathon.git

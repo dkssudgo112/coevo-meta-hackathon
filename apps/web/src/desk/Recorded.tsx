@@ -148,9 +148,10 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
   return (
     <ReplayContext.Provider value={true}>
       <div className="desk">
-        <header className="desk-top">
+        <header className="desk-top wrap">
           <Flag state="watching" />
           <h2 className="grow">Sample session <span className="tag">{run.label}</span></h2>
+          <a className="btn small" href="/practice-preview">Explore the Practice Range</a>
           <button className="btn small" onClick={onLive}>Run it live instead</button>
         </header>
         <div className="stack" style={{ gap: 4 }}>
@@ -214,7 +215,7 @@ export function RecordedRunView({ run, manifest, onLive }: { run: RecordedRun; m
         ) : null; })()}
         <p className="faint">This run cost ${run.cost.metaUsd.toFixed(4)} in Meta usage plus a ${run.cost.mediaReservationUsd.toFixed(2)} media reservation. {run.cost.note}</p>
         {i === steps.length - 1 && (
-          <div className="notice">{run.notes[2]} <button className="btn small" onClick={onLive}>Run it live yourself</button> <a className="btn small" href="/desk">Use it with your phone</a></div>
+          <div className="notice">{run.notes[2]} <a className="btn small" href="/practice-preview">Explore a practice scene</a> <button className="btn small" onClick={onLive}>Run it live yourself</button> <a className="btn small" href="/desk">Use it with your phone</a></div>
         )}
       </div>
     </ReplayContext.Provider>
