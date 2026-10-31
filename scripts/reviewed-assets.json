@@ -57,8 +57,8 @@
     },
     {
       "path": "apps/web/public/demo/coevo-caddie-demo.en.vtt",
-      "sha256": "dc944a6f0e760a24560e8948dc27ea3da67e0681ef658542c31cc078a6fff003",
-      "review": "English captions for the demo film (40 cues: narration, three speaker-labelled lines from the earlier run's podcast and short, and the closing on-screen notice). Plain text; listed so the published bytes are recorded with the film.",
+      "sha256": "8dc4d16af2a72a64979ec4318e3e459d7abafb523414471170fedc054dc56ab0",
+      "review": "English captions for the demo film (40 cues: narration, three speaker-labelled lines from the earlier run's podcast and short, and the closing on-screen notice as a two-line cue with default placement, so players wrap it). Plain text; listed so the published bytes are recorded with the film.",
       "provenance": "Generated from the film's narration script and measured timings (scripts/vtt.py in the film project)."
     },
     {
