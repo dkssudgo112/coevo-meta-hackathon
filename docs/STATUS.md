@@ -34,9 +34,11 @@ These were checked in the test build in a browser, with scripted fake models and
 - **Unreadable screens and lost connections.** An unreadable camera frame is retried quietly; after three in a row the phone asks to tilt it or take one photo. A model or network failure shows "Caddie paused — connection." without an empty card.
 - **Judging and checking habits.** Besides describing and delegating, the habits list can now record judging the AI's output (the person tells the AI to fix a wrong or invented detail) and checking (the person tells the AI not to invent details), only from what the request explicitly says. This one has also run live once: an actual Meta AI screen where the scripted owner rejects the invented opening hours was read correctly and both habits were recorded.
 
-## Resolved deployment issue
+## Resolved deployment issues
 
 - **Workspaces placed in Hong Kong could not reach Meta's API (found and fixed Oct 31).** What looked like intermittent provider outages was where each workspace's server object was created. Meta calls are made from that object, which stays where it was first created; objects placed in Hong Kong got 404 `model_not_found` for every model, while the same calls from the US or the maintainer's computer worked (a free diagnostic probe showed both in the same minute). New workspaces are now created in Cloudflare's US jurisdiction, which fixes where they run. An older workspace that finds itself in a restricted region copies its data and token hashes to a new US workspace, and the paired phone and Desk switch to it on their next request with no re-pairing. After the copy is verified, the old object retains only its routing record. The recorded sample is unaffected.
+
+- **Idle connections exhausted the Cloudflare Free duration allowance (Oct 31).** Open SSE streams and their heartbeat timer kept workspace objects awake. Live updates now use hibernatable WebSockets with authenticated attachments and runtime heartbeats. Local tests observed the object leave memory while the socket stayed connected; production authentication, pairing, push updates, heartbeat and reconnect were checked after deployment. Existing pages from before this change need one reload; their pairing is kept. The account still has finite provider quotas. Static video ranges are streamed, using build metadata when the asset binding omits the file length; concurrent range checks and anonymous playback passed.
 
 ## Verified in the assumed setup (browser, controlled camera)
 
