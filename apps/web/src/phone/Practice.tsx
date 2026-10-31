@@ -243,9 +243,21 @@ function Labels({ p }: { p: PracticeAttempt }) {
   return (
     <>
       <div className="row wrap">{p.fixture ? <FixtureTag /> : p.fixture === null ? <span className="faint">Origin not recorded</span> : null}{p.autoOpened && <span className="faint">Opened by the Caddie</span>}</div>
-      {p.fixture && <p className="faint">{practiceSampleLine(p.briefSource, p.provenance)}</p>}
+      {p.fixture && <p className="faint">{p.scene ? sceneSampleLine(p) : practiceSampleLine(p.briefSource, p.provenance)}</p>}
     </>
   );
+}
+
+/** Names only what exists so far, and who made it. */
+function sceneSampleLine(p: PracticeAttempt): string {
+  const made = ['the scene'];
+  if (p.transcript && p.briefSource === 'spoken') made.push('the transcript');
+  if (p.imageStatus === 'ready' || p.revision?.imageStatus === 'ready') made.push('the drafts');
+  if (p.ingredients) made.push('the brief check');
+  if (p.readingStatus === 'ready' || p.revision?.readingStatus === 'ready') made.push('the image reading');
+  const by = p.provenance === 'fixture' ? 'from the test model' : 'real model output';
+  const input = p.transcript ? 'The briefs and the call are scripted input' : 'Any brief or call here is scripted input';
+  return `Sample: scripted practice, not a real person’s attempt. ${input}; ${made.join(', ').replace(/, ([^,]*)$/, ' and $1')} ${made.length > 1 ? 'are' : 'is'} ${by}.`;
 }
 
 /** Speak or type a brief; used for the first brief and for the revision. */
