@@ -21,8 +21,14 @@ export const PRICES = {
  */
 export const META_APPROVED_TOTAL_USD = 100;
 export const META_OPERATING_CEILING_USD = META_APPROVED_TOTAL_USD;
-/** Modal uses its own separately verified free balance ($1.00); stay below it. */
-export const MODAL_CEILING_USD = 0.9;
+/** Safe default for an account whose only verified compute allocation is $1. */
+export const MODAL_DEFAULT_CEILING_USD = 0.9;
+/**
+ * A funded deployment may opt in to $25 total, below the verified $30 monthly compute credit.
+ * Its Modal account must also enforce a $0 net spend limit and a $25 gross usage limit.
+ * Keep prior reservations: this is a lifetime ceiling, never a monthly reset.
+ */
+export const MODAL_CEILING_USD = 25;
 
 /**
  * Explicit priced allowlist per operation (Standard tier, USD, from the public
@@ -55,8 +61,9 @@ export function lifetimeCap(configured: string | undefined): number {
 }
 
 export function modalCap(configured: string | undefined): number {
+  if (!configured?.trim()) return MODAL_DEFAULT_CEILING_USD;
   const n = Number(configured);
-  return Number.isFinite(n) && n > 0 ? Math.min(n, MODAL_CEILING_USD) : MODAL_CEILING_USD;
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, MODAL_CEILING_USD) : MODAL_DEFAULT_CEILING_USD;
 }
 
 /** Lifetime ledger. No date field on purpose: day rollover can never reset it. */

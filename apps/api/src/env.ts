@@ -11,7 +11,7 @@ export interface Env extends MetaEnv, MediaEnv {
   COEVO_AI_MODE?: string;
   /** Lifetime spend ceiling for all paid calls, in USD. */
   COEVO_LIFETIME_CAP_USD?: string;
-  /** Modal media ceiling (separate free balance). Can only lower the built-in ceiling. */
+  /** Modal lifetime ceiling: defaults to $0.90; explicit funded opt-in is clamped to $25. */
   COEVO_MODAL_CAP_USD?: string;
   /** Enables /api/admin/* (ledger view, external reservations). Absent = routes do not exist. */
   COEVO_ADMIN_TOKEN?: string;

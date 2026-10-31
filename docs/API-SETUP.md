@@ -59,6 +59,12 @@ COEVO_ALLOW_MODAL_COMPUTE=true uv run modal run --profile coevo-hackathon --env 
 
 No GPU is configured in this example. Promotional credit claims, a successful token check, and actual available compute are separate states.
 
+### Keep media within free compute
+
+Confirm the workspace's included compute credit in Modal before raising the application allowance. In Modal's Usage & Billing page, set a **net spend limit of $0** and a **gross usage limit below the available compute credit**. These are different controls: gross usage includes credits; net spend is what would be charged after credits.
+
+The app defaults to a separate $0.90 Modal lifetime ceiling. A funded deployment can explicitly set server-side `COEVO_MODAL_CAP_USD="25"`, which is clamped to $25 and never resets the existing ledger. Zero disables new media reservations. Raise this allowance only after verifying sufficient compute credits and saving the provider's zero net spend limit. Keep deployment-specific configuration out of public examples. Volume charges and products not covered by compute credits require a separate review before use; this media service uses CPU functions and private R2 rather than Modal Volumes or Shared Endpoints.
+
 ## Media service (Modal)
 
 `infra/modal/media.py` runs Kokoro-82M text-to-speech (Apache-2.0) and ffmpeg on CPU. It has no warm containers. Deploy only after checking credits:

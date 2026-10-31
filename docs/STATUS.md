@@ -69,8 +69,11 @@ The landing page now starts the real service: *Start on this computer* opens the
 
 ## Still to do
 
-- Confirm sufficient shared Modal rendering allowance for additional live reviewers. It is separate from Meta credits; reaching it stops new audio/video renders, not the already published recordings. See [Operations](OPERATIONS.md).
 - The final submission is the maintainer's.
+
+## Modal allowance
+
+The app now supports an explicit funded opt-in to a separate $25 Modal lifetime ceiling, retaining earlier reservations; unconfigured deployments stay at $0.90. This addresses the earlier low rendering allowance without resetting accounting. Provider funding and spending controls must be verified separately; account evidence remains private. See [Operations](OPERATIONS.md).
 
 ## Publication
 

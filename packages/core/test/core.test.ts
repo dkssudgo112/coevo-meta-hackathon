@@ -176,14 +176,37 @@ test('budget charges per day and caps', () => {
   assert.equal(lifetimeCap('2.5'), 2.5, 'the earlier lower ceiling is still respected if configured');
   assert.equal(lifetimeCap('1000'), 100, 'configuration can never raise it above the approved total');
   assert.equal(lifetimeCap('-5'), 100);
-  assert.equal(modalCap('5'), 0.9, 'Modal keeps its separate $0.90 ceiling');
-  assert.equal(modalCap('100'), 0.9);
+  assert.equal(modalCap(undefined), 0.9, 'unconfigured deployments retain the earlier safe ceiling');
+  assert.equal(modalCap('25'), 25, 'funded deployments must explicitly opt in');
+  assert.equal(modalCap('100'), 25, 'configuration cannot exceed the funded operating ceiling');
   assert.equal(PRICES.samPerImage, 0.0025, 'SAM 3.1 price unchanged');
   assert.equal(PRICED_MODELS.segment['sam-3.1'].perImage, 0.0025);
   assert.equal(CAPS.workspacePerDayUsd, 0.6);
   assert.equal(CAPS.sampleWorkspaceUsd, 0.3);
   assert.equal(st.spentUsd, 0.5);
   assert.ok(Math.abs(sparkCost({ input_tokens: 1_000_000, output_tokens: 0 }) - 1.25) < 1e-9);
+});
+
+test('Modal funding opt-in fails safely and preserves a pre-existing lifetime ledger', () => {
+  for (const value of [undefined, '', '  ', 'abc', '-1', 'Infinity', 'NaN']) assert.equal(modalCap(value), 0.9);
+  assert.equal(modalCap('0'), 0, 'an explicit zero disables new media reservations');
+  assert.equal(modalCap('0.5'), 0.5);
+  assert.equal(modalCap(' 25 '), 25);
+  assert.equal(modalCap('1000'), 25);
+  const previous = { spentUsd: 1.4, reservations: 7, since: '2026-10-26T00:00:00.000Z' };
+  assert.equal(ledgerReserve(previous, 0.04, modalCap('0')).ok, false);
+  let ledger = previous;
+  let accepted = 0;
+  for (let i = 0; i < 700; i++) {
+    const r = ledgerReserve(ledger, 0.04, modalCap('25'));
+    if (r.ok) { ledger = r.ledger; accepted++; }
+  }
+  assert.equal(accepted, 590);
+  assert.ok(ledger.spentUsd <= 25 + 1e-9);
+  assert.equal(ledger.since, previous.since);
+  assert.equal(ledger.reservations, previous.reservations + accepted);
+  assert.equal(ledgerReserve(ledger, 0.04, modalCap('25')).ok, false);
+  assert.equal(lifetimeCap('1000'), 100, 'the Meta ceiling remains independent');
 });
 
 test('wav encoding produces 16-bit mono with correct duration', () => {

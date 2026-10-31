@@ -10,6 +10,7 @@
 
 const [, , base = 'http://127.0.0.1:8790', phase = 'fill'] = process.argv;
 const CAP = Number(process.env.EXPECT_CAP ?? 100);
+const MODAL_CAP = Number(process.env.EXPECT_MODAL_CAP ?? 0.9);
 // External reservations are at most $1 each, so a large ceiling is filled in $1 steps.
 const STEP = CAP >= 10 ? 1 : 0.02;
 const token = process.env.BUDGET_TEST_TOKEN ?? 'local-budget-test-token-0123456789';
@@ -43,7 +44,7 @@ if (phase === 'fill') {
   const start = await ledger();
   writeFileSync(PENDING, JSON.stringify({ ticket: c.ticket, since: start.meta.since, reservations: start.meta.reservations }));
   check(CAP === 100 ? 'configured $1000 is clamped to the $100 approved total' : `a lower configured limit ($${CAP}) is respected`, start.meta.capUsd === CAP, `cap ${start.meta.capUsd}`);
-  check('Modal ledger is separate with its own ceiling ≤ $0.90', start.modal.capUsd <= 0.9, `cap ${start.modal.capUsd}`);
+  check('Modal ledger has its separately configured ceiling', start.modal.capUsd === MODAL_CAP, `cap ${start.modal.capUsd}`);
   const room = CAP - start.meta.spentUsd;
   const n = Math.ceil(room / STEP) + 40;
   const results = await Promise.all(Array.from({ length: n }, () => reserve(STEP)));
