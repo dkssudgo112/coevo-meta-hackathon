@@ -1,3 +1,5 @@
+import { STATIC_MEDIA_LENGTHS } from './media-sizes.ts';
+
 /**
  * Static media answer byte-range requests: Safari plays video only from 206 responses, and the asset
  * store returns the whole file. Slice the stream, not a file-sized array: several
@@ -41,10 +43,13 @@ export async function serveAsset(req: Request, assets: Pick<Fetcher, 'fetch'>): 
     out.headers.set('Accept-Ranges', 'bytes');
     return out;
   }
-  const size = Number(res.headers.get('Content-Length'));
+  // The deployed asset binding omits Content-Length even though the final edge response adds it.
+  // Build-time sizes of the same published files let us stream ranges without reading them twice.
+  const length = res.headers.get('Content-Length');
+  const size = length === null ? STATIC_MEDIA_LENGTHS[new URL(req.url).pathname] : Number(length);
   // An unknown or encoded representation cannot be sliced truthfully. HTTP allows
   // ignoring Range and serving the complete response; never buffer to guess its size.
-  if (!res.body || !res.headers.has('Content-Length') || !Number.isSafeInteger(size) || size < 0 || res.headers.has('Content-Encoding')) return res;
+  if (!res.body || !Number.isSafeInteger(size) || size < 0 || res.headers.has('Content-Encoding')) return res;
   const start = m[1] === '' ? Math.max(0, size - Number(m[2])) : Number(m[1]);
   const end = m[1] === '' || m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
   if (start >= size || start > end) {

@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { serveAsset } from '../src/assets.ts';
+import { STATIC_MEDIA_LENGTHS } from '../src/media-sizes.ts';
+import { statSync } from 'node:fs';
 
 const body = new Uint8Array(Array.from({ length: 100 }, (_, i) => i));
 const store = { fetch: async (req: Request | string) => new Response(new URL(typeof req === 'string' ? req : req.url).pathname.endsWith('.mp4') || new URL(typeof req === 'string' ? req : req.url).pathname.endsWith('.m4a') ? body : 'page', { status: 200, headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(body.length) } }) } as unknown as Fetcher;
@@ -57,6 +59,17 @@ test('unknown-length assets pass through without buffering or claiming a range',
   assert.equal(r.status, 200);
   assert.equal(r.headers.has('Content-Range'), false);
   assert.deepEqual(new Uint8Array(await r.arrayBuffer()), body);
+});
+
+test('published media sizes match the files and provide ranges when the binding omits length', async () => {
+  for (const [path, size] of Object.entries(STATIC_MEDIA_LENGTHS)) {
+    assert.equal(statSync(new URL('../../web/public' + path, import.meta.url)).size, size);
+    const binding = { fetch: async () => new Response(body) } as unknown as Fetcher;
+    const res = await serveAsset(new Request('https://x.test' + path + '?v=reviewed', { headers: { Range: 'bytes=0-9' } }), binding);
+    assert.equal(res.status, 206);
+    assert.equal(res.headers.get('Content-Range'), `bytes 0-9/${size}`);
+    assert.deepEqual(new Uint8Array(await res.arrayBuffer()), body.slice(0, 10));
+  }
 });
 
 test('whole-file media says it accepts ranges; a range past the end is 416; pages pass through', async () => {

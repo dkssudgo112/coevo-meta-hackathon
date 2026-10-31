@@ -16,7 +16,7 @@
     "dev:api": "wrangler dev --local --ip 127.0.0.1 --port 8788",
     "dev:web": "npm run dev --workspace @coevo/web",
     "typecheck": "tsc --noEmit -p tsconfig.api.json && npm run typecheck --workspace @coevo/web",
-    "build": "npm run build --workspace @coevo/web && wrangler deploy --dry-run --outdir dist/worker",
+    "build": "node scripts/media-sizes.mjs && npm run build --workspace @coevo/web && wrangler deploy --dry-run --outdir dist/worker",
     "verify": "npm run typecheck && npm test && npm run build && npm run test:release && npm run doctor",
     "meta:models": "node scripts/meta-check.mjs models",
     "meta:smoke": "node scripts/meta-check.mjs smoke",
